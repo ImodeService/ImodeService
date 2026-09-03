@@ -1,0 +1,18 @@
+[
+  {
+    "id": "SP-DEMO-001",
+    "partNo": "SP-HO500WT-FUSE",
+    "name": "Fuse 5A 250V",
+    "supplier": "Thai Electric",
+    "unit": "ชิ้น",
+    "currentQty": 2,
+    "minQty": 3,
+    "maxQty": 12,
+    "reorderPoint": 4,
+    "leadTimeDays": 3,
+    "location": "ชั้น A1",
+    "modelTags": "HO500WT",
+    "machineIds": [],
+    "note": "อะไหล่ไฟฟ้าหลัก"
+  }
+]

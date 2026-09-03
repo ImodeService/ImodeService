@@ -1,0 +1,16 @@
+[
+  {
+    "id": "PC-DEMO-001",
+    "docNo": "PC-202608-001",
+    "date": "2026-08-30",
+    "requester": "อภิชาติ ปิมแปง",
+    "category": "อะไหล่",
+    "purpose": "ซื้อฟิวส์สำรองและคอนเนคเตอร์ใช้ในงาน Service",
+    "vendor": "ร้านช่างไฟบางนา",
+    "amount": 1250,
+    "status": "รอเคลียร์",
+    "reference": "REC-001",
+    "note": "TEST DATA",
+    "receipts": []
+  }
+]

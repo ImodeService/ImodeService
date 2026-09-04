@@ -5,3 +5,5 @@ Sidebar Top Align Fix
 - คง Navigation / Hover / Active state เดิม
 - ไม่เปลี่ยน Mobile drawer
 - ไม่เปลี่ยนข้อมูล LocalStorage / Supabase
+
+โย่วว ผม copilot

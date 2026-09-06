@@ -1,0 +1,1265 @@
+# I-MODE Plus Service & Maintenance — Claude Code Project Memory
+
+## Role
+
+You are the coding agent for an existing project:
+
+I-MODE Plus Service & Maintenance
+Current release: V6.8 Service focus
+
+Your job is to safely maintain and incrementally improve the existing system.
+
+The current code and behavior are the source of truth.
+
+Investigate before answering.
+
+Never speculate about code that you have not inspected.
+
+When the user refers to a function, page, module, bug, or UI element:
+read/search the actual current implementation before making claims.
+
+---
+
+## Critical Working Rule
+
+Do not start by refactoring.
+
+Use this sequence:
+
+INSPECT
+→ TRACE
+→ PLAN
+→ EDIT
+→ VALIDATE
+→ REGRESSION CHECK
+→ REPORT
+
+Prefer the minimum implementation needed for the requested task.
+
+Do not create abstractions, helpers, files, or frameworks for hypothetical future requirements.
+
+---
+
+## Project Scope
+
+This is a Service & Maintenance management system.
+
+Main business workflow:
+
+Customer / LINE OA / Phone / Email
+→ Customer Master
+→ Machine Master
+→ Service Case
+→ Quotation if needed
+→ Technician Assignment
+→ Calendar
+→ Field Service
+→ Service Report
+→ QC
+→ Warranty / Machine Documents
+→ Close Case
+→ Dashboard / Reports
+
+CRM and Sales CRM are explicitly out of scope.
+
+Never reintroduce CRM unless the user explicitly changes project scope.
+
+---
+
+## Application Architecture
+
+Current main application entrypoint:
+
+`index.html`
+
+Expect:
+
+- large inline CSS
+- large inline JavaScript
+- multiple IIFEs
+- functions assigned to `window`
+- duplicated definitions
+- later patches overriding earlier implementations
+- localStorage persistence
+- optional Supabase synchronization
+
+Never assume the first matching function is active.
+
+Search the full workspace and identify the effective current implementation.
+
+---
+
+## Version
+
+Keep:
+
+V6.8
+Service focus
+
+This is what `index.html` actually ships: `<title>… · V6.8 Service focus</title>`, the
+topbar `Service focus · V6.8`, and the sidebar block `Version 6.8 / Service focus`.
+An earlier note in this file said "Service UAT"; that was wrong and has been corrected.
+
+Do not bump or rename the release, and do not revert it to "V6.8 UAT", unless explicitly
+requested.
+
+---
+
+## Design Language
+
+Preserve:
+
+- professional white UI
+- I-MODE blue
+- orange primary/action accents
+- mild dimensional button effect
+- V5.17-like header direction
+- V6.7.1-like sidebar behavior
+- responsive desktop/tablet/mobile
+- TH/EN
+- font scaling
+
+Do not redesign unrelated pages.
+
+Do not redesign Settings responsive layout unless explicitly requested.
+
+---
+
+## Modules
+
+Current functional areas include:
+
+Dashboard
+Customers
+Machines
+Service Cases
+Quotation
+Onsite / Work Site Pricing
+Service Maintenance
+Calendar
+Field Service
+Machine QC
+Spare Parts
+Purchase Orders
+Petty Cash
+Warranty
+Machine Documents
+Notifications
+Reports
+Settings
+Customer Portal / QR / LINE OA
+
+Preserve existing modules unless explicitly instructed otherwise.
+
+---
+
+## Technician Role
+
+Normal Technician experience should focus on approximately:
+
+1. My Work / Technician Home
+2. Calendar
+3. Field Service
+4. Machine QC
+5. Parts for Job
+6. Machine Information / Documents
+7. My Expenses
+8. My Reports
+
+Technicians generally should not manage:
+
+Quotation Approval
+Pricing Configuration
+Purchase Orders
+Department Petty Cash
+User Management
+Settings
+Cloud/Supabase
+Company-level Reports
+
+Field Service is the technician's main workspace.
+
+---
+
+## Field Service
+
+Expected workflow:
+
+Assigned
+→ Appointment
+→ Traveling
+→ Arrived
+→ GPS Check-in
+→ Inspection
+→ PM / Maintenance / Service
+→ Repair
+→ Waiting Parts if needed
+→ Testing
+→ Customer Acceptance
+→ Signatures
+→ Service Report
+→ Finish
+
+Existing statuses:
+
+กำลังเดินทาง
+ถึงหน้างาน
+เริ่มตรวจเช็ก
+กำลัง PM / Maintenance
+กำลังซ่อม Service
+รออะไหล่
+ทดสอบเครื่อง
+รอลูกค้าตรวจรับ
+จบงาน
+
+Existing capabilities include:
+
+- GPS Check-in
+- status timeline
+- media evidence
+- Before / After photos
+- video
+- PM/Service checklist
+- diagnosis
+- work performed
+- recommendation
+- replaced parts
+- customer signature
+- technician signature
+- next PM date
+- Service Report
+
+Priority future improvements:
+
+P1:
+- Timesheet / Work Time Tracking
+- Parts Request / Issue / Return
+- Closing Gate validation
+
+Prefer extending Field Service rather than creating redundant modules.
+
+---
+
+## Service Case
+
+Default statuses:
+
+เคสใหม่
+→ มอบหมายแล้ว
+→ นัดหมายแล้ว
+→ กำลังดำเนินการ
+→ รออะไหล่
+→ รอส่งงาน
+→ เสร็จสิ้น
+→ ปิดเคส
+
+However:
+
+`รออะไหล่` is conditional.
+
+Do not implement a workflow that forces all cases through that state.
+
+Support logical branches.
+
+---
+
+## Machine Master
+
+Machine Master links to:
+
+Customer
+Service Case
+Quotation
+QC
+Warranty
+Documents
+Spare Parts
+Service History
+Customer Portal / QR
+
+Machine pagination must be preserved:
+
+10 / 25 / 50 / 100 / All
+
+Preserve:
+
+Search
+Service Filter
+Warranty Filter
+Size Filter
+Previous
+Next
+Page numbers
+
+Do not modify Serial, Customer, Warranty, Service Status, or other machine identity fields merely to fit UI behavior.
+
+---
+
+## Machine Image Logic
+
+Priority:
+
+actual `m.photo`
+→ exact-model reference
+→ machine-family reference
+→ No Image
+
+Reference images must not overwrite persisted `m.photo`.
+
+Use `object-fit: contain` for product reference images.
+
+---
+
+## Machine QC
+
+Types:
+
+Incoming Inspection
+Pre-Delivery QC
+Post-Service QC
+Installation Acceptance
+PM Verification
+
+Statuses:
+
+Draft
+In Progress
+Pass
+Conditional
+Fail
+
+Checklist:
+
+Pending
+Pass
+Fail
+N/A
+
+QC is linked:
+
+Customer
+→ Machine
+→ Service Case
+→ QC
+
+Keep the Thai two-page QC document.
+
+Page 1:
+General information / Checklist / Result / Signatures
+
+Page 2:
+Evidence / damage / missing equipment / Findings / Corrective Action / photos
+
+Videos do not need to print.
+
+Historical scope bug to verify:
+
+`window.qcDocHTML()` previously called a `qcTypeThai()` defined in another IIFE.
+
+Do not patch this blindly.
+
+First inspect whether the current active implementation still has this scope error.
+
+If it does:
+apply a minimal scope fix.
+
+Do not redesign QC.
+
+---
+
+## Quotation
+
+Service Quotation may use:
+
+Customer
+Service Case
+Machine
+Size
+Service Type
+Travel
+Google Maps
+Urgency
+Warranty
+Parts
+Labor
+Discount
+VAT
+
+No Sales CRM.
+
+Onsite pricing must not silently overwrite an existing quotation.
+
+Require explicit user action.
+
+---
+
+## Onsite Pricing
+
+Service Levels:
+
+S = 500 THB
+M = 1,000 THB
+L = 1,500 THB
+
+Travel:
+
+0–15 = 250
+16–30 = 400
+31–50 = 600
+51–80 = 900
+81–120 = 1,300
+121–180 = 1,900
+>180 = 10 THB/km or manual
+
+Formula:
+
+Service Level
++ Travel
++ Spare Parts
++ Actual Cost
+
+---
+
+## Spare Parts
+
+Current concepts:
+
+Part No.
+Name
+Supplier
+Unit
+Current Qty
+Min
+Max
+Reorder Point
+Lead Time
+Location
+Machine mapping
+
+PO states:
+
+รออนุมัติ
+สั่งซื้อแล้ว
+รับเข้าแล้ว
+ยกเลิก
+
+Future Technician Parts flow:
+
+Request
+→ Reserve
+→ Issue
+→ Use
+→ Return
+→ Actual Stock Movement
+→ Service Report
+
+Do not expose unrestricted purchasing features to a normal Technician.
+
+---
+
+## Petty Cash
+
+Statuses:
+
+รอเคลียร์
+เคลียร์แล้ว
+ยกเลิก
+
+Technician UX should eventually use:
+
+My Expenses
+
+linked to Service Case.
+
+---
+
+## Warranty
+
+Warranty connects:
+
+Customer
+Machine
+Serial
+Service history
+
+Preserve warranty certificate/document functionality.
+
+---
+
+## Machine Documents
+
+Categories include:
+
+Operating Manual
+Technical Datasheet
+Electrical Diagram
+Mechanical Drawing
+PM Checklist
+SOP / Work Instruction
+Software / Firmware
+Calibration / Certificate
+Spare Parts List
+Training Material
+
+---
+
+## Customer Portal
+
+Customer Portal / QR / LINE OA must remain separate from the internal application UI.
+
+Customer actions may include:
+
+- report problem
+- request quotation
+- warranty check
+- warranty quotation
+- service history
+- machine documents
+- contact Service
+
+Preserve existing portal mode behavior.
+
+---
+
+## Responsive Requirements
+
+Desktop:
+normal sidebar/topbar/table workflow.
+
+Mobile:
+drawer
+compact topbar
+bottom navigation
+mobile cards
+no horizontal topbar overflow
+
+Do not regress Calendar mobile behavior.
+
+Do not redesign Settings mobile layout.
+
+---
+
+## Assets
+
+Use:
+
+`./assets/Iconservice.png`
+for favicon
+
+`./assets/imode-ui-logo-v532.png`
+for internal UI/sidebar
+
+`./assets/imode-document-logo.webp`
+for documents / QR / QC
+
+Never swap these roles.
+
+GitHub Pages is case-sensitive.
+
+---
+
+## localStorage Safety
+
+Preserve these keys:
+
+`imode_test_v532_cases`
+`imode_v5_tech`
+`imode_test_v532_customers`
+`imode_test_v532_machines`
+`imode_test_v532_notifications`
+`imode_test_v532_quotes`
+`imode_v5_settings`
+`imode_v5_cloud`
+`imode_v5_current_user`
+`imode_test_v532_warranties`
+`imode_test_v532_machine_documents`
+`imode_test_v532_line_requests`
+`imode_test_v532_service_reports`
+`imode_v66_qc_records`
+`imode_v67_petty_cash`
+`imode_v67_spare_parts`
+`imode_v67_purchase_orders`
+
+Added by the login system (2026-09-07), same rules apply:
+
+`imode_v69_session`
+`imode_v69_auth_audit`
+`imode_v69_auth_lock`
+`imode_v69_local_pw`
+`imode_v69_sb_auth`
+
+Clearing `imode_v69_session` signs the user out; clearing `imode_v69_local_pw` restores
+the built-in UAT passwords. Neither destroys business data.
+
+Never run:
+
+`localStorage.clear()`
+
+Do not perform destructive migrations unless explicitly requested.
+
+---
+
+## Supabase Safety
+
+Do not change:
+
+- project URL
+- Anon / Publishable key
+- table names
+- cloud configuration
+
+without explicit request.
+
+Never add service-role credentials to frontend code.
+
+Existing cloud areas can include:
+
+service_cases
+technicians
+customers
+machines
+notifications
+system_settings
+quotations
+machine_warranties
+machine_documents
+line_customer_requests
+service_reports
+
+---
+
+## Git / Deployment
+
+Deployment is currently UAT-oriented using GitHub Pages.
+
+Project/repository is associated with:
+
+`ImodeService`
+
+Use relative asset paths.
+
+Be careful with filename casing.
+
+Do not change Pages configuration without explicit instruction.
+
+For meaningful changes:
+
+prefer a feature branch unless the user's workflow explicitly says otherwise.
+
+Never auto-merge a PR unless requested.
+
+---
+
+## Editing Policy
+
+For each requested task:
+
+### Inspect
+
+Read the relevant current files.
+
+Search relevant function names and IDs.
+
+Search for duplicates.
+
+Understand persistence and side effects.
+
+### Plan
+
+State the smallest safe implementation.
+
+### Edit
+
+Modify only necessary code.
+
+Avoid unrelated cleanup.
+
+### Validate
+
+Check inline JavaScript syntax.
+
+Run appropriate tests.
+
+Inspect runtime scope.
+
+### Regression
+
+Check affected desktop and mobile behavior.
+
+Check persistence.
+
+Check asset paths.
+
+### Report
+
+Summarize:
+
+- files changed
+- active functions changed
+- behavior changed
+- validation run
+- remaining risk
+
+---
+
+## JavaScript Validation
+
+The application contains multiple inline scripts.
+
+After JS changes:
+
+extract inline scripts without `src`
+
+and syntax-check them with:
+
+`node --check`
+
+Also review:
+
+ReferenceError
+IIFE scope
+duplicate const/let
+undefined global
+function override order
+
+Do not treat syntax success as proof of runtime correctness.
+
+---
+
+## Do Not Do These
+
+Do not:
+
+- rewrite the application
+- migrate frameworks
+- clean unrelated legacy code
+- rename everything
+- reset user data
+- change storage keys
+- change Supabase settings
+- change database schema without approval
+- remove modules
+- add CRM
+- change Version
+- redesign unrelated pages
+- create unnecessary helper scripts
+- hard-code secrets
+
+---
+
+## New Session Startup
+
+At the start of a new project session:
+
+1. Read this CLAUDE.md.
+2. Inspect the current repository.
+3. Inspect the active `index.html`.
+4. Do not edit yet unless the user already requested a specific change.
+5. Ground all statements in the actual current code.
+
+If asked only to understand the project, report:
+
+- project structure
+- architecture
+- modules
+- persistence
+- active JS sections
+- overridden/duplicate functions
+- Service workflow
+- Technician workflow
+- risks / technical debt
+
+Then wait.
+
+If the user gives a specific task, investigate first and then proceed with the smallest safe change.
+
+---
+
+## Session Change Log — 2026-09-05 → 2026-09-06
+
+All edits were made in `index.html` (single file). No storage key was renamed, no Supabase
+setting was touched, no user data was reset.
+
+### 1. Modal close policy
+
+- Codex had added a stripper inside `openModal()` that deleted every "ยกเลิก" button.
+  That stripper was **removed** — the modal body HTML is now passed through untouched.
+- The accidental-close guard stays where it was, in the `v671QcQrResponsiveFixScript`
+  IIFE (~line 5836): backdrop click and Esc are blocked **only** when
+  `modalHasDataEntry()` returns true. Read-only detail popups still close normally.
+- Rule to remember: "ต้องกดกากบาทเท่านั้น" means *block the accidental close paths on
+  data-entry forms*. It does **not** mean deleting the explicit Cancel button.
+- Verified across all 29 data-entry modals. Four settings modals (Travel, Roles,
+  Typography, DataBackup) have no Cancel button by original design — left as-is.
+
+### 2. Cases page
+
+- **KPI status cards** replace the old status dropdown, reusing the QC page pattern.
+  `renderCaseStatusKpis()` fills `#caseStatusKpis` with `.module-kpi-card` buttons inside
+  a new `.case-kpi-grid`. Card 0 is "เคสทั้งหมด", then one card per status from
+  `caseFilterStatuses()`. Counts respect the active search + priority filter. Click calls
+  `selectCaseStatus()`; the active card is marked `aria-pressed="true"`.
+- Grid sizing: `auto-fit, minmax(112px, 1fr)`, with breakpoints at 1500px → 5 columns,
+  900px → 3, 640px → 2. All 9 cards fit one row at 1920px.
+- `casePriorityFilter` is a dropdown that shows a count per priority.
+- Each case row has a "สร้างใบเสนอราคา" button, and the whole row is clickable to open
+  the case.
+- The duplicated "เคสงานบริการ" title was removed from the panel head.
+
+### 3. Shared list pagination — 8 pages
+
+Two page-specific pagination implementations were replaced by one shared helper:
+`paginateList()`, `renderListPager()`, `setListLimit()`, `setListPage()`,
+`listPagerState()`, `listPagerRerender()`, `listPageItems()`, driven by
+`LIST_PAGER_CONFIG`.
+
+Registered keys: `cases`, `customers`, `qc`, `quotation`, `warranty`, `documents`,
+`spareParts`, `pettyCash`.
+
+- HTML id convention: `<key>DisplayLimit` / `<key>TotalCount` / `<key>Pagination`.
+  The cases ids were renamed to `casesDisplayLimit` / `casesTotalCount` /
+  `casesPagination` to fit this convention.
+- Markup reuses the existing `machine-pagination` / `machine-page-*` CSS classes.
+- Limits are 10 / 25 / 50 / 100 / All, matching the machines page.
+- **The machines page keeps its own original pager** — it was not migrated, and the rule
+  that its 10/25/50/100/All pagination must be preserved still stands.
+
+### 4. Machines
+
+- **KPI cards added**, inside the `v68MachineLimitQcActionFix` IIFE:
+  `renderMachineKpis()` plus `window.setMachineKpiFilter(kind, value)`, called at the top
+  of `window.renderMachines`. Five cards: เครื่องทั้งหมด / ต่อ Service / ไม่ต่อ Service /
+  อยู่ในประกัน / หมดประกัน.
+- **Machine size is now S / M / L** (M was missing). Added `normalizeMachineSize()`, an
+  M option in `maSize` and `machineSizeFilter`, the `Medium Machine` mapping in
+  `saveMachine` and `setQuoteMachineSize`, M in the quote size picker, and a green
+  `.machine-size-badge.M`.
+- Pricing note: the `machineRate` at ~line 5279 handles only S and L and returns 0
+  otherwise, but it is **dead code** — `window.machineRate` at ~line 5766 overrides it and
+  resolves `c[prefix + size]`, so M reads `onsiteM / workshopM / diagnosisM / nextM /
+  laborM` from the existing rate config. Verified M = 2250 / 1150 / 750 / 1150.
+
+### 5. Quotation — Google Maps button
+
+- The button was correct; there was simply no Google Maps API key configured. Added a
+  free no-key fallback: `quoteMapsPoint()`, `quoteDirectionsUrl()`, `openQuoteDirections()`
+  build a `https://www.google.com/maps/dir/?api=1` URL. A customer's own `mapUrl` wins if
+  it is set.
+- **Regression fixed:** `quoteCustomerChanged()` (~line 5331) calls
+  `calculateQuoteDistance(false)` automatically, so the first version of the fallback
+  opened a Maps tab merely by selecting a company. The tab now opens only when
+  `showToast === true`, which only the 📍 button passes.
+- The error/catch branch also offers an "เปิด Google Maps" button.
+
+### 6. Layout cleanup
+
+- `PAGE_INFO` hero subtitles moved (th/en at ~line 4159; petty-cash and spare-parts at
+  ~lines 5830-5833).
+- Duplicate `.plain-module-intro` blocks and duplicate panel `<h3>` titles removed from:
+  qc, petty-cash, spare-parts, technicians, machines, quotation, customers, warranty,
+  documents, cases.
+- Action buttons moved out of the standalone top rows and into the `.panel-head` row on:
+  QC, petty cash, spare parts, customers, technicians (the team segment moved up too),
+  and reports ("📄 ตั้งค่ารายงาน" now sits in the "สรุปประสิทธิภาพงาน Service" panel head).
+  The emptied `.plain-module-intro` / `.module-action-row` / `.team-toolbar` wrappers were
+  deleted.
+
+### 7. Codex hand-off items
+
+All five items Codex started were confirmed code-complete and then verified in a headless
+browser: quotation button per case row, clickable case row, status filter buttons,
+data-entry popups that resist backdrop/Esc, and the merged date+time picker.
+
+### Validation harness
+
+Built in the session scratchpad (deliberately **not** added to the repo, per the
+"no unnecessary helper scripts" rule):
+
+- `syntax-check.js` — extracts every inline `<script>` and runs `node --check` on it
+- `ui-check.js` — headless Chrome over CDP against a local static server, with CDN,
+  Supabase and Maps requests blocked; runs `ui-assertions.js`; pass `mobile` for 390×844
+- `shot.js` / `shot-wide.js` — clipped screenshots for layout checks
+
+### Verified facts about the current build
+
+- **No routing.** `pushState | replaceState | popstate | hashchange | history.back` has
+  **zero** matches. `goPage()` only toggles `.page.active`. The only URL handling is
+  `initPortalFromUrl()` reading `?machineToken=` and `#/customer-portal`.
+- **No audit / SLA / approval engine.** `audit.view` is a permission label in the roles
+  table, `sla.autoEscalateMin` is a settings value, and `bhAudit` is a toggle in the
+  System Behavior modal. Nothing writes an audit log or escalates a case.
+- **Four disconnected identity sets:** `demoUsers` (8, hard-coded), `technicians`
+  (`imode_v5_tech`, T001–T003), `settings.relatedEmployees` (EMP-*), and `customers`
+  (CUST-*). `currentUser` links to none of them; Field Service matches the logged-in
+  technician by **name string**. There is no logout, no password field, and no Customer
+  role yet.
+
+### Deferred / open
+
+- **UAT accounts and roles** (`admin_test`, `technician_test1`, `technician_test2`,
+  `customer_test1`). Already decided: a plain UAT login with hashing;
+  `enforceRolePermissions` stays `false` for now; the customer sees their own company's
+  machines, i.e. the post-QR-scan page. Still undecided: which technician records
+  `technician_test1/2` map to, and which customer `customer_test1` maps to.
+- The `Admin / Coordinator` role has no `quotation.create` permission — to be discussed
+  together with the account work.
+- UAT passwords stored client-side are visible in DevTools. They must never be real staff
+  passwords.
+
+### UI spec documents (11 PDFs, v1.0 • 15 Aug 2026) — gap summary
+
+Reviewed for understanding only; no code was changed to match them. The specs define
+10 modules / 39 popups / 96 web pages / 135 surfaces, a Popup-vs-WebPage decision
+standard, a Core Data Contract (Machine → Case → Owner → Status → Next Action), six
+mandatory system states, design tokens (sidebar 208px, topbar 72px, content 1440px,
+Primary `#0B63E5`, Navy `#073763`, Success `#079455`, Warning `#F79009`, Danger
+`#E31B2F`), telemetry events and a Definition of Done.
+
+Gaps against the current build: no routing to support the required Deep link / Browser
+Back / Breadcrumb on any page; no audit, SLA or approval engine; long multi-step forms
+live in modals rather than in web pages. Conversely the app has modules the master spec
+does not cover: QC, Petty Cash, Onsite Pricing (S/M/L plus travel zones Z0–Z6),
+standalone Warranty, and the Customer Portal / LINE OA. **The Calendar spec was not
+provided** (the master lists 4 popups / 6 web pages for it).
+
+---
+
+## Session Change Log — 2026-09-06 (part 2): UAT accounts & roles
+
+Added as one new patch script, `v68UatAccountsScript`, at the end of `index.html`.
+Additive only: no existing function body was rewritten, no storage key renamed, no
+Supabase setting touched. Every change lives inside the new IIFE, which wires itself in by
+overriding globals (`goPage`, `openUserLoginModal`, `renderCustomerPortal`,
+`initPortalFromUrl`) in the same patch-over-patch style the rest of the file uses.
+
+### Accounts
+
+| Username | Password | Role | Linked record |
+|---|---|---|---|
+| `admin_test` | `admin_test` | Admin / Coordinator | — |
+| `technician_test1` | `technician_test1` | Technician | `T001` สมชาย ใจดี |
+| `technician_test2` | `technician_test2` | Technician | `T002` ณัฐพล ช่างดี |
+| `customer_test<N>` | same as the username | Customer | `CUST-000<N>` |
+
+- Customer accounts are generated from the live `customers` array, so **every customer in
+  the system has a login**. The username comes from the numeric suffix of the customer id
+  (`CUST-0001` → `customer_test1`), never from the array position, so the mapping cannot
+  shift when a customer is added, removed or reordered. An id with no numeric suffix falls
+  back to a slug of the id.
+- `CUST-INTERNAL-IMODE` — created by `ensureInternalCustomer()` in the v67 IIFE for QC,
+  internal issue and spare-parts work — is **excluded**. It is I-MODE's own record, not an
+  external customer. It sits at index 0 of `customers`, which is why a position-based
+  username would have stolen `customer_test1` from รีกัล.
+- Current demo data: 11 customer rows → 10 customer accounts, 13 accounts in total.
+- `customer_test1` = `CUST-0001` = บริษัท รีกัล จิวเวลลี่ แมนูแฟคเจอร์ จำกัด (19 machines).
+
+### Passwords
+
+- Staff passwords are stored only as SHA-256 hex constants, so the plaintext is not in the
+  source. Customer accounts follow the documented UAT convention *password = username*,
+  hashed when the account registry is built.
+- `sha256()` is a self-contained synchronous implementation rather than `crypto.subtle`,
+  so the login also works when `index.html` is opened from `file://`, where
+  `crypto.subtle` is unavailable. Verified against node's `crypto` on 15 vectors,
+  including multi-block and UTF-8 input.
+- **This is a UAT-only client-side login, not real authentication.** The convention is
+  readable in the source. Never put a real staff password here.
+
+### Behavior
+
+- The login modal keeps everything it had — the 8 demo users and the manual-name form —
+  and the UAT username/password form is inserted above them. A collapsible list shows all
+  test accounts with the record each one maps to.
+- `admin_test` → the normal application, no forced page change.
+- `technician_test*` → opens Field Service on their own technician record. `currentUser.name`
+  is set to the technician's own name because Field Service matches by name string.
+- `customer_test*` → the post-QR-scan Customer Portal for their own company. `goPage()` is
+  wrapped so a customer session cannot leave the portal, the portal `×` becomes ออก
+  (logout), and when the company has more than one machine a picker above the machine card
+  switches between them. The portal actions themselves are unchanged.
+- A customer session is restored on reload, unless the URL carries a `machineToken` — a
+  scanned QR wins over the stored session.
+- `uatLogout()` clears `currentUser`, leaves portal mode and returns to the dashboard.
+  This is the application's first logout.
+
+### Field Service defect found (not fixed app-wide)
+
+`renderFieldService()` (~line 4871) starts with
+
+```js
+const cur=fieldTechSelect.value||fieldTechId||technicians[0]?.id||''
+```
+
+so the stale `<select>` value **wins over `fieldTechId`**. `openFieldService(tid)`
+therefore fails to switch technicians once the select has already been rendered. Rather
+than change that shared function, `openTechnicianWorkspace()` in the new script points the
+select at the technician before calling `openFieldService()`. **The underlying precedence
+bug is still there** and will affect any other caller that passes a technician id.
+
+### Permissions
+
+`enforceRolePermissions` is still `false`, as agreed. `settings.roles` has no `Customer`
+role, so a customer session is confined by the `goPage()` wrapper, not by the permission
+engine. Adding a real `Customer` role is still open, together with the missing
+`quotation.create` permission on `Admin / Coordinator`.
+
+### Validation
+
+- `node --check` on all 8 inline scripts: 0 failures.
+- Headless-Chrome suite, 49 assertions, at 1440×1000 and 390×844: all pass, with no
+  console errors and no page errors. It covers wrong-password and unknown-user rejection,
+  each account's link, portal confinement (`cases`, `settings`, `machines`, `quotation`
+  and `exitCustomerPortal` all bounce back), the machine picker, logout, and an actual
+  login for every generated customer account.
+- Regression suite, 16 assertions: cases KPI cards, the 8 shared pagers, machines KPI +
+  its own pager + the S/M/L filter, and the quotation Maps behaviour (no auto-open when a
+  customer is selected, opens on the 📍 button) all still pass.
+
+---
+
+## Session Change Log — 2026-09-06 (part 3): role-based Home Pages
+
+One new patch script, `v68RoleHomeScript`, at the end of `index.html`, plus three small
+edits inside `v68UatAccountsScript` so the Home Pages reuse the existing login instead of
+adding a second one. No new framework, no router, no new user / role / permission store.
+`index.html` is the only file changed. Version untouched.
+
+### New pages
+
+Injected into `<main>` by JS, so the giant existing markup was not edited:
+
+- `#page-home` — Admin / Technician Home
+- `#page-customer-home` — reached from a machine QR, before login
+- `#page-customer-login`
+
+`goPage()` is wrapped: it creates these pages on demand, toggles `body.rhome-mode` (which
+hides sidebar, topbar, hero and bottom nav), and renders the right one. Leaving a Home
+page restores the full application chrome.
+
+### Existing systems reused — nothing re-created
+
+- **Login validation:** `window.uatAuth.login()`, the same `sha256` check and account
+  registry from part 2. The Customer Login page calls it; it has no login of its own.
+- **Session:** the same `currentUser` global and `imode_v5_current_user` key.
+- **Roles:** `settings.roles` + `currentRoleConfig()`.
+- **Permissions:** the same precedence as the active `window.canPermission` — an enabled
+  `settings.userPermissions[<user key>]` entry wins, otherwise the role's `permissions`
+  array. Its `enforceRolePermissions` short-circuit is deliberately **not** applied,
+  because that toggle is off and the Home Page must still show only what the role grants.
+- **Navigation:** `goPage(name)`, wrapped, never replaced.
+- **QR:** the existing `?machineToken=` and `machineByQrToken()`.
+- **Portal:** `enterCustomerPortal()` from part 2.
+
+### Post-login destination
+
+`uatSubmitLogin` now calls `window.imodeRoleHomeAfterLogin()`, so staff — Admin and
+Technician — land on `#page-home`, not the Dashboard. Customers still go straight to their
+portal. `chooseUser` (the 8 demo users) and `saveManualUser` are wrapped so the legacy
+logins land on the Home Page too.
+
+### Admin / Technician Home
+
+One dominant centre circle; module circles at **varying** radii (factors 0.80–1.15 with
+per-index angle jitter) so the composition is organic rather than a perfect ring; one SVG
+connector line per circle with a mid-point node. Centre click → Dashboard. Small circle
+click → `goPage(<module>)`. No merge animation for staff. A `⌂` button is added to the
+topbar so staff can return Home.
+
+### Customer Home and the merge animation
+
+Entry state is explicit — `entryMode='customer-qr'`, set by the wrapped
+`initPortalFromUrl` — not inferred from how the page looks. The QR context card shows the
+machine name, model and serial. The seven circles are journey visuals only: they carry
+`aria-disabled="true"`, open no module, and only hint back to the centre.
+
+One click on the centre (the button then disables itself): the centre glows, connector
+lines fade, each circle travels to the centre on a 70 ms stagger while scaling to 0.18 and
+fading, the centre becomes **Customer**, pulses green, and after ~520 ms the page becomes
+`#page-customer-login`. Total ≈ 1.2 s for seven circles. Under
+`prefers-reduced-motion: reduce` the circles simply fade and the flow finishes in ~370 ms.
+
+### Customer Login
+
+Username / password against the shared auth. A staff account entered here is rejected and
+the session cleared. The LINE button renders **only** when LINE OA / LIFF is configured —
+there is no LINE authentication in this codebase, so with no config it is omitted rather
+than faked.
+
+### Field Service fix
+
+`renderFieldService()` prefers the existing `fieldTechSelect.value` over `fieldTechId`
+(recorded in part 2). Because technicians now reach Field Service from a Home circle
+instead of through `openTechnicianWorkspace()`, they were landing on **T001's** queue. The
+`goPage()` wrapper now points the select at `currentUser.technicianId` before the page
+renders, so a technician account always sees its own queue whichever entry point is used.
+
+### What the permission data currently produces
+
+- **Admin / Coordinator** → 15 circles: Dashboard, Service Cases, Customers, Machines, QC,
+  Calendar, Field Service, Service Maintenance, Warranty, Documents, Notifications,
+  Reports, Worksite, Spare Parts, Petty Cash.
+- **Technician** → 12 circles: the same, minus Worksite, Spare Parts and Petty Cash.
+- Neither shows **Settings** (no `settings.manage`) or **Quotation** (no `quotation.view`).
+
+`onsite`, `spare-parts` and `petty-cash` have no key in `PERMISSION_CATALOG`, so rather
+than invent one they follow a documented rule: they are shown to roles that can assign work
+or administer the system (`case.assign` / `settings.manage` / `users.manage`). Admin has
+`case.assign`; Technician does not.
+
+### Responsive and accessibility
+
+A wide 1000×700 coordinate stage on desktop and tablet, a tall 700×1000 one at ≤640px,
+re-rendered on breakpoint change; circle diameters clamp to ≥48px on mobile. Every circle
+is a real `<button>` with an `aria-label` and a visible `:focus-visible` ring, so keyboard
+Enter/Space work.
+
+Note on the header logo: `imode-ui-logo-v532.png` is a white wordmark made for the blue
+sidebar, so on the white Home header it is placed on a brand-coloured chip. Asset roles are
+unchanged.
+
+### Tests run
+
+- `node --check` on all 9 inline scripts: 0 failures.
+- Journey suite, 66 assertions, at 1440×1000, 768×1024 and 390×844, each with
+  `prefers-reduced-motion` both `no-preference` and `reduce` — six runs, all pass, no
+  console errors and no page errors. Covers admin and technician landing on Home rather
+  than Dashboard, chrome hidden, circles matching role permissions, centre → Dashboard,
+  circle → module, varying radii, one connector per circle; QR → Customer Home, journey
+  circles opening nothing, single-click merge with a repeat-click guard, circles
+  measurably travelling and scaling toward the centre, the centre becoming "Customer",
+  navigation to Customer Login, wrong password, a staff account rejected at the customer
+  door, a real customer login reaching their own portal, the back button, and an invalid
+  token showing a warning while leaking no serial.
+- Regression suite, 30 assertions, desktop and mobile: cases KPI cards, the 8 shared
+  pagers, machines KPI + own pager + S/M/L, quotation Maps behaviour, the modal Cancel
+  button and backdrop guard, the 13 UAT accounts, technician self-selection in Field
+  Service, the customer portal machine picker, the staff portal preview, all 17 existing
+  pages reachable, sidebar restored outside Home, no horizontal overflow, and both version
+  strings unchanged.
+
+### Limitations and risk
+
+1. **A machine QR now requires a login.** It previously opened the portal directly; it now
+   opens Customer Home and the visitor must sign in. This is the requested flow, but it is
+   a real behaviour change for anyone using the QR / LINE entry today.
+2. A logged-in customer who scans another company's QR still sees that machine's portal —
+   unchanged public-QR behaviour, not introduced here.
+3. Quotation and Settings do not appear on Admin Home because `Admin / Coordinator` holds
+   neither permission. Fix by ticking them in Settings → Roles, or by adding
+   `'quotation.view','quotation.create'` to the preset at `index.html:3922`.
+4. There is still no `Customer` role in `settings.roles`; a customer session is confined by
+   the `goPage()` wrapper, not by the permission engine, and `enforceRolePermissions`
+   remains `false`.
+5. No routing was added, so the Home Pages have no deep link and no browser Back — exactly
+   like every other page in this application.
+
+---
+
+## Session Change Log — 2026-09-07 (part 4): real login system
+
+The production database is not reachable yet, so the login was built around a **provider
+seam** instead of being wired to one backend. The application only ever calls `ImodeAuth`;
+what verifies the password underneath is swappable, so pointing this at the real database
+later is a configuration change, not a rewrite.
+
+### New files — the first code outside `index.html`
+
+| File | Purpose |
+|---|---|
+| `auth/auth-core.js` | session, absolute expiry, idle timeout, lockout, audit, offline grace |
+| `auth/auth-local.js` | offline / UAT provider — delegates to `window.uatAuth`, no second password check |
+| `auth/auth-supabase.js` | Supabase Auth provider — server-side bcrypt, JWT, reset mail |
+| `auth/auth-integration.js` | wires `ImodeAuth` into the app; the only file that knows both sides |
+| `supabase/01-schema.sql` | `profiles`, `auth_audit`, RLS helper functions |
+| `supabase/02-rls.sql` | Row Level Security for all 11 tables |
+| `supabase/03-users.sql` | links accounts to app records + verification queries |
+| `supabase/README.md` | step-by-step handover for IT |
+
+Loaded with classic `<script src>`, **not** ES modules, so `index.html` still opens from
+`file://` — verified in a headless browser: providers register, sign-in works, no errors.
+
+### New localStorage keys (additive; no existing key was read differently or renamed)
+
+| Key | Owner | Holds |
+|---|---|---|
+| `imode_v69_session` | auth-core | the cached session |
+| `imode_v69_auth_audit` | auth-core | sign-in audit ring buffer (200 entries) |
+| `imode_v69_auth_lock` | auth-core | failed-attempt and lockout state |
+| `imode_v69_local_pw` | auth-local | password-hash overrides from "change password" |
+| `imode_v69_sb_auth` | auth-supabase | Supabase tokens (managed by supabase-js) |
+
+`imode_v5_current_user` keeps its old meaning and is still written by `saveLocal()`.
+
+### Changes inside `index.html`
+
+Three small edits, all in `v68UatAccountsScript` and `v68RoleHomeScript`:
+
+- `window.uatAuth` gained `verify`, `findAccount`, `accountToUser`, `hash` and
+  `setSessionUser`. `verify()` checks a password **without** touching the session, so the
+  provider layer owns session creation instead of the registry.
+- `submitCustomerLogin()` on the Customer Login page now calls `window.imodeSignIn`, so
+  the customer door uses the same provider, lockout, expiry and audit as the staff door.
+- Four `<script src>` tags before `</body>`.
+
+### What the login now does
+
+- **Absolute expiry** 12 h, **idle timeout** 4 h, **offline grace** 7 days — all in
+  `settings.authConfig`, all enforced in `auth-core.js`.
+- **Lockout** after 5 failed attempts for 15 minutes, per username. Browser-side, so it
+  slows a person at the keyboard; Supabase's own rate limit is the one that counts.
+- **Audit trail** of sign-in / sign-out / change-password, kept on the device and pushed
+  to `auth_audit` when a server provider is active.
+- **Password policy**: at least 8 characters, letters and digits, not equal to the username.
+- **Change password** works on both providers. On `local` it stores a hash override for
+  that device; `ImodeAuthLocal.resetLocalOverride(username)` undoes it.
+- **Offline banner** appears while a session is alive only because the device is offline.
+- **Session migration**: anyone already signed in when this shipped keeps their session
+  rather than being kicked out, but it now expires like any other.
+
+### Deliberate design decisions
+
+- **When Supabase Auth is configured, the local UAT accounts stop working.** Leaving them
+  enabled beside a server check would be a documented way around it.
+  `settings.authConfig.allowLocalFallback = true` opts back in, knowingly, for UAT.
+- **No offline first sign-in.** A device that has never signed in needs network. A local
+  password check would be exactly the bypass this removes. Continuity comes from the
+  cached session, not from a second password store.
+- **The customer door refuses staff accounts; the staff modal accepts customers.** Anyone
+  can reach the customer login by scanning a machine QR, so that door is the one that must
+  be strict. A customer signing in from the staff modal gains nothing — the `goPage()`
+  wrapper still confines them to their portal.
+- **RLS matters more than the login screen.** The anon key ships in every browser, so
+  without `02-rls.sql` anyone can call the REST API directly and the login is decoration.
+  This is stated at the top of that file and in the README.
+
+### Tests run
+
+- `node --check` on all 9 inline scripts and all 4 new files: 0 failures.
+- **Auth suite, 57 assertions** — provider registration and selection, `verify` not
+  mutating state, sign-in / sign-out, session persistence to its own key, audit entries,
+  wrong password, unknown user, lockout after repeated failures (including that it does
+  not affect other accounts and clears on success), absolute expiry, idle timeout, offline
+  grace working while offline **and being refused while online**, grace window ending,
+  password policy, change password and the old password ceasing to work, admin reset of
+  the override, staff modal sign-in and error handling, staff rejected at the customer
+  door, customer accepted at the staff modal but still confined.
+- **Journey suite, 66 assertions** — unchanged, still passing.
+- **Regression suite, 30 assertions** — unchanged, still passing.
+- **`file://` load check** — external classic scripts load, `ImodeAuth` registers both
+  providers, `admin_test` signs in and lands on the role Home page, zero page errors.
+
+### Not done / open
+
+1. **Nothing was run against a real Supabase project.** `auth-supabase.js` and the three
+   SQL files are written and reviewed but untested end to end; that needs the project
+   owner to run them and work through the checklist in `supabase/README.md`.
+2. **`machines` column naming is unverified.** Every other table is pushed as snake_case,
+   but `cloudUpsert('machines', obj)` sends the raw JavaScript object, so that table may
+   have a quoted `"customerId"` column. `02-rls.sql` detects which column exists instead
+   of guessing, and reports it with `raise notice`.
+3. **Turning on RLS breaks unauthenticated sync**, which the app does at start-up today.
+   Flagged in the README as a decision, not silently changed.
+4. Password reset needs real email addresses; the `@imode.local` convention cannot
+   receive mail.
+5. The audit trail is append-only through the API but editable by anyone with database
+   access — an operational record, not evidence.

@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <link rel="icon" type="image/png" href="./assets/Iconservice.png">
+  <link rel="shortcut icon" type="image/png" href="./assets/Iconservice.png">
+  <link rel="apple-touch-icon" href="./assets/Iconservice.png">
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b2f8f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>I-MODE Plus Service & Maintenance · V6.8 Service focus</title>
+<link rel="stylesheet" href="./css/01-base-theme.css">
+<link rel="stylesheet" href="./css/02-v6.1-sales-easy-mode.css">
+<link rel="stylesheet" href="./css/03-service-focus-badge.css">
+
+<link rel="stylesheet" href="./css/04-qc-layout.css">
+
+
+<link rel="stylesheet" href="./css/05-kpi-cards.css">
+
+
+<link rel="stylesheet" href="./css/06-v6.7.1-sidebar-vertical-scroll-only-no-h.css">
+
+<link rel="stylesheet" href="./css/07-v671-qc-document-qr-modal.css">
+
+
+<link rel="stylesheet" href="./css/08-v6.7.1-mobile-dashboard-logo-readability.css">
+
+<link rel="stylesheet" href="./css/09-v6.8-v5.17-inspired-n.css">
+
+
+<link rel="stylesheet" href="./css/10-v68-style-correction.css">
+
+
+<link rel="stylesheet" href="./css/11-v68-responsive-layout.css">
+
+
+<link rel="stylesheet" href="./css/12-v6.8-desktop-sidebar-aligns-with-the-top-b.css">
+
+<link rel="stylesheet" href="./css/13-v6.8-sidebar-uses-the-transparent-ui-logo.css">
+
+<link rel="stylesheet" href="./css/14-v6.8-remove-the-stray-vertical-accent-bar.css">
+
+<link rel="stylesheet" href="./css/15-v6.8-enlarge-only-the-ui-logo-at-the-top-o.css">
+
+<link rel="stylesheet" href="./css/16-v6.8-mobile-calendar-show-the-real-calend.css">
+
+<link rel="stylesheet" href="./css/17-v6.8-qr-customer-portal-preview-hide-the.css">
+
+<link rel="stylesheet" href="./css/18-cases-toolbar-tabs.css">
+<link rel="stylesheet" href="./css/19-v6.8---machine-display-limit-total-counter.css">
+
+</head>
+<body>
+<script src="./js/01-v69QrBootGuard.js"></script>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand-block">
+      <div class="brand-logo-shell"><img src="./assets/imode-ui-logo-v532.png" alt="I-MODE" class="brand-logo"></div>
+      <div class="brand-title brand-title-one-line"><b>I-MODE Plus <span>Service & Maintenance</span></b></div>
+    </div>
+
+    <nav class="side-nav">
+      <button class="nav-item active" data-page="dashboard"><span>▦</span><b>แดชบอร์ด</b></button>
+      <button class="nav-item" data-page="cases"><span>📋</span><b>เคสงานบริการ</b></button>
+      <button class="nav-item" data-page="quotation"><span>฿</span><b>ทำใบเสนอราคา</b></button>
+      <button class="nav-item" data-page="customers"><span>👥</span><b>ลูกค้า</b></button>
+      <button class="nav-item" data-page="machines"><span>⚙</span><b>เครื่องจักร</b></button>
+      <button class="nav-item" data-page="qc"><span>✅</span><b>QC เครื่อง</b></button>
+      <button class="nav-item" data-page="petty-cash"><span>💵</span><b>เงินสดย่อย</b></button>
+      <button class="nav-item" data-page="spare-parts"><span>📦</span><b>สต๊อกอะไหล่</b></button>
+      <button class="nav-item" data-page="technicians"><span>👨‍🔧</span><b>ทีมช่าง</b></button>
+      <button class="nav-item" data-page="onsite"><span>📍</span><b>หน้างาน</b></button>
+      <button class="nav-item" data-page="calendar"><span>📅</span><b>ปฏิทินงาน</b></button>
+      <button class="nav-item" data-page="warranty"><span>🛡</span><b>ระบบประกันเครื่อง</b></button>
+      <button class="nav-item" data-page="documents"><span>📁</span><b>เอกสารเครื่องจักร</b></button>
+      <button class="nav-item" data-page="notifications"><span>🔔</span><b>การแจ้งเตือน</b><i id="sideNotifyBadge" class="nav-badge">0</i></button>
+      <button class="nav-item" data-page="reports"><span>📊</span><b>รายงาน</b></button>
+      <button class="nav-item" data-page="settings"><span>⚙</span><b>ตั้งค่าระบบ</b></button>
+    </nav>
+
+    <div class="sidebar-version" title="Current application version">
+      <b>Version 6.8</b>
+      <span>Service focus</span>
+    </div>
+
+  </aside>
+
+  <main class="main">
+    <header class="topbar v68-topbar">
+      <div class="topbar-left v68-topbar-left">
+        <button class="icon-btn v68-menu-btn" id="menuBtn" aria-label="เปิด/ปิดเมนู">☰</button>
+        <div class="v68-topbar-brand"><b>I-MODE SERVICE</b><small>Service focus · V6.8</small></div>
+      </div>
+      <div class="topbar-actions v68-topbar-actions">
+        <button class="orange-btn action-3d-orange ui-emphasis-action v68-top-accept" data-perm="case.create" onclick="openCaseModal()">＋ รับเคสใหม่</button>
+        <button class="search-btn tablet-up" onclick="openGlobalSearch()">⌕ <span>ค้นหา...</span></button>
+        <button id="languageQuickBtn" class="language-quick-btn" onclick="toggleLanguage()" title="เปลี่ยนภาษา / Change language">TH</button>
+        <button id="fontQuickBtn" class="font-quick-btn" onclick="openTypographySettingModal()" title="ขนาดตัวอักษร / Font size"><span class="font-aa">Aa</span><b>100%</b></button>
+        <button class="icon-btn v68-bell-btn" onclick="goPage('notifications')">🔔<i class="badge-dot" id="topNotifyBadge">0</i></button>
+        <button id="topbarUserCard" class="topbar-user-card" onclick="openUserLoginModal()"></button>
+      </div>
+    </header>
+
+    <section class="v68-global-hero hero-digital" id="v68GlobalHero">
+      <div class="v68-hero-main">
+        <div class="hero-copy v68-hero-copy">
+          <h2 id="pageTitle">I-MODE Plus Service & Maintenance</h2>
+          <p id="pageDesc">ภาพรวมงาน Service & Maintenance วันนี้</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- DASHBOARD -->
+    <section class="page active" id="page-dashboard">
+      <!-- V6.8: legacy dashboard mobile hero removed; global module header is the only header -->
+
+      <div class="metric-grid">
+        <button class="metric-card" onclick="openMetricPopup('open')"><span class="metric-icon blue">📋</span><small>เคสที่เปิดอยู่</small><strong id="mOpen">0</strong><em>ดูทั้งหมด →</em></button>
+        <button class="metric-card" onclick="openMetricPopup('urgent')"><span class="metric-icon orange">!</span><small>เคสด่วน</small><strong id="mUrgent">0</strong><em>ดูทั้งหมด →</em></button>
+        <button class="metric-card" onclick="openMetricPopup('assigned')"><span class="metric-icon blue">👨‍🔧</span><small>งานที่มอบหมาย</small><strong id="mAssigned">0</strong><em>ดูทั้งหมด →</em></button>
+        <button class="metric-card" onclick="openMetricPopup('done')"><span class="metric-icon green">✓</span><small>ปิดงานแล้ว</small><strong id="mDone">0</strong><em>ดูทั้งหมด →</em></button>
+      </div>
+
+      <div class="dashboard-grid dashboard-primary">
+        <div class="panel dashboard-status-panel">
+          <div class="panel-head">
+            <div><h3>เคสงานบริการ แยกตามสถานะ</h3><p>ภาพรวมงานที่อยู่ในระบบ</p></div>
+            <button class="soft-btn" onclick="openReportPopup('status')">ดูทั้งหมด</button>
+          </div>
+          <div class="panel-body">
+            <div class="status-donut-wrap">
+              <div id="dashboardStatusDonut" class="status-donut-box"></div>
+              <div id="dashboardStatusLegend" class="status-legend"></div>
+            </div>
+            <div id="dashboardChartUpdated" class="panel-footnote"></div>
+          </div>
+        </div>
+
+        <div class="panel dashboard-cases-panel">
+          <div class="panel-head">
+            <div><h3>เคสล่าสุด</h3><p>รายการที่เพิ่งเข้าสู่ระบบ</p></div>
+            <button class="soft-btn" onclick="goPage('cases')">ดูทั้งหมด</button>
+          </div>
+          <div id="dashboardLatestCases" class="dashboard-list"></div>
+        </div>
+
+        <div class="panel dashboard-alert-panel">
+          <div class="panel-head"><div><h3>แจ้งเตือนสำคัญ</h3><p>รายการที่ต้องติดตาม</p></div><button class="notify-chip" id="dashNotifyChip">0</button></div>
+          <div id="dashboardAlerts" class="stack-list"></div>
+          <button class="panel-link" onclick="goPage('notifications')">ดูการแจ้งเตือนทั้งหมด →</button>
+        </div>
+      </div>
+
+      <div class="dashboard-grid dashboard-secondary">
+        <div class="panel dashboard-team-panel">
+          <div class="panel-head">
+            <div><h3>สถานะ Service Maintenance</h3><p>ทีมที่พร้อมรับงานและภาระงานปัจจุบัน</p></div>
+            <button class="soft-btn" onclick="goPage('technicians')">ดูช่างทั้งหมด</button>
+          </div>
+          <div id="dashboardTeamStatus" class="dashboard-team-list"></div>
+        </div>
+
+        <div class="panel dashboard-performance-panel">
+          <div class="panel-head">
+            <div><h3>ผลการดำเนินงาน</h3><p>สรุปประสิทธิภาพการให้บริการจากข้อมูลในระบบ</p></div>
+            <button class="soft-btn" onclick="goPage('reports')">ดูรายงาน</button>
+          </div>
+          <div id="dashboardPerformance" class="dashboard-performance"></div>
+        </div>
+
+        <div class="panel dashboard-schedule-panel">
+          <div class="panel-head"><div><h3>นัดหมายวันนี้</h3><p id="dashScheduleDate">ตารางเข้าบริการที่ใกล้ที่สุด</p></div><button class="soft-btn" onclick="goPage('calendar')">ดูปฏิทินทั้งหมด</button></div>
+          <div id="dashboardSchedule" class="stack-list"></div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- CRM / SALES MANAGEMENT -->
+
+    <!-- CASES -->
+    <section class="page" id="page-cases">
+      
+      <div id="caseStatusKpis" class="module-kpi-grid case-kpi-grid" role="group" aria-label="กรองสถานะเคส"></div>
+      <div class="panel">
+        <div class="panel-head toolbar-head machine-master-head"><div class="machine-head-copy"><div class="machine-title-line"><div class="machine-list-meta"><label class="machine-display-control">แสดง <select id="casesDisplayLimit" onchange="setListLimit('cases',this.value)"><option value="10">10</option><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option><option value="all">ทั้งหมด</option></select> เคส</label><span class="machine-total-chip">ทั้งหมด <b id="casesTotalCount">0</b> เคส</span></div></div></div><button class="primary-btn action-3d-orange ui-emphasis-action" onclick="openCaseModal()">＋ รับเคสใหม่</button></div>
+        <div class="toolbar">
+          <input id="caseSearch" placeholder="ค้นหาเลขเคส ลูกค้า เครื่อง Serial..." oninput="renderCases()">
+          <select id="caseStatusFilter" onchange="renderCases()"></select>
+          <select id="casePriorityFilter" onchange="renderCases()"></select>
+          <button class="soft-btn" onclick="exportCSV()">Export CSV</button><button class="soft-btn" onclick="exportExcel()">Export Excel</button>
+        </div>
+        <div class="table-wrap"><table class="wide-table"><thead><tr><th>เลขเคส</th><th>ลูกค้า</th><th>เครื่อง</th><th>ประเภทงาน</th><th>Priority</th><th>สถานะ</th><th>ช่าง</th><th>นัดหมาย</th><th class="case-manage-col">จัดการ</th></tr></thead><tbody id="caseTable"></tbody></table></div>
+        <div id="caseCards" class="mobile-card-list"></div>
+        <div id="casesPagination" class="machine-pagination" aria-label="Case list pagination"></div>
+      </div>
+    </section>
+
+    <!-- CUSTOMERS -->
+    <section class="page" id="page-customers">
+      
+      <div class="module-kpi-grid line-kpis">
+        <button class="module-kpi"><span class="kpi-ico green">LINE</span><div><small>ลูกค้าเชื่อม LINE</small><b id="lineLinkedCustomers">0</b></div></button>
+        <button class="module-kpi" onclick="filterLineRequests('new')"><span class="kpi-ico orange">!</span><div><small>คำขอใหม่จาก LINE</small><b id="lineNewRequests">0</b></div></button>
+        <button class="module-kpi"><span class="kpi-ico blue">QR</span><div><small>เครื่องพร้อม QR</small><b id="lineQrMachines">0</b></div></button>
+        <button class="module-kpi" onclick="filterLineRequests('warranty_quote')"><span class="kpi-ico purple">฿</span><div><small>ขอราคา Warranty</small><b id="lineWarrantyRequests">0</b></div></button>
+      </div>
+      <div class="panel">
+        <div class="panel-head toolbar-head machine-master-head"><div class="machine-head-copy"><div class="machine-title-line"><div class="machine-list-meta"><label class="machine-display-control">แสดง <select id="customersDisplayLimit" onchange="setListLimit('customers',this.value)"><option value="10">10</option><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option><option value="all">ทั้งหมด</option></select> ราย</label><span class="machine-total-chip">ทั้งหมด <b id="customersTotalCount">0</b> ราย</span></div></div></div><div class="button-row"><button class="soft-btn module-utility-btn action-3d-orange-soft" onclick="openLineOASettingModal()">⚙ ตั้งค่า LINE OA</button><button class="orange-btn module-portal-btn action-3d-orange" onclick="previewCustomerPortal()">▦ ดูหน้า Customer Portal ›</button><button class="primary-btn action-3d-orange ui-emphasis-action" onclick="openCustomerModal()">＋ เพิ่มลูกค้า</button></div></div>
+        <div class="toolbar demo-master-toolbar"><input id="customerMasterSearch" placeholder="ค้นหาบริษัท ผู้ติดต่อ โทรศัพท์ หรือที่อยู่..." oninput="renderCustomers()"><select id="customerServiceFilter" onchange="renderCustomers()"><option value="all">ทุกสถานะ Service</option><option value="มี Service">มี Service</option><option value="ไม่มี Service">ไม่มี Service</option><option value="Mixed">Mixed</option></select></div>
+        <div class="table-wrap"><table><thead><tr><th>บริษัท</th><th>ผู้ติดต่อ</th><th>โทรศัพท์</th><th>LINE</th><th>สถานที่</th><th>เครื่อง</th><th>เคส</th><th>จัดการ</th></tr></thead><tbody id="customerTable"></tbody></table></div>
+        <div id="customerCards" class="mobile-card-list"></div>
+        <div id="customersPagination" class="machine-pagination" aria-label="Customer list pagination"></div>
+      </div>
+      <div class="panel line-request-panel">
+        <div class="panel-head toolbar-head"><div><h3>คำขอจาก LINE OA / QR เครื่อง</h3><p>รับแจ้งปัญหา ขอ Warranty และติดตามคำขอจากลูกค้า</p></div><button class="soft-btn" onclick="filterLineRequests('all')">ดูทั้งหมด</button></div>
+        <div class="toolbar"><input id="lineRequestSearch" placeholder="ค้นหาลูกค้า เครื่อง เบอร์โทร หรือรายละเอียด..." oninput="renderLineRequests()"><select id="lineRequestTypeFilter" onchange="renderLineRequests()"><option value="all">ทุกประเภท</option><option value="service">แจ้งปัญหา</option><option value="service_quote">ขอราคา Service</option><option value="warranty_quote">ขอราคา Warranty</option><option value="warranty_check">เช็ค Warranty</option></select><select id="lineRequestStatusFilter" onchange="renderLineRequests()"><option value="all">ทุกสถานะ</option><option value="ใหม่">ใหม่</option><option value="กำลังดำเนินการ">กำลังดำเนินการ</option><option value="เสร็จสิ้น">เสร็จสิ้น</option></select></div>
+        <div class="table-wrap"><table><thead><tr><th>วันที่</th><th>ประเภท</th><th>ลูกค้า</th><th>เครื่อง</th><th>รายละเอียด</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody id="lineRequestTable"></tbody></table></div>
+        <div id="lineRequestCards" class="mobile-card-list"></div>
+      </div>
+    </section>
+
+    <!-- MACHINES -->
+    <section class="page" id="page-machines">
+
+      <div id="machineStatusKpis" class="module-kpi-grid case-kpi-grid" role="group" aria-label="กรองสถานะเครื่องจักร"></div>
+      <div class="panel">
+        <div class="panel-head toolbar-head machine-master-head"><div class="machine-head-copy"><div class="machine-title-line"><div class="machine-list-meta"><label class="machine-display-control">แสดง <select id="machineDisplayLimit" onchange="window.setMachineDisplayLimit(this.value)"><option value="10">10</option><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option><option value="all">ทั้งหมด</option></select> เครื่อง</label><span class="machine-total-chip">ทั้งหมด <b id="machineTotalCount">0</b> เครื่อง</span></div></div></div><button class="primary-btn action-3d-orange ui-emphasis-action" onclick="openMachineModal()">＋ เพิ่มเครื่อง</button></div>
+        <div class="toolbar demo-master-toolbar"><input id="machineMasterSearch" placeholder="ค้นหาชื่อเครื่อง TH/EN, Model, Serial หรือลูกค้า..." oninput="renderMachines()"><select id="machineServiceFilter" onchange="renderMachines()"><option value="all">ทุกสถานะ Service</option><option value="ต่อ Service">ต่อ Service</option><option value="ไม่ต่อ Service">ไม่ต่อ Service</option><option value="ไม่ระบุ">ไม่ระบุ</option></select><select id="machineWarrantyFilter" onchange="renderMachines()"><option value="all">ทุกสถานะประกัน</option><option value="อยู่ในประกัน">อยู่ในประกัน</option><option value="หมดประกัน">หมดประกัน</option><option value="ไม่ทราบ">ไม่ทราบ</option></select><select id="machineSizeFilter" onchange="renderMachines()"><option value="all">ทุกขนาด</option><option value="S">S - เครื่องเล็ก</option><option value="M">M - เครื่องขนาดกลาง</option><option value="L">L - เครื่องใหญ่</option><option value="confirm">รอ Technical Confirm</option></select></div>
+        <div class="table-wrap"><table class="wide-table"><thead><tr><th>รูป</th><th>ชื่อเครื่อง TH / EN</th><th>Model</th><th>Serial No.</th><th>ลูกค้า</th><th>ปี</th><th>Size</th><th>Service</th><th>ประกัน</th><th>เคส</th><th>จัดการ</th></tr></thead><tbody id="machineTable"></tbody></table></div>
+        <div id="machineCards" class="mobile-card-list"></div>
+        <div id="machinePagination" class="machine-pagination" aria-label="Machine list pagination"></div>
+      </div>
+    </section>
+
+    <!-- TECHNICIANS -->
+
+    <!-- MACHINE QC -->
+    <section class="page" id="page-qc">
+      <div class="module-kpi-grid qc-kpi-grid">
+        <button class="module-kpi-card" onclick="setQcStatusFilter('all')"><small>QC ทั้งหมด</small><b id="qcKpiAll">0</b><span>รายการ</span></button>
+        <button class="module-kpi-card" onclick="setQcStatusFilter('Draft')"><small>รอตรวจ / Draft</small><b id="qcKpiDraft">0</b><span>รายการ</span></button>
+        <button class="module-kpi-card" onclick="setQcStatusFilter('In Progress')"><small>กำลังตรวจ</small><b id="qcKpiProgress">0</b><span>รายการ</span></button>
+        <button class="module-kpi-card" onclick="setQcStatusFilter('Pass')"><small>ผ่าน QC</small><b id="qcKpiPass">0</b><span>รายการ</span></button>
+        <button class="module-kpi-card" onclick="setQcStatusFilter('Fail')"><small>ไม่ผ่าน / Conditional</small><b id="qcKpiFail">0</b><span>รายการ</span></button>
+      </div>
+      <div class="panel">
+        <div class="panel-head toolbar-head machine-master-head"><div class="machine-head-copy"><div class="machine-title-line"><div class="machine-list-meta"><label class="machine-display-control">แสดง <select id="qcDisplayLimit" onchange="setListLimit('qc',this.value)"><option value="10">10</option><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option><option value="all">ทั้งหมด</option></select> รายการ</label><span class="machine-total-chip">ทั้งหมด <b id="qcTotalCount">0</b> รายการ</span></div></div></div><div class="button-row"><button class="soft-btn" onclick="exportQcCSV()">Export QC CSV</button><button class="primary-btn action-3d-orange ui-emphasis-action" onclick="openQcModal()">＋ สร้าง QC</button></div></div>
+        <div class="toolbar qc-toolbar"><input id="qcSearch" placeholder="ค้นหา QC No., ลูกค้า, เครื่อง, Model, Serial..." oninput="renderQc()"><select id="qcTypeFilter" onchange="renderQc()"><option value="all">ทุกประเภท QC</option><option>Incoming Inspection</option><option>Pre-Delivery QC</option><option>Post-Service QC</option><option>Installation Acceptance</option><option>PM Verification</option></select><select id="qcStatusFilter" onchange="renderQc()"><option value="all">ทุกสถานะ</option><option>Draft</option><option>In Progress</option><option>Pass</option><option>Conditional</option><option>Fail</option></select></div>
+        <div class="table-wrap"><table class="wide-table"><thead><tr><th>QC No.</th><th>วันที่</th><th>ประเภท</th><th>ลูกค้า</th><th>เครื่อง / Serial</th><th>ผู้ตรวจ</th><th>ผล</th><th>Checklist</th><th>จัดการ</th></tr></thead><tbody id="qcTable"></tbody></table></div>
+        <div id="qcCards" class="mobile-card-list"></div>
+        <div id="qcPagination" class="machine-pagination" aria-label="QC list pagination"></div>
+      </div>
+    </section>
+
+    <!-- PETTY CASH -->
+    <section class="page" id="page-petty-cash">
+      <div class="module-kpi-grid qc-kpi-grid kpi-grid-4">
+        <div class="module-kpi-card"><small>ยอดเบิกเดือนนี้</small><b id="pcKpiMonthTotal">0</b><span>บาท</span></div>
+        <div class="module-kpi-card"><small>รอเคลียร์บัญชี</small><b id="pcKpiPending">0</b><span>รายการ</span></div>
+        <div class="module-kpi-card"><small>เคลียร์แล้ว</small><b id="pcKpiCleared">0</b><span>รายการ</span></div>
+        <div class="module-kpi-card"><small>จำนวนรายการ</small><b id="pcKpiCount">0</b><span>ในเดือนที่เลือก</span></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head toolbar-head machine-master-head"><div class="machine-head-copy"><div class="machine-title-line"><div class="machine-list-meta"><label class="machine-display-control">แสดง <select id="pettyCashDisplayLimit" onchange="setListLimit('pettyCash',this.value)"><option value="10">10</option><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option><option value="all">ทั้งหมด</option></select> รายการ</label><span class="machine-total-chip">ทั้งหมด <b id="pettyCashTotalCount">0</b> รายการ</span></div></div></div><div class="button-row"><button class="soft-btn" onclick="previewPettyCashMonthly()">สรุปรายเดือน</button><button class="soft-btn" onclick="exportPettyCashCSV()">Export CSV</button><button class="primary-btn action-3d-orange ui-emphasis-action" onclick="openPettyCashModal()">＋ เบิก/บันทึกรายการ</button></div></div>
+        <div class="toolbar qc-toolbar"><input id="pettySearch" placeholder="ค้นหาเลขที่เอกสาร ผู้เบิก ผู้ขาย หรือวัตถุประสงค์..." oninput="renderPettyCash()"><input id="pettyMonthFilter" type="month" onchange="renderPettyCash()"><select id="pettyStatusFilter" onchange="renderPettyCash()"><option value="all">ทุกสถานะ</option><option value="รอเคลียร์">รอเคลียร์</option><option value="เคลียร์แล้ว">เคลียร์แล้ว</option><option value="ยกเลิก">ยกเลิก</option></select></div>
+        <div class="table-wrap"><table class="wide-table"><thead><tr><th>เลขที่</th><th>วันที่</th><th>ผู้เบิก</th><th>หมวด</th><th>วัตถุประสงค์</th><th>ร้านค้า/ผู้ขาย</th><th>จำนวนเงิน</th><th>สถานะ</th><th>หลักฐาน</th><th>จัดการ</th></tr></thead><tbody id="pettyTable"></tbody></table></div>
+        <div id="pettyCards" class="mobile-card-list"></div>
+        <div id="pettyCashPagination" class="machine-pagination" aria-label="Petty cash list pagination"></div>
+      </div>
+    </section>
+
+    <!-- SPARE PARTS -->
+    <section class="page" id="page-spare-parts">
+      <div class="module-kpi-grid qc-kpi-grid kpi-grid-5">
+        <div class="module-kpi-card"><small>อะไหล่ทั้งหมด</small><b id="spKpiAll">0</b><span>รายการ</span></div>
+        <div class="module-kpi-card"><small>ต่ำกว่าขั้นต่ำ</small><b id="spKpiLow">0</b><span>รายการ</span></div>
+        <div class="module-kpi-card"><small>ถึงจุดสั่งซื้อ</small><b id="spKpiReorder">0</b><span>รายการ</span></div>
+        <div class="module-kpi-card"><small>เกินค่าสูงสุด</small><b id="spKpiOver">0</b><span>รายการ</span></div>
+        <div class="module-kpi-card"><small>PO เปิดอยู่</small><b id="spKpiPO">0</b><span>ใบสั่งซื้อ</span></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head toolbar-head machine-master-head"><div class="machine-head-copy"><div class="machine-title-line"><div class="machine-list-meta"><label class="machine-display-control">แสดง <select id="sparePartsDisplayLimit" onchange="setListLimit('spareParts',this.value)"><option value="10">10</option><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option><option value="all">ทั้งหมด</option></select> รายการ</label><span class="machine-total-chip">ทั้งหมด <b id="sparePartsTotalCount">0</b> รายการ</span></div></div></div><div class="button-row"><button class="soft-btn" onclick="openPurchaseOrderModal()">＋ สร้างใบสั่งซื้อ</button><button class="soft-btn" onclick="exportSparePartsCSV()">Export Stock CSV</button><button class="primary-btn action-3d-orange ui-emphasis-action" onclick="openSparePartModal()">＋ เพิ่มอะไหล่</button></div></div>
+        <div class="toolbar" style="grid-template-columns:minmax(280px,1fr) 180px 230px;display:grid;gap:9px"><input id="spSearch" placeholder="ค้นหา Part No., ชื่ออะไหล่, Supplier หรือ Machine..." oninput="renderSpareParts()"><select id="spStatusFilter" onchange="renderSpareParts()"><option value="all">ทุกสถานะสต๊อก</option><option value="low">ต่ำกว่าขั้นต่ำ</option><option value="reorder">ถึงจุดสั่งซื้อ</option><option value="high">เกินค่าสูงสุด</option><option value="normal">ปกติ</option></select><select id="spMachineFilter" onchange="renderSpareParts()"><option value="all">ทุกเครื่อง</option></select></div>
+        <div class="table-wrap"><table class="wide-table"><thead><tr><th>Part No.</th><th>อะไหล่</th><th>เครื่อง/Model ที่ใช้</th><th>Supplier</th><th>คงเหลือ</th><th>ต่ำสุด</th><th>สูงสุด</th><th>จุดสั่งซื้อ</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody id="sparePartTable"></tbody></table></div>
+        <div id="sparePartCards" class="mobile-card-list"></div>
+        <div id="sparePartsPagination" class="machine-pagination" aria-label="Spare parts list pagination"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head toolbar-head"><div><h3>ระบบการสั่งซื้ออะไหล่</h3><p>สร้างรายการสั่งซื้อและติดตามสถานะรับเข้า</p></div><button class="primary-btn action-3d-orange" onclick="openPurchaseOrderModal()">＋ สั่งซื้ออะไหล่</button></div>
+        <div class="table-wrap"><table class="wide-table"><thead><tr><th>PO No.</th><th>วันที่</th><th>อะไหล่</th><th>Supplier</th><th>จำนวน</th><th>กำหนดรับ</th><th>สถานะ</th><th>มูลค่า</th><th>จัดการ</th></tr></thead><tbody id="purchaseOrderTable"></tbody></table></div>
+      </div>
+    </section>
+
+
+    <!-- V6.8 ONSITE / FIELD PRICING -->
+    <section class="page" id="page-onsite">
+      <div class="v68-onsite-grid">
+        <div class="panel v68-calc-panel">
+          <div class="panel-head toolbar-head"><div><h3>คำนวณค่าบริการหน้างาน</h3><p>สูตร: Service Level + Travel Zone + Spare Parts + Actual Cost</p></div><button class="soft-btn" onclick="openOnsitePricingSettingModal()">⚙ ตั้งราคา</button></div>
+          <div class="panel-body">
+            <div class="form-grid cols2 v68-onsite-form">
+              <div class="field full"><label>เครื่องจักร</label><select id="onsiteMachineSelect" onchange="v68OnsiteMachineChanged()"></select></div>
+              <div class="field"><label>Service Level / ขนาด</label><select id="onsiteLevel" onchange="calculateOnsitePricing()"><option value="S">S · เครื่องเล็ก</option><option value="M">M · เครื่องขนาดกลาง</option><option value="L">L · เครื่องใหญ่ / ระบบซับซ้อน</option></select></div>
+              <div class="field"><label>ระยะทางขาเดียว (km)</label><input id="onsiteDistance" type="number" min="0" step="1" value="0" oninput="calculateOnsitePricing()"></div>
+              <div class="field"><label>อะไหล่ / Spare Parts (บาท)</label><input id="onsiteParts" type="number" min="0" step="0.01" value="0" oninput="calculateOnsitePricing()"></div>
+              <div class="field"><label>Actual Cost อื่น ๆ (บาท)</label><input id="onsiteActual" type="number" min="0" step="0.01" value="0" oninput="calculateOnsitePricing()"></div>
+            </div>
+            <div class="v68-price-result-grid">
+              <div class="v68-price-result"><small>Service Level</small><b id="onsiteServiceFee">฿0</b><span id="onsiteLevelText">S</span></div>
+              <div class="v68-price-result"><small>Travel Zone</small><b id="onsiteTravelFee">฿0</b><span id="onsiteZoneText">Zone 0</span></div>
+              <div class="v68-price-result total"><small>รวมก่อน VAT</small><b id="onsiteSubtotal">฿0</b><span id="onsiteVatHint">ยังไม่รวม VAT 7%</span></div>
+              <div class="v68-price-result vat"><small>รวม VAT</small><b id="onsiteGrandTotal">฿0</b><span id="onsiteVatAmount">VAT ฿0</span></div>
+            </div>
+            <div class="v68-pricing-actions"><span id="onsiteQuoteRateState" class="v68-rate-state"></span><button class="primary-btn action-3d-orange" onclick="v68ApplyPricingToQuotation()">ใช้ S/M/L นี้กับ Quotation</button></div>
+          </div>
+        </div>
+
+        <div class="panel v68-level-panel">
+          <div class="panel-head"><div><h3>Service Level ตามขนาดและความซับซ้อน</h3><p>อ้างอิงจากตารางค่าบริการที่กำหนดสำหรับ V6.8</p></div></div>
+          <div class="panel-body"><div id="onsiteLevelCards" class="v68-level-grid"></div></div>
+        </div>
+      </div>
+
+      <div class="panel v68-zone-panel">
+        <div class="panel-head toolbar-head"><div><h3>ค่าเดินทางสำหรับตรวจเช็คหน้างาน (Travel Zone)</h3><p>ระยะทางขาเดียว อ้างอิงตามการตั้งค่า Travel Zone</p></div><button class="soft-btn" onclick="openTravelSettingModal()">แก้ไข Travel Zone</button></div>
+        <div class="table-wrap v68-always-table"><table><thead><tr><th>Zone</th><th>ระยะทาง (ขาเดียว)</th><th>ค่าเดินทาง</th><th>หมายเหตุ</th></tr></thead><tbody id="onsiteZoneRows"></tbody></table></div>
+      </div>
+
+      <div class="panel v68-base-price-panel">
+        <div class="panel-head"><div><h3>ราคาเริ่มต้น Onsite</h3><p>Service Level + Travel Zone — ยังไม่รวมอะไหล่และค่าใช้จ่ายจริง</p></div></div>
+        <div class="table-wrap v68-always-table"><table id="onsiteBasePriceTable"><thead id="onsiteBasePriceHead"></thead><tbody id="onsiteBasePriceRows"></tbody></table></div>
+        <div class="v68-onsite-note"><b>เงื่อนไข:</b> Workshop = Service Level + Spare Parts (ไม่มีค่า Travel) · Onsite = Service Level + Travel Zone + Spare Parts + Actual Cost · ราคายังไม่รวม VAT 7%</div>
+      </div>
+    </section>
+
+    <section class="page" id="page-technicians">
+      
+      <div class="panel">
+        <div class="panel-head toolbar-head"><div class="team-segment" id="techTeamSegment"><button class="seg-btn active" data-team="all" onclick="setTechTeamFilter('all')">ทั้งหมด</button><button class="seg-btn" data-team="Technical" onclick="setTechTeamFilter('Technical')">ทีม Technical</button><button class="seg-btn" data-team="R&D" onclick="setTechTeamFilter('R&D')">ทีม R&D</button></div><div class="button-row"><button class="soft-btn action-3d-orange-soft ui-emphasis-action" onclick="goPage('onsite')">📍 โมดูลหน้างาน</button><button class="primary-btn action-3d-orange ui-emphasis-action" onclick="openTechnicianModal()">＋ เพิ่มพนักงาน Service</button></div></div>
+        <div class="team-toolbar">
+          <div id="technicianTeamSummary" class="team-summary-grid"></div>
+        </div>
+        <div id="technicianGrid" class="people-grid"></div>
+      </div>
+    </section>
+
+    <!-- CALENDAR -->
+    <section class="page" id="page-calendar">
+      
+      <div class="panel">
+        <div class="panel-head toolbar-head"><div><h3>ปฏิทินงานช่าง</h3><p>ดูนัดหมายตามวัน สัปดาห์ เดือน ปี และกรองตามทีม</p></div><button class="primary-btn action-3d-orange ui-emphasis-action" onclick="openScheduleModal()">＋ เพิ่มนัดหมาย</button></div>
+        <div class="calendar-toolbar calendar-toolbar-v2">
+          <div class="calendar-main-controls">
+            <button class="soft-btn" onclick="changeCalendar(-1)">← ก่อนหน้า</button>
+            <button class="soft-btn" onclick="changeCalendar(0,true)">วันนี้</button>
+            <button class="soft-btn" onclick="changeCalendar(1)">ถัดไป →</button>
+          </div>
+          <div class="calendar-view-switch">
+            <button class="soft-btn cal-view-btn active" data-cal-view="day" onclick="setCalendarView('day')">วัน</button>
+            <button class="soft-btn cal-view-btn" data-cal-view="week" onclick="setCalendarView('week')">สัปดาห์</button>
+            <button class="soft-btn cal-view-btn" data-cal-view="month" onclick="setCalendarView('month')">เดือน</button>
+            <button class="soft-btn cal-view-btn" data-cal-view="year" onclick="setCalendarView('year')">ปี</button>
+          </div>
+          <div class="calendar-filters">
+            <select id="calendarTeamFilter" onchange="setCalendarTeamFilter(this.value)">
+              <option value="all">ทุกทีม</option>
+              <option value="Technical">ทีม Technical</option>
+              <option value="R&D">ทีม R&D</option>
+            </select>
+          </div>
+          <b id="calendarRange"></b>
+        </div>
+        <div class="calendar-scroll"><div id="technicianCalendar" class="tech-calendar"></div></div>
+        <div id="mobileAgenda" class="mobile-agenda"></div>
+      </div>
+    </section>
+
+    <!-- NOTIFICATIONS -->
+    <section class="page" id="page-notifications">
+      
+      <div class="panel">
+        <div class="panel-head toolbar-head"><div><h3>ศูนย์การแจ้งเตือน</h3><p>นัดหมาย เคสด่วน งานรออะไหล่ และการส่งงาน</p></div><button class="soft-btn action-3d-orange-soft ui-emphasis-action" onclick="openNotificationSettingModal()">⚙ ตั้งค่า</button></div>
+        <div id="notificationList" class="notification-list"></div>
+      </div>
+    </section>
+
+
+    <!-- QUOTATION -->
+    <section class="page" id="page-quotation">
+      
+
+      <div class="quotation-layout">
+        <div>
+          <div class="panel quote-section">
+            <div class="panel-head toolbar-head"><div><h3>1. อ้างอิงเคสและลูกค้า</h3><p>เลือกเคสเพื่อดึงข้อมูลลูกค้าและเครื่องอัตโนมัติ</p></div><button class="soft-btn compact-action action-3d-orange-soft ui-emphasis-action" onclick="resetQuote()">↺ ล้างข้อมูล</button></div>
+            <div class="panel-body">
+              <div class="form-grid cols2">
+                <div class="field"><label>อ้างอิง Service Case</label><select id="qCase" onchange="loadCaseIntoQuote(this.value)"><option value="">ไม่อ้างอิงเคส</option></select></div>
+                <div class="field"><label>ลูกค้า *</label><select id="qCustomer" onchange="quoteCustomerChanged()" required><option value="">เลือกลูกค้า</option></select></div>
+                <div class="field"><label>ผู้ติดต่อ</label><input id="qContact"></div>
+                <div class="field"><label>สถานที่ให้บริการ</label><input id="qLocation"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel quote-section">
+            <div class="panel-head"><div><h3>2. เงื่อนไขบริการ</h3><p>ประเภทบริการ ระยะทาง ความเร่งด่วน และ Warranty</p></div></div>
+            <div class="panel-body">
+              <div class="form-grid cols3">
+                <div class="field"><label>ประเภทบริการ</label><select id="qService" onchange="quoteServiceChanged()"><option value="OS">Onsite Service</option><option value="WS">Workshop Service</option><option value="DG">Diagnosis Only</option></select></div>
+                <div class="field quote-distance-field"><label>ระยะทางเที่ยวเดียว (km)</label><div class="distance-input-row"><input id="qDistance" type="number" min="0" step="0.1" value="0" oninput="markQuoteDistanceManual();calcQuote()"><button type="button" class="soft-btn distance-calc-btn" onclick="calculateQuoteDistance(true)">📍 Google Maps</button></div><small id="qRouteStatus" class="route-status">เลือก customer เพื่อคำนวณระยะทางอัตโนมัติ</small></div>
+                <div class="field"><label>Pickup / Delivery</label><select id="qPickup" onchange="calcQuote()"><option value="0">ไม่มี</option><option value="1">Pickup</option><option value="2">Delivery</option><option value="3">Pickup + Delivery</option></select></div>
+                <div class="field"><label>ความเร่งด่วน</label><select id="qUrgency" onchange="calcQuote()"><option value="normal">ปกติ 0%</option><option value="urgent">เร่งด่วน +30%</option><option value="emergency">ฉุกเฉิน +50%</option><option value="critical">Critical • เสนอราคาเป็นกรณี</option></select></div>
+                <div class="field"><label>การรับประกัน</label><select id="qWarranty" onchange="quoteWarrantyChanged()"><option value="none">ไม่เกี่ยวกับ Warranty</option><option value="existing">อยู่ในประกันเดิมของเครื่อง</option><option value="repair">Warranty งานซ่อมเดิม / จุดเดิม</option><option value="extend">ซื้อ / ต่อประกันเครื่อง</option></select></div>
+                <div class="field" id="qWarrantyMonthsWrap" style="display:none"><label>แพ็กเกจต่อประกันเครื่อง</label><select id="qWarrantyMonths" onchange="calcQuote()"><option value="6">6 เดือน</option><option value="12" selected>12 เดือน</option><option value="24">24 เดือน</option></select><small class="field-help">แสดงเฉพาะเมื่อเลือก “ซื้อ / ต่อประกันเครื่อง”</small></div>
+                <div class="field"><label>VAT</label><select id="qVat" onchange="calcQuote()"><option value="yes">VAT 7%</option><option value="no">ไม่คิด VAT</option></select></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel quote-section">
+            <div class="panel-head"><div><h3>3. เครื่องจักร</h3><p>เครื่องแรกคิดเต็มราคา เครื่องถัดไปใช้อัตรา Additional Machine</p></div><button class="soft-btn" onclick="addQuoteMachine()">＋ เพิ่มเครื่อง</button></div>
+            <div class="panel-body">
+              <div id="quoteMachineLines"></div>
+              <div class="info-box">เครื่องต้องระบุ Size S/L ใน Machine Master เพื่อคำนวณราคาได้ถูกต้อง</div>
+            </div>
+          </div>
+
+          <div class="panel quote-section">
+            <div class="panel-head"><div><h3>4. ค่าแรงเพิ่มเติม / Diagnosis</h3></div></div>
+            <div class="panel-body">
+              <div class="form-grid cols3">
+                <div class="field"><label>ชั่วโมงเพิ่มเติม</label><input id="qExtraHours" type="number" min="0" value="0" oninput="calcQuote()"></div>
+                <div class="field"><label>จำนวนช่างเพิ่ม</label><input id="qExtraTechs" type="number" min="0" value="0" oninput="calcQuote()"></div>
+                <div class="field"><label>Diagnosis ที่ชำระแล้ว</label><input id="qDiagnosisPaid" type="number" min="0" value="0" oninput="calcQuote()"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel quote-section" id="quotePartsSection">
+            <div class="panel-head"><div><h3>5. Spare Parts</h3><p>คำนวณราคาขายจากต้นทุนและประเภทอะไหล่</p></div><button class="soft-btn" id="quoteAddPartBtn" onclick="addQuotePart()">＋ เพิ่มอะไหล่</button></div>
+            <div class="panel-body"><div id="quotePartsLockNote" class="info-box" style="display:none">Diagnosis Only: ล็อกรายการอะไหล่ และไม่คิดค่าอะไหล่ในใบเสนอราคา</div>
+              <div id="quotePartLines"></div>
+            </div>
+          </div>
+
+          <div class="panel quote-section">
+            <div class="panel-head"><div><h3>6. ค่าใช้จ่ายอื่น / ส่วนลด</h3></div></div>
+            <div class="panel-body">
+              <div class="form-grid cols3">
+                <div class="field"><label>ค่าทางด่วน</label><input id="qToll" type="number" min="0" value="0" oninput="calcQuote()"></div>
+                <div class="field"><label>ค่าใช้จ่ายอื่น</label><input id="qOther" type="number" min="0" value="0" oninput="calcQuote()"></div>
+                <div class="field"><label>ส่วนลด %</label><input id="qDiscount" type="number" min="0" max="100" value="0" oninput="calcQuote()"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="panel quote-summary">
+          <div class="panel-head"><div><h3>สรุปใบเสนอราคา</h3><p id="quoteEditLabel">ใบเสนอราคาใหม่</p></div></div>
+          <div class="panel-body">
+            <div id="qZoneBadge" class="quote-zone">Zone 0 • 250 บาท</div>
+            <div class="quote-sum-row"><span>Service</span><b id="qsService">0.00</b></div>
+            <div class="quote-sum-row"><span>Emergency</span><b id="qsEmergency">0.00</b></div>
+            <div class="quote-sum-row"><span>Travel</span><b id="qsTravel">0.00</b></div>
+            <div class="quote-sum-row"><span>Pickup / Delivery</span><b id="qsPickup">0.00</b></div>
+            <div class="quote-sum-row"><span>Extra Labor</span><b id="qsLabor">0.00</b></div>
+            <div class="quote-sum-row"><span>Spare Parts</span><b id="qsParts">0.00</b></div>
+            <div class="quote-sum-row"><span>Other</span><b id="qsOther">0.00</b></div>
+            <div class="quote-sum-row"><span>หัก Diagnosis</span><b id="qsDiagnosis">0.00</b></div>
+            <div class="quote-sum-row"><span>ส่วนลด</span><b id="qsDiscount">0.00</b></div>
+            <div class="quote-sum-row"><span>VAT</span><b id="qsVat">0.00</b></div>
+            <div class="quote-sum-row quote-total-row"><span>Grand Total</span><b id="qsGrand">0.00</b></div>
+            <div class="quote-grand" id="qGrandBig">฿0.00</div>
+            <div id="quoteWarnings"></div>
+            <div class="quote-action-stack">
+              <button class="primary-btn" onclick="saveQuotation()">💾 บันทึกใบเสนอราคา</button>
+              <button class="orange-btn action-3d-orange quote-main-action" onclick="previewQuotation()">🖨 ดู / พิมพ์ใบเสนอราคา</button>
+            </div>
+            <details class="quote-footer-editor">
+              <summary>✎ แก้ไขข้อมูลท้ายใบเสนอราคา</summary>
+              <div class="quote-footer-editor-body">
+                <div class="field"><label>Delivery</label><input id="qDelivery" value="ตามตกลง" oninput="calcQuote()"></div>
+                <div class="field"><label>Payment</label><input id="qPayment" value="ตามเงื่อนไข" oninput="calcQuote()"></div>
+                <div class="field"><label>Purchaser / ผู้ซื้อ</label><input id="qPurchaserName" placeholder="ชื่อผู้ลงนาม / ผู้ซื้อ" oninput="calcQuote()"></div>
+                <div class="field"><label>วันที่ผู้ซื้อ</label><input id="qPurchaserDate" type="date" oninput="calcQuote()"></div>
+                <div class="field"><label>Customer Service / ผู้จัดทำ</label><input id="qPreparedBy" oninput="calcQuote()"></div>
+                <div class="field"><label>วันที่ผู้จัดทำ</label><input id="qPreparedDate" type="date" oninput="calcQuote()"></div>
+                <div class="field"><label>Authorizer / ผู้อนุมัติ</label><input id="qAuthorizedBy" oninput="calcQuote()"></div>
+                <div class="field"><label>วันที่ผู้อนุมัติ</label><input id="qAuthorizedDate" type="date" oninput="calcQuote()"></div>
+              </div>
+            </details>
+          </div>
+        </aside>
+      </div>
+
+      <div class="panel quote-history-panel">
+        <div class="panel-head toolbar-head machine-master-head"><div class="machine-head-copy"><div class="machine-title-line"><div class="machine-list-meta"><label class="machine-display-control">แสดง <select id="quotationDisplayLimit" onchange="setListLimit('quotation',this.value)"><option value="10">10</option><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option><option value="all">ทั้งหมด</option></select> ใบ</label><span class="machine-total-chip">ทั้งหมด <b id="quotationTotalCount">0</b> ใบ</span></div></div></div></div>
+        <div class="table-wrap"><table><thead><tr><th>เลขที่</th><th>วันที่</th><th>Service Case</th><th>ลูกค้า</th><th>ยอดรวม</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody id="quotationTable"></tbody></table></div>
+        <div id="quotationCards" class="mobile-card-list"></div>
+        <div id="quotationPagination" class="machine-pagination" aria-label="Quotation list pagination"></div>
+      </div>
+    </section>
+
+
+
+    <!-- CUSTOMER LINE / QR PORTAL — the markup now lives in ./pages/customer-portal.html
+         and ./pages/pages.js inserts it right here while the page is parsing. -->
+    <script src="./pages/pages.js"></script>
+
+    <!-- TECHNICIAN FIELD SERVICE -->
+    <section class="page field-service-page" id="page-field-service">
+      <div class="field-hero hero-digital">
+        <div class="hero-copy"><span class="module-eyebrow">TECHNICIAN MOBILE WORKSPACE</span><h2>หน้างานช่าง</h2><p>คิวงาน • นัดหมาย • Check-in • PM Checklist • Before/After • อะไหล่ • Service Report</p></div>
+        <div class="field-tech-selector"><label>ช่างผู้ใช้งาน</label><select id="fieldTechSelect" onchange="renderFieldService()"></select></div>
+      </div>
+      <div class="field-kpi-grid"><div class="field-kpi"><small>งานวันนี้</small><b id="fsToday">0</b></div><div class="field-kpi"><small>7 วันข้างหน้า</small><b id="fsUpcoming">0</b></div><div class="field-kpi"><small>งานเปิด</small><b id="fsOpen">0</b></div><div class="field-kpi"><small>รอส่ง Report</small><b id="fsReportPending">0</b></div></div>
+      <div class="field-layout">
+        <div class="panel"><div class="panel-head"><div><h3>คิวเข้าหาลูกค้า</h3><p>เรียงตามวันและเวลานัดหมาย</p></div><button class="soft-btn" onclick="goPage('calendar')">ปฏิทินเต็ม</button></div><div id="fieldQueue" class="field-queue"></div></div>
+        <div class="panel"><div class="panel-head"><div><h3>งานของฉัน</h3><p>Onsite / Workshop / PM / Maintenance</p></div></div><div id="fieldJobs" class="field-jobs"></div></div>
+      </div>
+    </section>
+
+    <!-- WARRANTY -->
+    <section class="page" id="page-warranty">
+      
+      <div class="module-kpi-grid">
+        <button class="module-kpi" onclick="setWarrantyStatusFilter('active')"><span class="kpi-ico green">✓</span><div><small>อยู่ในประกัน</small><b id="wActive">0</b></div></button>
+        <button class="module-kpi" onclick="setWarrantyStatusFilter('expiring')"><span class="kpi-ico orange">!</span><div><small>ใกล้หมดอายุ</small><b id="wExpiring">0</b></div></button>
+        <button class="module-kpi" onclick="setWarrantyStatusFilter('expired')"><span class="kpi-ico red">×</span><div><small>หมดประกัน</small><b id="wExpired">0</b></div></button>
+        <button class="module-kpi" onclick="setWarrantyStatusFilter('all')"><span class="kpi-ico blue">🛡</span><div><small>Warranty ทั้งหมด</small><b id="wTotal">0</b></div></button>
+      </div>
+      <div class="panel">
+        <div class="panel-head toolbar-head machine-master-head"><div class="machine-head-copy"><div class="machine-title-line"><div class="machine-list-meta"><label class="machine-display-control">แสดง <select id="warrantyDisplayLimit" onchange="setListLimit('warranty',this.value)"><option value="10">10</option><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option><option value="all">ทั้งหมด</option></select> รายการ</label><span class="machine-total-chip">ทั้งหมด <b id="warrantyTotalCount">0</b> รายการ</span></div></div></div><button class="soft-btn action-3d-orange ui-emphasis-action" onclick="openWarrantyModal()">＋ เพิ่ม Warranty</button></div>
+        <div class="toolbar warranty-toolbar"><input id="warrantySearch" placeholder="ค้นหา Warranty No., ลูกค้า, เครื่อง, Serial..." oninput="renderWarranties()"><select id="warrantyStatusFilter" onchange="renderWarranties()"><option value="all">ทุกสถานะ</option><option value="active">อยู่ในประกัน</option><option value="expiring">ใกล้หมดอายุ</option><option value="expired">หมดประกัน</option><option value="upcoming">ยังไม่เริ่ม</option></select><select id="warrantyMachineFilter" onchange="renderWarranties()"><option value="">ทุกเครื่อง</option></select></div>
+        <div class="table-wrap"><table><thead><tr><th>Warranty No.</th><th>ลูกค้า</th><th>เครื่อง / Serial</th><th>เริ่มประกัน</th><th>สิ้นสุด</th><th>สถานะ</th><th>เคสในประกัน</th><th>เอกสาร</th><th>จัดการ</th></tr></thead><tbody id="warrantyTable"></tbody></table></div>
+        <div id="warrantyCards" class="mobile-card-list"></div>
+        <div id="warrantyPagination" class="machine-pagination" aria-label="Warranty list pagination"></div>
+      </div>
+    </section>
+
+    <!-- MACHINE DOCUMENTS -->
+    <section class="page" id="page-documents">
+      
+      <div id="documentCategorySummary" class="doc-category-grid"></div>
+      <div class="panel">
+        <div class="panel-head toolbar-head machine-master-head"><div class="machine-head-copy"><div class="machine-title-line"><div class="machine-list-meta"><label class="machine-display-control">แสดง <select id="documentsDisplayLimit" onchange="setListLimit('documents',this.value)"><option value="10">10</option><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option><option value="all">ทั้งหมด</option></select> ไฟล์</label><span class="machine-total-chip">ทั้งหมด <b id="documentsTotalCount">0</b> ไฟล์</span></div></div></div><button class="soft-btn action-3d-orange ui-emphasis-action" onclick="openMachineDocumentModal()">＋ Upload / Link</button></div>
+        <div class="toolbar document-toolbar"><input id="documentSearch" placeholder="ค้นหาชื่อเอกสาร, Model, Version..." oninput="renderMachineDocuments()"><select id="documentCategoryFilter" onchange="renderMachineDocuments()"><option value="">ทุกหมวดหมู่</option></select><select id="documentMachineFilter" onchange="renderMachineDocuments()"><option value="">ทุกเครื่อง</option></select></div>
+        <div class="table-wrap"><table><thead><tr><th>เอกสาร</th><th>หมวดหมู่</th><th>เครื่อง</th><th>Version</th><th>ภาษา</th><th>วันที่เอกสาร</th><th>ไฟล์ / Link</th><th>จัดการ</th></tr></thead><tbody id="machineDocumentTable"></tbody></table></div>
+        <div id="machineDocumentCards" class="mobile-card-list"></div>
+        <div id="documentsPagination" class="machine-pagination" aria-label="Document list pagination"></div>
+      </div>
+    </section>
+
+    <!-- REPORTS -->
+    <section class="page" id="page-reports">
+      
+      <div class="report-grid">
+        <button class="report-card" onclick="openReportPopup('status')"><span>📊</span><b>เคสตามสถานะ</b><strong id="rStatus">0</strong><small>กดเพื่อดูรายละเอียด</small></button>
+        <button class="report-card" onclick="openReportPopup('technician')"><span>👨‍🔧</span><b>ภาระงาน Service Maintenance</b><strong id="rTech">0</strong><small>งานที่กำลังเปิด</small></button>
+        <button class="report-card" onclick="openReportPopup('customer')"><span>👥</span><b>ลูกค้าที่มีเคส</b><strong id="rCustomer">0</strong><small>จำนวนลูกค้า</small></button>
+        <button class="report-card" onclick="openReportPopup('machine')"><span>⚙</span><b>เครื่องที่มีประวัติ</b><strong id="rMachine">0</strong><small>จำนวนเครื่อง</small></button>
+      </div>
+      <div class="panel">
+        <div class="panel-head toolbar-head"><div><h3>สรุปประสิทธิภาพงาน Service</h3><p>ข้อมูลคำนวณจากเคสในระบบ</p></div><button class="soft-btn module-utility-btn action-3d-orange" onclick="openReportExportSettingModal()">📄 ตั้งค่ารายงาน</button></div>
+        <div id="reportSummary" class="report-summary"></div>
+      </div>
+      <div class="panel service-report-panel">
+        <div class="panel-head toolbar-head"><div><h3>Service / PM Reports</h3><p>รายงานส่งลูกค้า พร้อม PM Checklist, อะไหล่ และ Before / After</p></div><button class="soft-btn" onclick="openFieldService()">＋ ทำรายงานหน้างาน</button></div>
+        <div class="table-wrap"><table><thead><tr><th>Report No.</th><th>Case</th><th>ลูกค้า</th><th>เครื่อง</th><th>ช่าง</th><th>วันที่</th><th>สถานะ</th><th>Export</th></tr></thead><tbody id="serviceReportTable"></tbody></table></div>
+        <div id="serviceReportCards" class="mobile-card-list"></div>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="page" id="page-settings">
+      
+      <div class="plain-module-intro">
+        <div><h2>ตั้งค่าระบบ</h2><p>กำหนดผู้ใช้งาน ขั้นตอนงาน SLA ค่าบริการ การแจ้งเตือน ภาษา การเชื่อมต่อ และโมดูลต่าง ๆ จากหน้าเดียว</p></div>
+        <span class="plain-status-badge action-3d-orange-soft settings-edit-badge">✓ แก้ไขได้ทุกส่วน</span>
+      </div>
+      <div class="settings-section-head settings-section-accent"><div><b>การจัดการระบบและขั้นตอนงาน</b><small>ผู้ใช้งาน สิทธิ์ ขั้นตอนงาน ข้อมูลหลัก ภาษา และข้อมูลบริษัท</small></div></div>
+      <div class="settings-card-grid">
+        <button class="setting-action-card" onclick="openRolesSettingModal()"><span class="setting-icon">👥</span><div><b>ผู้ใช้งานและสิทธิ์</b><small id="setRolesSummary">กำหนดบทบาทและสิทธิ์การใช้งาน</small></div><strong>›</strong></button>
+        <button class="setting-action-card v68-employee-card" onclick="openEmployeeSettingModal()"><span class="setting-icon">🪪</span><div><b>พนักงานที่เกี่ยวข้อง</b><small id="setEmployeeSummary">รายชื่อผู้ประสานงานและพนักงาน Service</small></div><strong>›</strong></button>
+        <button class="setting-action-card" onclick="openSlaSettingModal()"><span class="setting-icon">⏱</span><div><b>SLA และขั้นตอนงาน</b><small id="setSlaSummary">เวลาตอบรับ แก้ไข และยกระดับงาน</small></div><strong>›</strong></button>
+        <button class="setting-action-card" onclick="openMasterHubModal()"><span class="setting-icon">🧩</span><div><b>ข้อมูลหลักของระบบ</b><small id="setMasterSummary">ประเภทงาน สถานะ และความสำคัญ</small></div><strong>›</strong></button>
+        <button class="setting-action-card" onclick="openLanguageSettingModal()"><span class="setting-icon">🌐</span><div><b>ภาษาและการแสดงผล</b><small id="setLanguageSummary">ภาษาไทย / English</small></div><strong>›</strong></button><button class="setting-action-card accessibility-card" onclick="openTypographySettingModal()"><span class="setting-icon font-setting-icon">Aa</span><div><b>ขนาดตัวอักษรและการเข้าถึง</b><small id="setTypographySummary">100% · มาตรฐาน</small></div><strong>›</strong></button>
+        <button class="setting-action-card" onclick="openCompanySettingModal()"><span class="setting-icon">🏢</span><div><b>ข้อมูลบริษัทและระบบ</b><small id="setCompanySummary">ชื่อระบบ บริษัท และข้อมูลเอกสาร</small></div><strong>›</strong></button>
+      </div>
+      <div class="settings-section-head settings-section-accent"><div><b>ค่าบริการและใบเสนอราคา</b><small>ค่าที่ใช้คำนวณบริการ ค่าเดินทาง ประกัน อะไหล่ และใบเสนอราคา</small></div></div>
+      <div class="settings-card-grid">
+        <button class="setting-action-card commercial setting-card-accent" onclick="openServiceRateSettingModal()"><span class="setting-icon">🧰</span><div><b>อัตราค่าบริการ</b><small id="setRateSummary">หน้างาน / Workshop / ตรวจวิเคราะห์ / ค่าแรง</small></div><strong>›</strong></button>
+        <button class="setting-action-card commercial setting-card-accent" onclick="openOnsitePricingSettingModal()"><span class="setting-icon">S/M/L</span><div><b>ราคา Service Level หน้างาน</b><small id="setOnsitePricingSummary">S 500 · M 1,000 · L 1,500 + Travel Zone</small></div><strong>›</strong></button>
+        <button class="setting-action-card commercial setting-card-accent" onclick="openTravelSettingModal()"><span class="setting-icon">🗺️</span><div><b>โซนและค่าเดินทาง</b><small id="setTravelSummary">ระยะทางและค่าเดินทาง</small></div><strong>›</strong></button>
+        <button class="setting-action-card commercial setting-card-accent" onclick="openEmergencySettingModal()"><span class="setting-icon">⚡</span><div><b>งานด่วนและการรับประกันงานซ่อม</b><small id="setEmergencySummary">งานด่วน / ฉุกเฉิน / Warranty</small></div><strong>›</strong></button>
+        <button class="setting-action-card commercial setting-card-accent" onclick="openQuotationSettingModal()"><span class="setting-icon">฿</span><div><b>ใบเสนอราคาและอะไหล่</b><small id="setQuoteSummary">VAT / Markup / อายุใบเสนอราคา</small></div><strong>›</strong></button>
+      </div>
+      <div class="settings-section-head settings-section-accent"><div><b>โมดูล Service ที่เพิ่มใหม่</b><small>ตั้งค่า Field Service, Location, Warranty, Documents, Media, Report และ Export</small></div></div>
+      <div class="settings-card-grid">
+        <button class="setting-action-card module-setting setting-card-accent" onclick="openFieldServiceSettingModal()"><span class="setting-icon">👨‍🔧</span><div><b>งานภาคสนามและใบตรวจช่าง</b><small id="setFieldSummary">PM / Maintenance / Service / Reminder</small></div><strong>›</strong></button>
+        <button class="setting-action-card module-setting setting-card-accent" onclick="openLocationSettingModal()"><span class="setting-icon">📍</span><div><b>ตำแหน่งลูกค้าและ Google Maps</b><small id="setLocationSummary">ที่อยู่ GPS และ Check-in</small></div><strong>›</strong></button>
+        <button class="setting-action-card module-setting setting-card-accent" onclick="openWarrantyModuleSettingModal()"><span class="setting-icon">🛡</span><div><b>ระบบประกันเครื่อง</b><small id="setWarrantyModuleSummary">ระยะประกัน เตือนหมดอายุ และแพ็กเกจ</small></div><strong>›</strong></button>
+        <button class="setting-action-card module-setting setting-card-accent" onclick="openDocumentModuleSettingModal()"><span class="setting-icon">📁</span><div><b>คลังเอกสารเครื่องจักร</b><small id="setDocumentModuleSummary">หมวดเอกสาร Upload / Drive Link</small></div><strong>›</strong></button>
+        <button class="setting-action-card module-setting setting-card-accent" onclick="openMediaSettingModal()"><span class="setting-icon">📷</span><div><b>รูปภาพ วิดีโอ และลายเซ็น</b><small id="setMediaSummary">Before / After / Video / Signature</small></div><strong>›</strong></button>
+        <button class="setting-action-card module-setting setting-card-accent" onclick="openReportExportSettingModal()"><span class="setting-icon">📄</span><div><b>รายงานและการส่งออกไฟล์</b><small id="setReportExportSummary">PDF / CSV / Excel / LINE Report</small></div><strong>›</strong></button>
+      </div>
+      <div class="settings-section-head settings-section-accent"><div><b>การสื่อสาร การเชื่อมต่อ และพฤติกรรมระบบ</b><small>LINE OA, Google Maps, Cloud, การแจ้งเตือน และการทำงานของ Web App</small></div></div>
+      <div class="settings-card-grid">
+        <button class="setting-action-card" onclick="openNotificationSettingModal()"><span class="setting-icon">🔔</span><div><b>การแจ้งเตือน</b><small id="setNotificationSummary">LINE OA / Email / Push / เหตุการณ์</small></div><strong>›</strong></button>
+        <button class="setting-action-card" onclick="openIntegrationSettingModal()"><span class="setting-icon">🔗</span><div><b>การเชื่อมต่อระบบ</b><small id="setIntegrationSummary">LINE OA / Maps / Drive / ERP</small></div><strong>›</strong></button>
+        <button class="setting-action-card" onclick="openLineOASettingModal()"><span class="setting-icon">LINE</span><div><b>LINE OA สำหรับลูกค้า</b><small id="setLineOASummary">LIFF / QR เครื่อง / Webhook Backend</small></div><strong>›</strong></button>
+        <button class="setting-action-card" onclick="openSystemBehaviorSettingModal()"><span class="setting-icon">🛡️</span><div><b>พฤติกรรมและความปลอดภัยระบบ</b><small id="setBehaviorSummary">Audit / Offline / Autosave / Export</small></div><strong>›</strong></button>
+        <button class="setting-action-card" onclick="syncCloud()"><span class="setting-icon">↻</span><div><b>ซิงก์และรีเฟรชข้อมูล</b><small>ซิงก์ข้อมูลกับ Cloud และรีเฟรชระบบ</small></div><strong>›</strong></button>
+        <button class="setting-action-card" onclick="openDataBackupModal()"><span class="setting-icon">💾</span><div><b>Data Backup / Restore</b><small>สำรองข้อมูลทั้งหมดเป็น JSON และนำกลับเข้าระบบ</small></div><strong>›</strong></button>
+      </div>
+      <div class="settings-grid settings-cloud-grid">
+        <div class="panel"><div class="panel-head"><div><h3>ฐานข้อมูล Cloud</h3><p>Supabase Database + Storage</p></div><span class="setting-state" id="setCloudState">Local</span></div><div class="panel-body"><div class="info-box">ส่วนนี้สำหรับ IT เชื่อมฐานข้อมูลกลางภายหลัง โดยระบบยังใช้งานแบบ Local ได้ตามปกติ</div><div class="field"><label>URL โครงการ Supabase</label><input id="supabaseUrl" placeholder="https://xxxx.supabase.co"></div><div class="field"><label>Publishable / Anon Key</label><textarea id="supabaseKey" placeholder="sb_publishable_..."></textarea></div><div class="button-row"><button class="soft-btn" onclick="disconnectCloud()">ใช้ข้อมูลในเครื่อง</button><button class="primary-btn" onclick="saveCloudSettings()">เชื่อม Cloud</button></div><div id="cloudResult" class="cloud-result"></div></div></div>
+        <div class="panel"><div class="panel-head"><div><h3>สรุปค่ากำหนดระบบ</h3><p>ค่าหลักที่ระบบกำลังใช้งาน</p></div><button class="soft-btn" onclick="exportSettings()">ส่งออก JSON</button></div><div id="settingsSnapshot" class="settings-snapshot"></div></div>
+        <div class="panel span2"><div class="panel-head"><div><h3>สถานะระบบ</h3><p>จำนวนข้อมูลและการเชื่อมต่อ</p></div></div><div id="systemStatus" class="system-status"></div></div>
+      </div>
+    </section>
+</main>
+
+  <!-- MOBILE BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <button data-page="dashboard" class="active"><span>▦</span><b>หน้าหลัก</b></button>
+    <button data-page="cases"><span>📋</span><b>เคส</b></button>
+    <button class="fab" onclick="openCaseModal()"><span>＋</span><b>รับเคส</b></button>
+    <button data-page="calendar"><span>📅</span><b>ปฏิทิน</b></button>
+    <button onclick="openMoreSheet()"><span>•••</span><b>เพิ่มเติม</b></button>
+  </nav>
+</div>
+
+<div class="modal" id="modal">
+  <div class="modal-panel" id="modalPanel">
+    <div class="modal-head"><div><h2 id="modalTitle"></h2><p id="modalSub"></p></div><button class="close-btn" onclick="closeModal()">×</button></div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script src="./js/02-demo-data.js"></script>
+<script src="./js/03-app-core.js"></script>
+
+<script src="./js/04-v67EnhanceScript.js"></script>
+
+
+<script src="./js/05-v671QcQrResponsiveFixScript.js"></script>
+
+
+<script src="./js/06-v68ModulesScript.js"></script>
+
+
+<script src="./js/07-v68MachineLimitQcActionFix.js"></script>
+
+
+<!-- =====================================================================
+     I-MODE Plus Customer Portal V6.9.1 SAFE PATCH
+     - Appended after every original script so existing buttons remain intact.
+     - QR continues to use the existing LIFF / machineToken URL builder.
+     - Portal actions open a dedicated detail view with Back navigation.
+     - Responsive layout for phones and tablets.
+     ===================================================================== -->
+<link rel="stylesheet" href="./css/20-customer-portal-must-own-the-viewport-when-o.css">
+
+<script src="./js/08-imodePortalV691SafeScript.js"></script>
+
+<script src="./js/09-v68UatAccountsScript.js"></script>
+
+<script src="./js/10-v68RoleHomeScript.js"></script>
+
+<script src="./auth/auth-core.js"></script>
+<script src="./auth/auth-local.js"></script>
+<script src="./auth/auth-supabase.js"></script>
+<script src="./auth/auth-integration.js"></script>
+
+<script src="./js/11-v69PortalEntryScript.js"></script>
+
+<script src="./js/12-v69RoleScopeScript.js"></script>
+
+<script src="./js/13-v69TeamScopeScript.js"></script>
+
+<script src="./js/14-v69CustomerEntryScript.js"></script>
+
+<script src="./js/15-v69SidebarAccountScript.js"></script>
+
+<script src="./js/16-v69WorkAssignScript.js"></script>
+
+<script src="./js/17-v69LoginUserListScript.js"></script>
+
+<script src="./js/18-v69LineQrScript.js"></script>
+
+</body>
+</html>

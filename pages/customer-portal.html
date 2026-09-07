@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<base href="../">
+<title>Customer Portal · I-MODE Plus</title>
+
+<!-- ==========================================================================
+     I-MODE Plus · หน้าลูกค้า (Customer Portal)
+
+     ไฟล์นี้เป็น "หน้าจริง" ของหน้าลูกค้า แก้ที่นี่ได้เลย
+     ./pages/pages.js จะดึงเฉพาะ <section id="page-customer-portal"> ด้านล่าง
+     ไปวางใน <main> ของ index.html ตอนหน้าเว็บกำลังโหลด
+
+     ทุกอย่างใน <head> นี้มีไว้ให้ "เปิดไฟล์นี้เดี่ยวๆ แล้วเห็นหน้าตาจริง" เท่านั้น
+     ไม่ถูกส่งเข้า index.html จึงไม่กระทบลำดับ CSS ของแอป
+     (ถ้าย้าย <link> พวกนี้เข้าไปใน <section> จะไปทับ CSS ของทั้งระบบ)
+
+     id สามตัวนี้ห้ามเปลี่ยนชื่อ — renderCustomerPortal() เขียนข้อมูลลงไปโดยตรง:
+     portalLineIdentity · portalMachineHero · portalContent
+     ========================================================================== -->
+
+<link rel="stylesheet" href="css/01-base-theme.css">
+<link rel="stylesheet" href="css/02-v6.1-sales-easy-mode.css">
+<link rel="stylesheet" href="css/03-service-focus-badge.css">
+<link rel="stylesheet" href="css/04-qc-layout.css">
+<link rel="stylesheet" href="css/05-kpi-cards.css">
+<link rel="stylesheet" href="css/06-v6.7.1-sidebar-vertical-scroll-only-no-h.css">
+<link rel="stylesheet" href="css/07-v671-qc-document-qr-modal.css">
+<link rel="stylesheet" href="css/08-v6.7.1-mobile-dashboard-logo-readability.css">
+<link rel="stylesheet" href="css/09-v6.8-v5.17-inspired-n.css">
+<link rel="stylesheet" href="css/10-v68-style-correction.css">
+<link rel="stylesheet" href="css/11-v68-responsive-layout.css">
+<link rel="stylesheet" href="css/12-v6.8-desktop-sidebar-aligns-with-the-top-b.css">
+<link rel="stylesheet" href="css/13-v6.8-sidebar-uses-the-transparent-ui-logo.css">
+<link rel="stylesheet" href="css/14-v6.8-remove-the-stray-vertical-accent-bar.css">
+<link rel="stylesheet" href="css/15-v6.8-enlarge-only-the-ui-logo-at-the-top-o.css">
+<link rel="stylesheet" href="css/16-v6.8-mobile-calendar-show-the-real-calend.css">
+<link rel="stylesheet" href="css/17-v6.8-qr-customer-portal-preview-hide-the.css">
+<link rel="stylesheet" href="css/18-cases-toolbar-tabs.css">
+<link rel="stylesheet" href="css/19-v6.8---machine-display-limit-total-counter.css">
+<link rel="stylesheet" href="css/20-customer-portal-must-own-the-viewport-when-o.css">
+<style>
+  /* .page ถูกซ่อนไว้จนกว่า goPage() จะเติม .active ให้ — เปิดให้เห็นเฉพาะตอนดูไฟล์นี้เดี่ยวๆ */
+  body{margin:0;background:#eef4ff}
+  #page-customer-portal{display:block}
+</style>
+</head>
+<body>
+
+<section class="page customer-portal-page" id="page-customer-portal">
+      <div class="portal-shell">
+        <div class="portal-header"><img src="./assets/imode-ui-logo-v532.png" alt="I-MODE"><div><b>I-MODE Plus</b><small>Customer Service Portal</small></div><button class="portal-close" onclick="exitCustomerPortal()">×</button></div>
+        <div id="portalLineIdentity" class="portal-line-identity"></div>
+        <div id="portalMachineHero"></div>
+        <div class="portal-action-grid">
+          <button onclick="openPortalIssueForm()"><span>🔧</span><b>แจ้งปัญหาเครื่อง</b><small>เปิด Service Case ผ่าน LINE</small></button>
+          <button onclick="showPortalWarranty()"><span>🛡</span><b>เช็คประกัน</b><small>วันเริ่ม/หมดอายุ Warranty</small></button>
+          <button onclick="openPortalServiceQuoteRequest()"><span>💰</span><b>ขอราคา Service</b><small>ให้ทีมจัดทำใบเสนอราคาบริการ</small></button>
+          <button onclick="openPortalWarrantyRequest()"><span>฿</span><b>ซื้อ / ต่อ Warranty</b><small>ขอใบเสนอราคา Warranty</small></button>
+          <button onclick="showPortalHistory()"><span>🕘</span><b>ประวัติ Service</b><small>ซ่อม PM และเปลี่ยนอะไหล่</small></button>
+          <button onclick="showPortalDocuments()"><span>📘</span><b>คู่มือเครื่อง</b><small>Manual / Datasheet / PM</small></button>
+          <button onclick="contactServiceFromPortal()"><span>💬</span><b>ติดต่อ Service</b><small>โทร / LINE Official Account</small></button>
+        </div>
+        <div id="portalContent" class="portal-content"></div>
+        <div class="portal-footer">บริษัท ไอโมด พลัส จำกัด • I-MODE Plus Service & Maintenance</div>
+      </div>
+    </section>
+
+</body>
+</html>

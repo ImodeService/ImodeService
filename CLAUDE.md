@@ -2230,3 +2230,72 @@ Two changes to the customer Home page, both in `css/22-v69-customer-home.css`.
 Suite z1, 14 assertions: the header background and all three text colours, the close chip,
 the logo chip removed, the strip element still present but `display:none`, the LINE mini
 button not visible, and the machine card / 8 action cards / no overflow unaffected.
+
+### Follow-up (same day): the printed QR did not work on a customer's phone
+
+Reported from the live GitHub Pages site: scanning a printed machine QR on a phone showed
+**ไม่พบข้อมูลเครื่องจาก QR Code**.
+
+`ensureMasters()` minted the token with `'QR-'+uid()` — **random, and generated
+independently in every browser**. With no shared database, the office PC and the customer's
+phone each invented a different token for the same machine, so a printed QR could never
+resolve anywhere but the machine that printed it. Machine ids and serials come from
+`js/02-demo-data.js` and are identical on every device, which is exactly why typing the
+serial always worked and scanning never did. Verified with two fresh profiles: ids matched,
+serials matched, tokens did not.
+
+**`js/21-v69StableQrScript.js` (new)**
+
+- `qrToken` is now **`QR-<machine id>`** — derived, so two devices compute the same value
+  without talking to each other. Hung off a wrapper around `ensureMasters()`, which is
+  where the random token was minted and which runs on every `renderAll()`, so a machine
+  added on the Machines page gets a stable token as soon as it is saved.
+- **QRs printed before this change must be reprinted**; their random token no longer
+  resolves. Nothing that used to work stops working — no QR had ever worked on a second
+  device.
+- **A URL for the LINE rich menu**, which did not exist: `initPortalFromUrl()` only
+  understood `?machineToken=` and `#/customer-portal`, both of which need a machine already
+  chosen. Now `#/customer-entry` (or `?page=customer-entry`) opens the scan / serial page,
+  and `?serial=<serial>` opens that machine's Home page directly — an unknown serial lands
+  on the entry page with the box prefilled rather than on an empty form. It routes on
+  DOMContentLoaded *after* js/11's `bootRoute()` has sent the session-less visitor to the
+  staff door, because js/21 registers its listener later.
+
+**Forced dark mode.** The phone repainted the white customer page dark and inverted the
+machine photograph. `<meta name="color-scheme" content="light">` in index.html and
+`:root{color-scheme:only light}` in css/22 — some Android browsers honour only one of the
+two.
+
+**Still true and worth repeating:** a machine the office *adds* does not exist on a
+customer's phone at all, whatever its token, until Supabase is connected. Only the seeded
+machines are shared. Also worth setting **ตั้งค่าระบบ → ตั้งค่า LINE OA → Public App URL**
+(`lnPublic`) to the public site, or a QR generated from Live Server points at
+`127.0.0.1:5500` and works on nothing but that PC.
+
+Suite q2, 14 assertions: the token is derived from the id, two devices compute the same
+one, device A's QR opens the Home page on device B with the right machine, both rich-menu
+routes, the `?serial=` deep link and its unknown-serial fallback, and color-scheme pinned.
+**16 suites, 183 assertions, 0 failures, 0 JS errors.**
+
+### Follow-up (same day): the project is a git repository now
+
+It was not one — every deployment meant uploading through the GitHub web UI and deleting
+the stale files by hand, which is also how a renamed file (`customer-portal.html` →
+`customer-home.html`) can end up served alongside its replacement.
+
+- `git init` on `E:\ImodeService-main`, `user.email = service@imode.co.th`, branch `main`,
+  one commit of all 80 tracked files. `.gitignore` was already correct (logs, backups with
+  real customer data, credentials).
+- Remote added, **nothing pushed** — the user asked for the commands rather than the push.
+  `origin = https://github.com/ImodeService/ImodeService.git`
+- Windows needed `git config --global --add safe.directory E:/ImodeService-main` first;
+  E: does not record ownership and git refuses the repo without it.
+
+**The live site is served from a sub-path**: `https://imodeservice.github.io/ImodeService/`,
+not the domain root. Verified the whole app under that prefix with a rewriting test server —
+boot, the 22 stylesheets, the customer page markup (not the fallback), the QR URL keeping
+the prefix, `?machineToken=`, `#/customer-entry`, `?serial=` and the `./vendor/jsQR.min.js`
+resolution all work, because every path in the project is relative. So the rich-menu link
+is **`https://imodeservice.github.io/ImodeService/#/customer-entry`**.
+
+Suite q3, 10 assertions, covers the sub-path deployment.

@@ -13,6 +13,12 @@
    --chome-i, an index js/19 stamps on every button before the first paint.
    ===================================================================== */
 
+/* Belt and braces with the <meta name="color-scheme"> in index.html: some Android
+   browsers only honour the CSS property. The whole UI is white by design — without this,
+   Chrome/Samsung Internet "auto dark theme" repaints the customer page dark and inverts
+   the machine photographs. */
+:root{color-scheme:only light}
+
 .chome{
   --chome-ink:#0c225e;
   --chome-muted:#68789a;

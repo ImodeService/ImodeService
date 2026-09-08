@@ -120,23 +120,9 @@ body.customer-portal-mode .portal-action-grid > button:active{
   transform:translateY(var(--tactile-press));
   box-shadow:0 1px 0 #b94705, 0 4px 9px rgba(238,95,11,.20), inset 0 2px 6px rgba(138,48,0,.20) !important;
 }
-.centry-scan-file,
 .rhome-login-btn{
   transition:transform .16s ease, box-shadow .16s ease, filter .16s ease;
   will-change:transform;
-}
-.centry-scan-file{
-  box-shadow:0 4px 0 #dfe9f8, 0 10px 18px rgba(16,54,128,.10), inset 0 1px 0 #fff;
-}
-.centry-scan-file:hover{
-  transform:translateY(var(--tactile-lift));
-  box-shadow:0 6px 0 #d6e4f7, 0 14px 24px rgba(16,54,128,.14), inset 0 1px 0 #fff;
-}
-.centry-scan-file:active{
-  transform:translateY(var(--tactile-press));
-  box-shadow:0 1px 0 #d6e4f7, 0 4px 8px rgba(16,54,128,.12), inset 0 2px 6px rgba(16,54,128,.10);
-}
-.rhome-login-btn{
   box-shadow:0 5px 0 #0a479f, 0 13px 22px rgba(11,99,229,.26), inset 0 1px 0 rgba(255,255,255,.35);
 }
 .rhome-login-btn:hover{
@@ -261,7 +247,6 @@ body.customer-portal-mode .portal-action-grid > button:active{
   .rhome-modcard-icon,
   .rhome-modtoggle,
   .centry-scan,
-  .centry-scan-file,
   .rhome-login-btn,
   .work-row,
   .field-job-card,
@@ -280,8 +265,6 @@ body.customer-portal-mode .portal-action-grid > button:active{
   .rhome-modcard:active:not(.is-launch),
   .centry-scan:hover,
   .centry-scan:active,
-  .centry-scan-file:hover,
-  .centry-scan-file:active,
   .rhome-login-btn:hover,
   .rhome-login-btn:active,
   .work-row:hover,

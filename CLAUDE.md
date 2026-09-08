@@ -2344,3 +2344,52 @@ Suites b1 (16) and b2 (17): module → module → Back through the staff Home bo
 navigation three deep, the customer report form, **Back straight after submitting a case**,
 the entry page → machine → Back, the portal's own ← arrow consuming its entry, and the boot
 not stacking dead entries.
+
+### Follow-up (same day): the result screen after reporting, and why the admin sees nothing
+
+**1. The report result screen.** `submitPortalIssue()` replaced `#portalContent` with a bare
+"รับแจ้งปัญหาแล้ว" and stopped there — a dead end with no way back and no sight of the case
+just opened. `js/19` now wraps it (it is a top-level function declaration in js/03, so
+`window.submitPortalIssue` and the binding the form reads are the same property, and
+`openPortalIssueForm()` picks the override up when it wires the form). The screen now shows
+
+- **✅ ทำรายการสำเร็จ** with the ticket number,
+- **รายการแจ้งเคสของเครื่องนี้** — every case for that machine, newest first, with a status
+  chip,
+- **กลับหน้าหลัก**,
+- and a `toastMsg()` confirmation.
+
+**2. The photo-of-QR button is gone** from the machine-entry page, as asked, along with its
+file input, its `decodeImageFile()` decoder and its styles. `vendor/jsQR.min.js` stays —
+the camera path still needs it wherever `BarcodeDetector` is missing. The camera error
+messages no longer offer the photo option.
+
+**3. Why a case reported on a phone never reaches the admin — not a bug**
+
+Measured on the live site: `localStorage.imode_v5_cloud` is null, `cloudSettings.url` is
+empty, `supa` is null, the Settings badge reads **Local Mode**, and a fresh device has
+`cases.length === 0`.
+
+Every device keeps its **own** localStorage. The customer's phone writes the case to the
+phone; the admin's PC reads its own copy. They never meet. Nothing in the frontend can fix
+this — `submitPortalIssue()` already calls `cloudUpsertCase(c)` and `cloudUpsertLineRequest(req)`,
+and both are no-ops while `supa` is null. Same device → same browser works and is covered by
+suite y4.
+
+The fix is to connect the database, in this order:
+
+1. Supabase → new project, keep the **Project URL** and **anon key**.
+2. SQL Editor → run **`supabase/00-tables.sql`** only.
+3. In the app: ตั้งค่าระบบ → ฐานข้อมูล Cloud → paste both → **เชื่อม Cloud**.
+
+**Do not run `02-rls.sql` yet.** Its policies grant insert `to authenticated` only
+(lines ~158 and ~172), and part 12 removed customer accounts — an anonymous customer would
+be denied and the portal would stop being able to open a case at all. Turning RLS on needs
+that decision revisited first: either an explicit anon-insert policy for `service_cases` and
+`line_customer_requests`, or moving the write behind `settings.lineConfig.backendEndpoint`,
+which `sendPortalBackend()` already posts to.
+
+Suite c2, 16 assertions: the photo button and its input are gone, the scan button and serial
+box remain, the success banner with its ticket, the case list growing from one to two
+reports, the status chip, the toast, and กลับหน้าหลัก returning to the Home page through the
+new history entry.

@@ -83,12 +83,12 @@
     not something the visitor can act on. */
  function noScanReason(){
   if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia))
-   return tl('เบราว์เซอร์นี้เปิดกล้องไม่ได้ กรุณากรอกหมายเลขเครื่อง หรือเลือกรูป QR จากเครื่อง',
-             'This browser cannot open a camera — type the serial, or pick a photo of the QR.');
+   return tl('เบราว์เซอร์นี้เปิดกล้องไม่ได้ กรุณากรอกหมายเลขเครื่องด้านล่าง',
+             'This browser cannot open a camera — please type the serial below.');
   if(!window.isSecureContext)
    /* An http:// LAN address is the usual case here — a phone opening 192.168.x.x. */
-   return tl('เบราว์เซอร์เปิดกล้องได้เฉพาะหน้าเว็บที่เป็น https (หรือ localhost) เท่านั้น กรุณากรอกหมายเลขเครื่อง หรือเลือกรูป QR จากเครื่อง',
-             'Browsers only allow the camera on https pages (or localhost). Type the serial, or pick a photo of the QR.');
+   return tl('เบราว์เซอร์เปิดกล้องได้เฉพาะหน้าเว็บที่เป็น https (หรือ localhost) เท่านั้น กรุณากรอกหมายเลขเครื่องด้านล่าง',
+             'Browsers only allow the camera on https pages (or localhost). Please type the serial below.');
   return tl('อุปกรณ์นี้สแกน QR ไม่ได้ กรุณากรอกหมายเลขเครื่องด้านล่าง',
             'This device cannot scan a QR code — please type the serial below');
  }
@@ -116,11 +116,6 @@
    +'<p>'+esc2(tl('ระบุเครื่องของคุณเพื่อเข้าใช้บริการ','Tell us which machine you have'))+'</p>'
    +(canScan()?'<button type="button" class="centry-scan" id="centryScan">📷 '+esc2(tl('สแกน QR ที่ตัวเครื่อง','Scan the QR on the machine'))+'</button>'
               :'<div class="centry-scan-off">'+esc2(noScanReason())+'</div>')
-   /* A photo of the QR works on every device, camera or not: a desktop with the picture
-      already saved, an iPhone that took the shot in the plant, a browser that refuses the
-      camera. Same decoder, so it costs nothing extra. */
-   +'<button type="button" class="centry-scan-file" id="centryPick">🖼 '+esc2(tl('เลือกรูป QR จากเครื่อง','Use a photo of the QR'))+'</button>'
-   +'<input type="file" id="centryFile" accept="image/*" hidden>'
    +'<div class="rhome-login-or">'+esc2(tl('หรือ','or'))+'</div>'
    +'<form id="centryForm" autocomplete="off">'
    +'<div class="rhome-field"><span aria-hidden="true">🔎</span><input id="centrySerial" placeholder="'+esc2(tl('หมายเลขเครื่อง (S/N)','Machine serial number'))+'" aria-label="'+esc2(tl('หมายเลขเครื่อง','Machine serial number'))+'"></div>'
@@ -137,8 +132,6 @@
   if(scan)scan.onclick=startScan;
   var stop=document.getElementById('centryStop');
   if(stop)stop.onclick=stopScan;
-  var pick=document.getElementById('centryPick'),file=document.getElementById('centryFile');
-  if(pick&&file){pick.onclick=function(){file.value='';file.click()};file.onchange=function(){decodeImageFile(file.files&&file.files[0])}}
  }
  window.imodeRenderCustomerEntry=renderEntry;
 
@@ -265,26 +258,6 @@
   });
  }
 
- /* ---------- 4c. scan from a photo ---------- */
- function decodeImageFile(file){
-  if(!file)return;
-  entryError(tl('กำลังอ่านรูป...','Reading the image...'));
-  getDecoder().then(function(decode){
-   var img=new Image();
-   img.onload=function(){
-    decode(img).then(function(text){
-     try{URL.revokeObjectURL(img.src)}catch(e){}
-     if(text){scanState.lastBad='';entryError('');handleScanned(text);return}
-     entryError(tl('ไม่พบ QR ในรูปนี้ ลองถ่ายใหม่ให้ชัดขึ้น หรือกรอกหมายเลขเครื่องด้านล่าง','No QR code found in that image — try a clearer photo, or type the serial below'));
-    });
-   };
-   img.onerror=function(){entryError(tl('เปิดรูปนี้ไม่ได้','That image could not be opened'))};
-   img.src=URL.createObjectURL(file);
-  },function(){
-   entryError(tl('โหลดตัวอ่าน QR ไม่สำเร็จ กรุณากรอกหมายเลขเครื่อง','The QR reader could not be loaded — please type the serial'));
-  });
- }
-
  function startScan(){
   if(inLineClient()&&typeof liff.scanCodeV2==='function'){
    liff.scanCodeV2().then(function(res){handleScanned(res&&res.value)},function(){
@@ -325,11 +298,11 @@
    stopScan();
    var name=err&&err.name||'';
    if(name==='NotAllowedError'||name==='SecurityError')
-    entryError(tl('เบราว์เซอร์ไม่อนุญาตให้ใช้กล้อง กรุณากดอนุญาตกล้องแล้วลองใหม่ หรือเลือกรูป QR จากเครื่อง','Camera permission was refused — allow the camera and try again, or use a photo of the QR'));
+    entryError(tl('เบราว์เซอร์ไม่อนุญาตให้ใช้กล้อง กรุณากดอนุญาตกล้องแล้วลองใหม่ หรือกรอกหมายเลขเครื่อง','Camera permission was refused — allow the camera and try again, or type the serial'));
    else if(name==='NotFoundError'||name==='OverconstrainedError')
-    entryError(tl('ไม่พบกล้องบนอุปกรณ์นี้ กรุณาเลือกรูป QR จากเครื่อง หรือกรอกหมายเลขเครื่อง','No camera on this device — use a photo of the QR, or type the serial'));
+    entryError(tl('ไม่พบกล้องบนอุปกรณ์นี้ กรุณากรอกหมายเลขเครื่องด้านล่าง','No camera on this device — please type the serial below'));
    else
-    entryError(tl('เปิดกล้องไม่สำเร็จ กรุณาเลือกรูป QR จากเครื่อง หรือกรอกหมายเลขเครื่อง','Could not open the camera — use a photo of the QR, or type the serial'));
+    entryError(tl('เปิดกล้องไม่สำเร็จ กรุณากรอกหมายเลขเครื่องด้านล่าง','Could not open the camera — please type the serial below'));
   });
  }
 
@@ -441,8 +414,6 @@
  +'.centry-card{max-width:400px}'
  +'.centry-scan{width:100%;border:none;border-radius:12px;padding:13px;font-size:14px;font-weight:700;color:#fff;cursor:pointer;background:linear-gradient(180deg,#ff9a4d,#f2711c);box-shadow:0 10px 22px rgba(242,113,28,.28)}'
  +'.centry-scan:hover{filter:brightness(1.05)}'
- +'.centry-scan-file{width:100%;margin-top:9px;border:1px solid #cfe0f7;border-radius:12px;padding:11px;font-size:13px;font-weight:700;color:#0c4bb5;cursor:pointer;background:linear-gradient(180deg,#ffffff,#eef4ff)}'
- +'.centry-scan-file:hover{border-color:#9dc4f2}'
  +'.centry-choice{display:grid;gap:8px;margin-top:10px}'
  +'.centry-choice button{text-align:left;padding:10px 12px;border:1px solid #d7e3f5;border-radius:12px;background:#fff;cursor:pointer}'
  +'.centry-choice button:hover{border-color:#0b63e5}'

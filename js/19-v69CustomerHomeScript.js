@@ -135,6 +135,86 @@
  }
  window.imodeCustomerHomeEntrance=playEntrance;
 
+ /* ---------- 5b. what a customer sees after reporting a problem ----------
+    The base submitPortalIssue() replaced #portalContent with a bare "รับแจ้งปัญหาแล้ว".
+    The customer is then looking at a dead end: no confirmation they can act on, and no way
+    to see the case they just opened alongside the ones before it. The result screen now
+    carries a success banner, the machine's case list newest first, and a way back.
+
+    submitPortalIssue is a top-level function declaration in js/03, so the binding the form
+    reads and window.submitPortalIssue are the same property — overriding it here is enough,
+    and openPortalIssueForm() picks the override up when it wires the form on submit. */
+ function caseStatusClass(st){
+  var s=String(st||'');
+  if(s==='ปิดเคส'||s==='เสร็จสิ้น')return 'done';
+  if(s==='รออะไหล่')return 'wait';
+  if(s==='เคสใหม่')return 'new';
+  return 'open';
+ }
+ function machineCaseListHTML(){
+  var e=window.esc||function(v){return String(v==null?'':v)};
+  var m=null;
+  try{m=typeof portalMachine==='function'?portalMachine():null}catch(err){}
+  if(!m)return '';
+  var list=[];
+  try{
+   list=(Array.isArray(cases)?cases:[]).filter(function(c){return c.machineId===m.id})
+    .sort(function(a,b){return new Date(b.createdAt||0)-new Date(a.createdAt||0)});
+  }catch(err){list=[]}
+  var rows=list.map(function(c){
+   var when='';
+   try{when=typeof fmt==='function'?fmt(c.createdAt):String(c.createdAt||'')}catch(err){}
+   return '<div class="chome-case">'
+    +'<div class="chome-case-top"><b>'+e(c.ticket||'-')+'</b>'
+    +'<span class="chome-case-chip '+caseStatusClass(c.status)+'">'+e(c.status||'-')+'</span></div>'
+    +'<small>'+e(when)+(c.serviceType?' · '+e(c.serviceType):'')+'</small>'
+    +(c.issue?'<small class="chome-case-issue">'+e(String(c.issue).slice(0,120))+'</small>':'')
+    +'</div>';
+  }).join('');
+  return '<div class="chome-caselist"><h4>'+e(tl('รายการแจ้งเคสของเครื่องนี้','Cases for this machine'))
+   +' <span>'+list.length+'</span></h4>'
+   +(rows||'<p class="chome-case-empty">'+e(tl('ยังไม่มีรายการ','Nothing yet'))+'</p>')
+   +'</div>';
+ }
+
+ function submitResultHTML(ticket){
+  var e=window.esc||function(v){return String(v==null?'':v)};
+  return '<div class="chome-done">'
+   +'<div class="chome-done-mark" aria-hidden="true">✅</div>'
+   +'<b>'+e(tl('ทำรายการสำเร็จ','Request sent'))+'</b>'
+   +'<p>'+e(tl('รับแจ้งปัญหาเรียบร้อยแล้ว','We have received your report'))
+   +(ticket?' · '+e(tl('เลขเคส ','Case '))+'<strong>'+e(ticket)+'</strong>':'')+'</p>'
+   +'<small>'+e(tl('ทีม Service จะติดต่อกลับเพื่อยืนยันนัดหมาย','The service team will contact you to confirm an appointment'))+'</small>'
+   +'</div>'
+   +machineCaseListHTML()
+   +'<button type="button" class="chome-back-home" onclick="imodePortalBackHome()">'
+   +e(tl('กลับหน้าหลัก','Back to the home page'))+'</button>';
+ }
+
+ var baseSubmitIssue=window.submitPortalIssue;
+ if(typeof baseSubmitIssue==='function'){
+  window.submitPortalIssue=function(ev){
+   var before=[];
+   try{before=(Array.isArray(cases)?cases:[]).map(function(c){return c.id})}catch(err){}
+   var out=baseSubmitIssue.apply(this,arguments);
+   var finish=function(){
+    var fresh=null;
+    try{
+     fresh=(Array.isArray(cases)?cases:[]).filter(function(c){return before.indexOf(c.id)<0})[0]||null;
+    }catch(err){}
+    var host=document.getElementById('portalContent');
+    if(host)host.innerHTML=submitResultHTML(fresh&&fresh.ticket);
+    if(typeof window.toastMsg==='function'){
+     window.toastMsg(tl('ทำรายการสำเร็จ · ส่งแจ้งปัญหาแล้ว','Done — your report has been sent'));
+    }
+   };
+   /* The base is async and writes its own confirmation last, so wait for it. */
+   if(out&&typeof out.then==='function')out.then(finish,finish);
+   else setTimeout(finish,0);
+   return out;
+  };
+ }
+
  /* ---------- 6. ข่าวสาร / ประกาศ ----------
     There is no news module in this application, so the card reads settings.portalNews —
     an array of {title, date, body} an admin can fill in later — and says plainly when

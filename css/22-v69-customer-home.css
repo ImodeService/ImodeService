@@ -297,6 +297,86 @@
 .chome-anim .chome-header{animation:chomeFadeIn .3s ease backwards}
 
 /* ---------------------------------------------------------------------
+   4b. After reporting a problem: confirmation + the machine's case list
+   --------------------------------------------------------------------- */
+.chome-done{
+  text-align:center;
+  padding:16px 12px 14px;
+  border-radius:16px;
+  background:linear-gradient(160deg,#e9f9ef,#ffffff);
+  border:1px solid #c8ead6;
+}
+.chome-done-mark{font-size:38px;line-height:1}
+.chome-done b{
+  display:block;
+  margin-top:6px;
+  font-size:17px;
+  color:#12784a;
+}
+.chome-done p{margin:6px 0 0;font-size:12.5px;color:var(--chome-ink)}
+.chome-done strong{color:#0b63e5}
+.chome-done small{display:block;margin-top:6px;font-size:11px;color:var(--chome-muted)}
+
+.chome-caselist{margin-top:16px}
+.chome-caselist h4{
+  margin:0 0 8px;
+  font-size:13.5px;
+  color:var(--chome-ink);
+  display:flex;
+  align-items:center;
+  gap:7px;
+}
+.chome-caselist h4 span{
+  font-size:11px;
+  font-weight:800;
+  color:#0b63e5;
+  background:#eaf2ff;
+  border:1px solid #d5e6fd;
+  border-radius:999px;
+  padding:1px 8px;
+}
+.chome-case{
+  padding:10px 12px;
+  border:1px solid var(--chome-line);
+  border-radius:12px;
+  background:#fff;
+  margin-bottom:8px;
+}
+.chome-case-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.chome-case-top b{font-size:12.5px;color:var(--chome-ink)}
+.chome-case small{display:block;margin-top:3px;font-size:10.5px;color:var(--chome-muted)}
+.chome-case-issue{overflow-wrap:anywhere}
+.chome-case-chip{
+  flex:0 0 auto;
+  font-size:10.5px;
+  font-weight:800;
+  border-radius:999px;
+  padding:2px 9px;
+}
+.chome-case-chip.new{background:#eaf2ff;color:#0b63e5;border:1px solid #d5e6fd}
+.chome-case-chip.open{background:#fff4e2;color:#9a5b06;border:1px solid #f6d9ab}
+.chome-case-chip.wait{background:#fdeceb;color:#9d2b26;border:1px solid #f5c9c6}
+.chome-case-chip.done{background:#e6f7ec;color:#12784a;border:1px solid #bde9cf}
+.chome-case-empty{font-size:12px;color:var(--chome-muted);margin:0}
+
+.chome-back-home{
+  width:100%;
+  margin-top:14px;
+  padding:12px;
+  border:1px solid #cfe0f7;
+  border-radius:12px;
+  font-size:13.5px;
+  font-weight:700;
+  color:#0c4bb5;
+  cursor:pointer;
+  background:linear-gradient(180deg,#ffffff,#eef4ff);
+  box-shadow:0 4px 0 #dfe9f8, 0 10px 18px rgba(16,54,128,.10);
+  transition:transform .16s ease, box-shadow .16s ease;
+}
+.chome-back-home:hover{transform:translateY(-2px);box-shadow:0 6px 0 #d6e4f7, 0 14px 24px rgba(16,54,128,.14)}
+.chome-back-home:active{transform:translateY(3px);box-shadow:0 1px 0 #d6e4f7, inset 0 2px 6px rgba(16,54,128,.10)}
+
+/* ---------------------------------------------------------------------
    5. Footer
    --------------------------------------------------------------------- */
 .chome-footer{

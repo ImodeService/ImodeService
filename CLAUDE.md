@@ -2467,3 +2467,110 @@ in งานของฉัน**. Test rows deleted afterwards; the tables are e
 Harness note: `cdp.py` now sets `imode_v69_cloud_optout` on every test document, so the
 other suites stay offline and never write to the live project. A suite that means to
 exercise the cloud sets `cdp.CLOUD = True` first (e1, e2).
+
+---
+
+## Session Change Log — 2026-09-09 (part 15): the cloud was never actually writable
+
+The user reported that after following the previous session's steps the data still did not
+travel — open the link in a second browser and it is gone — and supplied
+`supabase/imode-seed-2026-09-08T08-56-53.sql`, exported with `export-local-to-sql.js`.
+
+### The seed file was never the problem
+
+Checked before touching anything: every column the file writes exists in the live schema
+(all 9 tables, including `"sourceOrder"`), it parses to 11 customers / 41 machines /
+5 technicians / 3 cases / 40 warranties / 1 line request / 1 report / 1 quotation /
+1 settings row, Thai text is intact, and `qrToken` is already the stable `QR-<id>` form
+from js/21. The live GitHub Pages site was also already serving js/23 with the right URL
+and key. Nothing on the application side was wrong.
+
+### THE BUG: 02-rls.sql locked the database against the only role the app ever uses
+
+Every policy in `02-rls.sql` is `to authenticated`. Nobody in this application is ever
+authenticated with Supabase — customers have had no accounts since part 12, and staff sign
+in against the local UAT registry in js/09. Every request therefore carries the anon key,
+and the previous session's `disable row level security` had been undone (almost certainly
+by re-running `02-rls.sql` while following the checklist).
+
+Proved with a canary insert on all 11 tables: **`42501 new row violates row-level security
+policy`, every one.**
+
+Three things made it invisible, which is why two sessions were lost to it:
+
+| | |
+|---|---|
+| `cloudUpsert()` | `catch(e){console.warn(e)}` — a rejected write is swallowed |
+| a `select` under RLS | returns **HTTP 200 with zero rows**, not an error, so it cannot be told apart from an empty table — and `syncCloud()`'s `if(!c.error && c.data.length)` guards simply never fire |
+| `initCloud()` | decides the connection is healthy on that read alone, so the badge said **"Cloud Connected" while nothing could be read or written** |
+
+Corollary worth keeping: **a read returning 0 rows under RLS is not evidence the table is
+empty.** An earlier probe in this session reported "all 11 tables empty" on exactly that
+basis and could not actually distinguish the two.
+
+### Fix
+
+| File | What |
+|---|---|
+| `supabase/04-anon-uat.sql` | **new** — RLS stays ON; adds one `uat_anon_all` policy per table, `for all to anon, authenticated`, `using (true) with check (true)` |
+| `js/24-v69CloudHealthScript.js` | **new** — a rejected write is no longer silent |
+| `index.html` | one `<script src>` after js/23 |
+
+Policies rather than `disable row level security`: identical access, but visible in the
+dashboard and it **survives a re-run of `02-rls.sql`**, which drops and recreates only its
+own `staff_all` / `customer_*` policies. That is the exact failure that just happened.
+
+`js/24` replaces `window.cloudUpsert` — reimplemented, not delegated, because the original
+catches internally so a wrapper can never see whether the write landed. It is the same
+single statement plus an outcome record: one toast per session, the real reason written
+into the settings page line, plus `imodeCloudHealth()` and `imodeCloudSelfTest()`, the
+latter being the check that separates "empty table" from "not allowed to read it".
+`supa` and `cloudSettings` are read by bare identifier — they are top-level `let` in js/03
+and so absent from `window`.
+
+### Seeding
+
+Once the policy was in, the 104 rows were pushed **through PostgREST rather than the SQL
+Editor** (a scratchpad script parsing the same .sql file into JSON and upserting with
+`Prefer: resolution=merge-duplicates`): same rows, same upsert-on-id, no 145 KB paste to
+hang the editor, and per-table confirmation of what landed. All tables verified afterwards.
+
+### Verified end to end
+
+A **fresh Chrome profile with no localStorage and no opt-out, against the live GitHub Pages
+site**, downloads 41 machines / 11 customers / 3 cases / 5 technicians / 40 warranties /
+1 quotation, and `?serial=1234` opens the customer Home page with 8 action cards and no
+horizontal overflow.
+
+The proof that this is really cloud data and not the local demo seed: **`เทสท์นา`
+(IM-1234, serial 1234)**, a machine the user added by hand. It is not in
+`js/02-demo-data.js`; it exists only in Supabase, and the fresh profile shows it.
+
+Boot suite on the local build, desktop 1440×1000 and mobile 390×844: 0 JS errors,
+25 pages, `#page-staff-login` active, portal section present, no horizontal overflow, both
+V6.8 strings unchanged.
+
+### Corrections to earlier notes in this file
+
+- **`node` IS installed now — v24.19.0.** `node --check` works again and passed on every
+  file in `js/`, `auth/` and `pages/`. Several earlier entries say it is unavailable.
+- **The repository moved from `E:` to `G:`.** The old
+  `git config --global --add safe.directory E:/ImodeService-main` no longer applies;
+  `G:/ImodeService-main` was added.
+- `git` is not on `PATH` in this shell — it is at `C:\Program Files\Git\cmd\git.exe`.
+
+### Open / risk
+
+1. **`04-anon-uat.sql` means anyone on the internet can read and write this database.** The
+   publishable key ships in js/23 and that repo is public. Identical exposure to the
+   previous `disable row level security`, now written down explicitly in the file header.
+   Acceptable only as UAT on `service_Imode_test`. No real customer records until the staff
+   login moves to Supabase Auth (`auth/auth-supabase.js` is written and self-enables) and
+   `02-rls.sql` comes back with a narrow anon INSERT policy for `service_cases` and
+   `line_customer_requests`.
+2. The seed export contains real company names, addresses and phone numbers. It is
+   correctly covered by `.gitignore` (`imode-seed-*.sql`) — keep it that way.
+3. Pre-existing and untouched: `sw.js` does not exist, so `js/03:1639` logs a 404 on every
+   boot. Harmless — the registration is `.catch(()=>{})` — but it is real console noise.
+4. A machine added on one device now does reach the others, but only because that device
+   can write. Nothing reconciles a conflicting edit; last write wins.

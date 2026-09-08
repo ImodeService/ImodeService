@@ -725,5 +725,11 @@
      phone, syncs without anyone typing it in. Read the header before changing it. -->
 <script src="./js/23-v69CloudConfigScript.js"></script>
 
+<!-- V6.9 — a cloud write that the database rejects used to be swallowed by
+     cloudUpsert()'s catch, while initCloud() showed "Cloud Connected" because a read
+     under RLS returns 200 with zero rows instead of an error. This reports it.
+     Must stay after js/23 so it wraps a cloudUpsert that already has a client. -->
+<script src="./js/24-v69CloudHealthScript.js"></script>
+
 </body>
 </html>

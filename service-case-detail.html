@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>รายละเอียดเคสงานบริการ · I-MODE Plus Service &amp; Maintenance · Beta Service focus</title>
+<link rel="icon" href="./assets/Iconservice.png">
+<!--
+  Service Case Detail — the full-page workspace for one case.
+
+  Standalone on purpose: it is opened as its own document from the Service Cases list
+  (service-case-detail.html?caseId=SRV-…), not injected into index.html, so the giant
+  shared scope of the application is not a dependency and this page can be worked on
+  without touching it.
+
+  DATA
+  The page never talks to Supabase itself. CaseDetailData is a read-only adapter over the
+  same localStorage keys the application persists to, so opening a case here shows the
+  real case rather than a mock, and nothing here can write over it. When the cloud becomes
+  the source of truth, only the four marked functions in CaseDetailData change; no markup
+  and no render function has to move. USE_MOCK_DATA is the third fallback and is used only
+  when the id resolves to nothing, so the layout can still be reviewed on an empty device.
+
+  STATE THAT IS PREPARED BUT NOT YET FILLED
+  assignment / appointment / quotation / parts / qc / feedback / activity / internalNotes
+  all exist on the ViewModel and render from whatever the case already carries. Where the
+  application has no field for something yet (feedback, internal notes) the section says
+  so rather than inventing a value.
+-->
+<style>
+:root{
+  --imode-blue:#0b63e5; --imode-navy:#0c225e; --imode-navy-2:#123a80;
+  --imode-orange:#f27a1a; --imode-orange-dark:#d2620c;
+  --ok:#079455; --warn:#f79009; --danger:#e31b2f;
+  --ink:#12224a; --muted:#6b7d9e; --line:#e2ecfb; --line-2:#dfe9f8;
+  --bg:#f4f8ff; --card:#fff;
+  --radius:16px; --shadow:0 12px 30px rgba(18,58,128,.08);
+  color-scheme:only light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink); font-size:14px; line-height:1.5;
+  font-family:"Sarabun","Noto Sans Thai","Segoe UI",system-ui,-apple-system,sans-serif;
+  -webkit-text-size-adjust:100%;
+}
+button{font:inherit;color:inherit}
+a{color:var(--imode-blue)}
+.wrap{max-width:1440px;margin:0 auto;padding:0 20px 40px}
+
+/* ---------- topbar ---------- */
+.scd-topbar{
+  position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--line);
+  box-shadow:0 2px 10px rgba(18,58,128,.05);
+}
+.scd-topbar-in{max-width:1440px;margin:0 auto;padding:10px 20px;display:flex;align-items:center;gap:14px}
+.scd-menu{width:40px;height:40px;border:1px solid var(--line);border-radius:11px;background:#fff;cursor:pointer;font-size:17px;flex:none}
+.scd-brand{display:flex;flex-direction:column;line-height:1.2;flex:none}
+.scd-brand b{color:var(--imode-navy);font-size:15px;letter-spacing:.2px}
+.scd-brand small{color:var(--muted);font-size:11px}
+.scd-search{flex:1;min-width:0;display:flex;align-items:center;gap:8px;background:#f6f9ff;border:1px solid var(--line);border-radius:12px;padding:9px 13px}
+.scd-search input{flex:1;min-width:0;border:0;background:transparent;outline:none;font-size:13px}
+.scd-tools{display:flex;align-items:center;gap:9px;flex:none}
+.scd-chip-btn{height:40px;min-width:40px;padding:0 12px;border:1px solid var(--line);border-radius:11px;background:#fff;cursor:pointer;font-size:13px;font-weight:700;color:var(--imode-navy)}
+.scd-chip-btn:hover{border-color:#b9d2f4}
+.scd-bell{position:relative}
+.scd-bell b{position:absolute;top:-6px;right:-6px;background:var(--danger);color:#fff;border-radius:999px;font-size:10px;padding:1px 5px}
+.scd-user{display:flex;align-items:center;gap:9px;padding:5px 11px 5px 5px;border:1px solid var(--line);border-radius:999px;background:#fff}
+.scd-user .av{width:32px;height:32px;border-radius:50%;background:var(--imode-navy);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:800}
+.scd-user span{display:flex;flex-direction:column;line-height:1.2}
+.scd-user b{font-size:12.5px;color:var(--imode-navy)}
+.scd-user small{font-size:10.5px;color:var(--muted)}
+
+/* ---------- breadcrumb + header ---------- */
+.scd-crumb{display:flex;align-items:center;gap:9px;padding:16px 0 12px;font-size:13px;color:var(--muted);flex-wrap:wrap}
+.scd-crumb a{text-decoration:none;font-weight:700}
+.scd-crumb b{color:var(--imode-navy)}
+.scd-headcard{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:18px;align-items:start}
+.scd-headmain{background:var(--card);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px}
+.scd-title-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.scd-title-row h1{margin:0;font-size:28px;color:var(--imode-navy);letter-spacing:.3px}
+.scd-customer{margin:6px 0 0;font-size:17px;font-weight:700;color:var(--imode-navy-2)}
+.scd-meta{display:flex;flex-wrap:wrap;gap:10px 26px;margin-top:14px;font-size:13px;color:var(--ink)}
+.scd-meta div{display:flex;align-items:center;gap:8px}
+.scd-meta i{font-style:normal;font-size:15px}
+.scd-meta small{color:var(--muted)}
+.badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:6px 14px;font-size:13px;font-weight:800;border:1px solid transparent;white-space:nowrap}
+.badge-status{background:var(--imode-blue);color:#fff}
+.badge-status.is-done{background:var(--ok)}
+.badge-status.is-hold{background:var(--warn);color:#3a2500}
+.badge-prio{background:#eef4ff;border-color:#cfe0fa;color:var(--imode-navy-2)}
+.badge-prio.is-urgent{background:#fdeaea;border-color:#f6cccc;color:#a51f1f}
+.badge-sub{background:#fff6e8;border-color:#f5dcb4;color:#8a5200}
+.scd-sla{background:var(--card);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 18px}
+.scd-sla h3{margin:0 0 8px;font-size:13px;color:var(--muted);letter-spacing:.4px}
+.scd-sla-state{display:flex;align-items:center;gap:9px;font-size:22px;font-weight:800;color:var(--ok)}
+.scd-sla-state .dot{width:12px;height:12px;border-radius:50%;background:var(--ok);flex:none}
+.scd-sla.is-risk .scd-sla-state{color:var(--warn)} .scd-sla.is-risk .dot{background:var(--warn)}
+.scd-sla.is-over .scd-sla-state{color:var(--danger)} .scd-sla.is-over .dot{background:var(--danger)}
+.scd-sla p{margin:9px 0 0;font-size:13px;color:var(--ink)}
+
+/* ---------- progress ---------- */
+.scd-progress{margin-top:18px;background:var(--card);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 18px 16px;overflow-x:auto}
+.scd-steps{display:flex;align-items:flex-start;min-width:760px;list-style:none;margin:0;padding:0}
+.scd-steps li{flex:1;position:relative;text-align:center;padding:0 6px}
+.scd-steps li::before{content:"";position:absolute;top:17px;left:-50%;width:100%;height:3px;background:#e3ecfa;z-index:0}
+.scd-steps li:first-child::before{display:none}
+.scd-steps li.done::before,.scd-steps li.now::before{background:var(--ok)}
+.scd-steps .mark{position:relative;z-index:1;width:34px;height:34px;margin:0 auto;border-radius:50%;display:grid;place-items:center;background:#eef2f9;color:#8ea2c2;font-weight:800;font-size:14px;border:3px solid #fff;box-shadow:0 0 0 2px #e3ecfa}
+.scd-steps li.done .mark{background:var(--ok);color:#fff;box-shadow:0 0 0 2px var(--ok)}
+.scd-steps li.now .mark{background:var(--imode-blue);color:#fff;box-shadow:0 0 0 3px #cfe0fa}
+.scd-steps b{display:block;margin-top:9px;font-size:13px;color:var(--imode-navy)}
+.scd-steps li.pending b{color:#93a4c1}
+.scd-steps small{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
+.scd-steps li.now small{color:var(--imode-blue);font-weight:700}
+.scd-after{display:flex;align-items:center;gap:9px;justify-content:flex-end;margin-top:12px;font-size:13px;color:var(--muted)}
+.scd-after .mark{width:30px;height:30px;border-radius:50%;background:#eef2f9;color:#c6a02a;display:grid;place-items:center}
+.scd-substates{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+
+/* ---------- action bar ---------- */
+.scd-actions{display:grid;grid-template-columns:repeat(6,1fr);gap:13px;margin-top:18px}
+.scd-act{display:flex;align-items:center;justify-content:center;gap:9px;min-height:58px;padding:12px 14px;border-radius:14px;
+  border:1px solid var(--line-2);background:#fff;color:var(--imode-navy);font-size:14.5px;font-weight:700;cursor:pointer;
+  box-shadow:0 4px 0 #e6eefb;transition:transform .14s ease,box-shadow .14s ease}
+.scd-act i{font-style:normal;font-size:18px}
+.scd-act:hover{transform:translateY(-2px);box-shadow:0 6px 0 #dbe6f8}
+.scd-act:active{transform:translateY(3px);box-shadow:0 1px 0 #dbe6f8}
+.scd-act:focus-visible{outline:3px solid var(--imode-blue);outline-offset:2px}
+.scd-act.primary{background:var(--imode-blue);border-color:var(--imode-blue);color:#fff;box-shadow:0 5px 0 #084bad}
+.scd-act.primary:hover{box-shadow:0 7px 0 #084bad}
+.scd-act.primary:active{box-shadow:0 1px 0 #084bad}
+.scd-act.green{background:var(--ok);border-color:var(--ok);color:#fff;box-shadow:0 5px 0 #05723f}
+.scd-act.green:hover{box-shadow:0 7px 0 #05723f}
+.scd-act.green:active{box-shadow:0 1px 0 #05723f}
+
+/* ---------- main grid ---------- */
+.scd-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:18px;margin-top:18px}
+.card{background:var(--card);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px}
+.card-head{display:flex;align-items:center;gap:11px;margin-bottom:14px}
+.card-head .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:17px;background:#eef4ff;color:var(--imode-blue);flex:none}
+.card-head h2{margin:0;font-size:17px;color:var(--imode-navy)}
+.card-head .spacer{flex:1}
+
+.problem{background:linear-gradient(180deg,#fff8f8,#fff);border-color:#f6d9d9}
+.problem .card-head .ic{background:#fdeaea;color:var(--danger)}
+.problem h3{margin:0;font-size:22px;color:#b3202c;line-height:1.35}
+.problem .desc{margin:8px 0 0;font-size:16px;color:#7a2a2a}
+.media-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:16px}
+.media-thumb{width:110px;height:82px;border-radius:11px;border:1px solid var(--line);background:#f2f5fb center/cover no-repeat;display:grid;place-items:center;color:var(--muted);font-size:11.5px;overflow:hidden}
+.media-add{width:110px;height:82px;border-radius:11px;border:1.5px dashed #c9d8ef;background:#fbfdff;color:var(--imode-blue);font-size:12.5px;font-weight:700;cursor:pointer}
+.media-meta{display:flex;flex-wrap:wrap;gap:16px;margin-top:12px;font-size:13px;color:var(--imode-navy-2)}
+.media-meta button{border:0;background:transparent;color:var(--imode-blue);font-weight:700;cursor:pointer;padding:0}
+.note-box{margin-top:16px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:13px 15px}
+.note-box b{display:block;font-size:13px;color:var(--imode-navy);margin-bottom:5px}
+.note-box p{margin:0;font-size:13.5px;color:var(--ink)}
+
+.machine-body{display:grid;grid-template-columns:190px minmax(0,1fr);gap:18px}
+.machine-photo{width:100%;aspect-ratio:4/5;border-radius:12px;border:1px solid var(--line);background:#f7fafe;display:grid;place-items:center;overflow:hidden}
+.machine-photo img{width:100%;height:100%;object-fit:contain}
+.machine-photo span{color:var(--muted);font-size:12px}
+.machine-photo{position:relative}
+.machine-photo .ref-tag{position:absolute;left:8px;bottom:8px;background:rgba(12,34,94,.86);color:#fff;
+  border-radius:999px;padding:2px 9px;font-size:10.5px;font-weight:700}
+.machine-title{margin:0 0 10px;font-size:19px;color:var(--imode-navy)}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px 12px;font-size:13.5px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;font-weight:700;color:var(--imode-navy-2);overflow-wrap:anywhere}
+.warranty-pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 11px;font-size:12.5px;font-weight:800;background:#e9f8f0;color:#05723f;border:1px solid #c7ecd9}
+.warranty-pill.is-expiring{background:#fff6e8;color:#8a5200;border-color:#f5dcb4}
+.warranty-pill.is-expired{background:#fdeaea;color:#a51f1f;border-color:#f6cccc}
+.spec-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:10px;margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
+.spec{background:#f7fafe;border:1px solid var(--line);border-radius:11px;padding:9px 11px}
+.spec small{display:block;font-size:11px;color:var(--muted)}
+.spec b{font-size:13px;color:var(--imode-navy)}
+
+/* ---------- secondary modules ---------- */
+.scd-modules{display:grid;grid-template-columns:repeat(5,1fr);gap:13px;margin-top:18px}
+.scd-mod{display:flex;align-items:center;gap:11px;padding:15px 16px;border-radius:14px;border:1px solid var(--line-2);background:#fff;
+  color:var(--imode-navy);font-size:14px;font-weight:700;cursor:pointer;text-align:left;box-shadow:0 4px 0 #e6eefb;
+  transition:transform .14s ease,box-shadow .14s ease}
+.scd-mod i{font-style:normal;font-size:18px;width:32px;height:32px;border-radius:9px;background:#eef4ff;display:grid;place-items:center;flex:none}
+.scd-mod span{flex:1;min-width:0}
+.scd-mod u{text-decoration:none;color:var(--muted);font-weight:800}
+.scd-mod:hover{transform:translateY(-2px);box-shadow:0 6px 0 #dbe6f8}
+.scd-mod:active{transform:translateY(3px);box-shadow:0 1px 0 #dbe6f8}
+.scd-mod:focus-visible{outline:3px solid var(--imode-blue);outline-offset:2px}
+.scd-mod[aria-expanded="true"]{border-color:#b9d2f4;background:#f6faff}
+
+/* ---------- detail panel ---------- */
+.scd-panel{margin-top:14px}
+.scd-panel .card{border-style:solid}
+.scd-panel .kv{margin-top:4px}
+.scd-empty{color:var(--muted);font-size:13.5px;margin:0}
+.scd-list{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:9px}
+.scd-list li{border:1px solid var(--line);border-radius:11px;padding:10px 13px;background:#fbfdff}
+.scd-list li b{display:block;color:var(--imode-navy);font-size:13.5px}
+.scd-list li small{color:var(--muted);font-size:12px}
+
+/* ---------- footer ---------- */
+.scd-foot{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center;margin-top:22px}
+.scd-back{display:inline-flex;align-items:center;gap:9px;padding:13px 20px;border-radius:12px;border:1px solid var(--line-2);
+  background:#fff;color:var(--imode-navy);font-weight:700;cursor:pointer;text-decoration:none}
+.scd-back:hover{border-color:#b9d2f4}
+.scd-note-foot{color:var(--muted);font-size:12.5px;max-width:640px}
+
+/* ---------- states ---------- */
+.scd-state{margin:60px auto;max-width:520px;text-align:center;background:#fff;border:1px solid var(--line-2);border-radius:var(--radius);padding:36px 26px;box-shadow:var(--shadow)}
+.scd-state h2{margin:0 0 8px;color:var(--imode-navy);font-size:20px}
+.scd-state p{margin:0 0 18px;color:var(--muted)}
+.skeleton{background:linear-gradient(90deg,#eef3fb 25%,#f7fafe 50%,#eef3fb 75%);background-size:400% 100%;animation:sk 1.2s ease infinite;border-radius:10px}
+@keyframes sk{0%{background-position:100% 0}100%{background-position:0 0}}
+.sk-row{height:16px;margin:10px 0}
+.mock-flag{display:inline-flex;gap:7px;align-items:center;background:#fff6e8;border:1px solid #f5dcb4;color:#8a5200;
+  border-radius:999px;padding:5px 13px;font-size:12.5px;font-weight:700;margin-top:12px}
+
+/* ---------- toast ---------- */
+#scdToast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);opacity:0;pointer-events:none;
+  background:var(--imode-navy);color:#fff;border-radius:11px;padding:12px 18px;font-size:13px;z-index:60;transition:.2s}
+#scdToast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1200px){
+  .scd-actions{grid-template-columns:repeat(3,1fr)}
+  .scd-modules{grid-template-columns:repeat(3,1fr)}
+}
+@media (max-width:980px){
+  .scd-headcard{grid-template-columns:1fr}
+  .scd-grid{grid-template-columns:1fr}
+  .scd-search{display:none}
+}
+@media (max-width:640px){
+  .wrap{padding:0 12px 32px}
+  .scd-topbar-in{padding:9px 12px;gap:9px}
+  .scd-title-row h1{font-size:22px}
+  .scd-actions{grid-template-columns:repeat(2,1fr)}
+  .scd-modules{grid-template-columns:1fr}
+  .machine-body{grid-template-columns:120px minmax(0,1fr);gap:13px}
+  .scd-user span{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .scd-act,.scd-mod{transition:none}
+  .scd-act:hover,.scd-mod:hover{transform:none}
+  .skeleton{animation:none}
+}
+</style>
+</head>
+<body>
+
+<header class="scd-topbar">
+  <div class="scd-topbar-in">
+    <button class="scd-menu" type="button" data-action="open-app" aria-label="กลับไปที่ระบบหลัก">☰</button>
+    <div class="scd-brand"><b>I-MODE SERVICE</b><small>Service Focus · Beta</small></div>
+    <label class="scd-search">🔍<input id="scdSearch" type="search" placeholder="ค้นหาเคส / ลูกค้า / Serial / รุ่นเครื่อง ..." aria-label="ค้นหา"></label>
+    <div class="scd-tools">
+      <button class="scd-chip-btn scd-bell" type="button" data-action="open-notifications" aria-label="การแจ้งเตือน">🔔<b id="scdBell">0</b></button>
+      <button class="scd-chip-btn" type="button" data-action="toggle-language" id="scdLang">TH</button>
+      <div class="scd-user"><div class="av" id="scdUserAv">--</div><span><b id="scdUserName">ยังไม่ได้เข้าสู่ระบบ</b><small id="scdUserRole">Guest</small></span></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap" id="scdMain">
+  <div class="scd-state" id="scdLoading">
+    <h2>กำลังโหลดข้อมูลเคส...</h2>
+    <div class="skeleton sk-row" style="width:70%;margin-inline:auto"></div>
+    <div class="skeleton sk-row" style="width:50%;margin-inline:auto"></div>
+  </div>
+</main>
+
+<div id="scdToast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* =======================================================================
+   0. configuration
+   ======================================================================= */
+/* Local storage is the live source on every device today; the cloud copy is pulled into
+   it by the application's own syncCloud(). Flip USE_CLOUD when this page should read
+   Supabase directly — only loadAll() below changes. */
+var USE_CLOUD=false;
+/* Third fallback, so the layout is still reviewable on a device with no data at all. */
+var USE_MOCK_DATA=true;
+
+var K={
+  cases:'imode_test_v532_cases',
+  customers:'imode_test_v532_customers',
+  machines:'imode_test_v532_machines',
+  tech:'imode_v5_tech',
+  warranties:'imode_test_v532_warranties',
+  reports:'imode_test_v532_service_reports',
+  quotes:'imode_test_v532_quotes',
+  notifications:'imode_test_v532_notifications',
+  settings:'imode_v5_settings',
+  user:'imode_v5_current_user'
+};
+var APP='./index.html';
+
+/* =======================================================================
+   1. helpers
+   ======================================================================= */
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function readJSON(key,fallback){
+  try{var raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch(e){return fallback}
+}
+function el(id){return document.getElementById(id)}
+function toast(msg){
+  var t=el('scdToast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(toast._t);toast._t=setTimeout(function(){t.classList.remove('show')},2400);
+}
+function fmtDateTime(v){
+  if(!v)return '-';
+  var d=new Date(v);if(isNaN(d))return String(v);
+  return d.toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'})+' '+
+         d.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+}
+function fmtDay(v){
+  if(!v)return '-';
+  var d=new Date(v);if(isNaN(d))return String(v);
+  return d.toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'});
+}
+function daysBetween(a,b){return Math.round((new Date(a)-new Date(b))/86400000)}
+
+/* Machine image priority, kept the same as the application's:
+   the machine's own photo, then a family reference image, then No Image. A reference
+   image is only ever displayed — it is never written back onto the machine. */
+var MACHINE_FAMILY={
+  hydrogenHo500:'./assets/machines/hydrogen-ho500wt.webp',
+  hydrogenHo200:'./assets/machines/hydrogen-ho200wt.webp',
+  nitrogen:'./assets/machines/nitrogen-generator.webp',
+  laserMarking:'./assets/machines/laser-marking-bgf20.jpg',
+  laserWelding:'./assets/machines/laser-welding.webp',
+  blueThunder:'./assets/machines/welding-blue-thunder.jpg',
+  centrifugalVa20:'./assets/machines/centrifugal-va20.jpg',
+  centrifugalVa38:'./assets/machines/centrifugal-va38.jpg',
+  polishingFamily:'./assets/machines/polishing-family.webp'
+};
+function familyPhoto(m){
+  if(!m)return '';
+  var text=[m.model,m.name,m.nameTh,m.nameEn].filter(Boolean).join(' ').toLowerCase();
+  var compact=text.replace(/[\s_-]+/g,'');
+  if(compact.indexOf('ho500wt')>=0)return MACHINE_FAMILY.hydrogenHo500;
+  if(compact.indexOf('ho200wt')>=0)return MACHINE_FAMILY.hydrogenHo200;
+  if(/n\s*-?\s*(20|40)/i.test(text)||text.indexOf('nitrogen gas generator')>=0
+     ||text.indexOf('เครื่องผลิตแก๊สไนโตรเจน')>=0)return MACHINE_FAMILY.nitrogen;
+  if(/blue\s*-?\s*thunder/i.test(text))return MACHINE_FAMILY.blueThunder;
+  if(/laser\s*weld|bull\s*thunder|เครื่องเชื่อมเลเซอร์/i.test(text))return MACHINE_FAMILY.laserWelding;
+  if(/bgf\s*-?\s*20|laser\s*mark|เครื่องมาร์กเลเซอร์/i.test(text))return MACHINE_FAMILY.laserMarking;
+  if(/va\s*38/i.test(text))return MACHINE_FAMILY.centrifugalVa38;
+  if(/va\s*20/i.test(text))return MACHINE_FAMILY.centrifugalVa20;
+  if(/va\s*18|20\s*l\s*x\s*3|msh|gyratory\s*polish|เครื่องขัดระบบไจเรต/i.test(text))return MACHINE_FAMILY.polishingFamily;
+  if(/centrifugal\s*disc\s*finishing|เครื่องขัดแบบจานหมุนเหวี่ยง/i.test(text))return MACHINE_FAMILY.polishingFamily;
+  return '';
+}
+
+/* getCaseIdFromUrl — the only thing the URL ever carries. */
+function getCaseIdFromUrl(){
+  var p=new URLSearchParams(window.location.search);
+  return (p.get('caseId')||p.get('case')||'').trim();
+}
+
+/* =======================================================================
+   2. data adapter
+   Everything the page reads goes through here. Swapping localStorage for Supabase means
+   rewriting these functions and nothing else — no render function touches storage.
+   ======================================================================= */
+var CaseDetailData=(function(){
+  var db=null;
+  function all(){
+    if(db)return db;
+    db={
+      cases:readJSON(K.cases,[])||[],
+      customers:readJSON(K.customers,[])||[],
+      machines:readJSON(K.machines,[])||[],
+      technicians:readJSON(K.tech,[])||[],
+      warranties:readJSON(K.warranties,[])||[],
+      reports:readJSON(K.reports,[])||[],
+      quotes:readJSON(K.quotes,[])||[],
+      notifications:readJSON(K.notifications,[])||[],
+      settings:readJSON(K.settings,{})||{},
+      user:readJSON(K.user,null)
+    };
+    return db;
+  }
+  function byId(list,id){
+    for(var i=0;i<list.length;i++)if(list[i].id===id)return list[i];
+    return null;
+  }
+  return {
+    /* A case is found by id or by ticket, so a link may carry either. */
+    loadCase:function(caseId){
+      var list=all().cases;
+      return Promise.resolve(byId(list,caseId)||list.filter(function(c){
+        return String(c.ticket||'').toLowerCase()===String(caseId||'').toLowerCase();
+      })[0]||null);
+    },
+    loadMachine:function(machineId){return Promise.resolve(byId(all().machines,machineId))},
+    loadCustomer:function(customerId){return Promise.resolve(byId(all().customers,customerId))},
+    loadTechnician:function(techId){return Promise.resolve(byId(all().technicians,techId))},
+    loadMachineHistory:function(machineId){
+      return Promise.resolve(all().cases.filter(function(c){return c.machineId===machineId}));
+    },
+    loadWarranty:function(machineId){
+      var w=all().warranties.filter(function(x){return x.machineId===machineId})
+        .sort(function(a,b){return new Date(b.endDate||0)-new Date(a.endDate||0)});
+      return Promise.resolve(w[0]||null);
+    },
+    loadAssignment:function(c){
+      return Promise.resolve({technicianId:c&&c.assignee||'',assignedAt:c&&c.updatedAt||'',
+        coordinator:(all().user&&all().user.name)||''});
+    },
+    loadAppointment:function(c){
+      return Promise.resolve({date:c&&c.appointment||'',location:c&&c.location||'',
+        contact:c&&c.contact||'',status:c&&c.appointment?'confirmed':'pending'});
+    },
+    loadQuotation:function(caseId){
+      var q=all().quotes.filter(function(x){return x.caseId===caseId})
+        .sort(function(a,b){return new Date(b.updatedAt||b.createdAt||0)-new Date(a.updatedAt||a.createdAt||0)});
+      return Promise.resolve(q[0]||null);
+    },
+    loadReports:function(caseId){
+      return Promise.resolve(all().reports.filter(function(r){return r.caseId===caseId}));
+    },
+    loadAttachments:function(c){
+      /* The application keeps case evidence on the field status log and on the service
+         report, not on the case itself; both are read here so the card shows what really
+         exists rather than a placeholder count. */
+      var out=[];
+      (c&&c.fieldStatusLog||[]).forEach(function(entry){
+        (entry.media||[]).forEach(function(m){out.push({type:m.type,name:m.name||'',data:m.data||'',at:entry.createdAt})});
+      });
+      return this.loadReports(c&&c.id).then(function(reports){
+        reports.forEach(function(r){
+          (r.beforePhotos||[]).forEach(function(d){out.push({type:'image',name:'before',data:d})});
+          (r.afterPhotos||[]).forEach(function(d){out.push({type:'image',name:'after',data:d})});
+          (r.videos||[]).forEach(function(v){out.push({type:'video',name:v.name||'video',data:v.data||''})});
+        });
+        return out;
+      });
+    },
+    loadActivity:function(c){
+      var out=[];
+      if(c&&c.createdAt)out.push({type:'case_created',title:'รับแจ้งปัญหา',
+        description:(c.channel||'')+' · '+(c.contact||''),timestamp:c.createdAt,actor:c.contact||'',channel:c.channel||''});
+      (c&&c.fieldStatusLog||[]).forEach(function(e){
+        out.push({type:'field_status',title:e.status,description:e.note||'',timestamp:e.createdAt,actor:e.techId||''});
+      });
+      all().notifications.filter(function(n){return n.caseId===(c&&c.id)}).forEach(function(n){
+        out.push({type:'notification',title:n.title,description:n.message,timestamp:n.createdAt,actor:n.fromUser||''});
+      });
+      out.sort(function(a,b){return new Date(b.timestamp||0)-new Date(a.timestamp||0)});
+      return Promise.resolve(out);
+    },
+    /* No feedback and no internal-notes store exists in the application yet. Returning
+       null instead of a fabricated value is what lets the panels say so honestly. */
+    loadFeedback:function(){return Promise.resolve(null)},
+    loadInternalNotes:function(c){
+      return Promise.resolve(c&&c.note?[{text:c.note,at:c.updatedAt||c.createdAt,by:''}]:[]);
+    },
+    currentUser:function(){return all().user},
+    unreadNotifications:function(){
+      return all().notifications.filter(function(n){return !n.read}).length;
+    },
+    isEmpty:function(){return !all().cases.length}
+  };
+})();
+
+/* =======================================================================
+   3. the page ViewModel
+   A page-level shape only. It is not the database schema and nothing here implies one.
+   ======================================================================= */
+var caseDetailModel={
+  case:{id:'',caseNo:'',status:'',subStatus:'',priority:'',issueTitle:'',issueDescription:'',
+        customerNote:'',source:'',createdAt:'',updatedAt:''},
+  customer:{id:'',name:'',address:'',contactName:'',phone:'',email:'',lineUserId:'',whatsapp:''},
+  machine:{id:'',name:'',model:'',serialNumber:'',type:'',image:'',installDate:'',
+           warrantyStatus:'',warrantyEnd:'',warrantyDaysLeft:null,status:'',technicalSpecs:{}},
+  assignment:{coordinator:null,technician:null,assignedAt:''},
+  appointment:{date:'',time:'',location:'',contact:'',status:''},
+  quotation:{required:false,quotationNo:'',total:0,status:'not_required'},
+  service:{fieldStatus:'',partsStatus:'none',partsItems:[],qcStatus:'',reportStatus:''},
+  closing:{qcCompleted:false,customerSignature:false,technicianSignature:false,
+           serviceReportReady:false,beforeAfterComplete:false,partsCompleted:false,customerAccepted:false},
+  attachments:[],
+  activity:[],
+  feedback:null,
+  internalNotes:[],
+  history:[],
+  isMock:false
+};
+
+/* =======================================================================
+   4. mock — only when the id resolves to nothing
+   ======================================================================= */
+function mockModel(caseId){
+  var now=Date.now();
+  return {
+    case:{id:caseId||'MOCK',caseNo:caseId||'SRV-00000000-000',status:'กำลังดำเนินการ',subStatus:'',
+      priority:'เร่งด่วน',issueTitle:'เครื่องไม่ผลิตแก๊สไฮโดรเจน มีเสียงเตือน Error E01',
+      issueDescription:'เครื่องหยุดระหว่างการผลิต และต้องการใช้งานด่วน',
+      customerNote:'เครื่องหยุดระหว่าง Production ต้องการให้เข้าตรวจสอบโดยเร็วที่สุด',
+      source:'Machine QR (LINE)',createdAt:new Date(now-2*86400000).toISOString(),updatedAt:new Date().toISOString()},
+    customer:{id:'',name:'บริษัท ตัวอย่าง จำกัด',address:'-',contactName:'คุณสมชาย (ฝ่ายผลิต)',
+      phone:'081-234-5678',email:'',lineUserId:'',whatsapp:''},
+    machine:{id:'',name:'เครื่องผลิตแก๊สไฮโดรเจน',model:'HO500WT',serialNumber:'22-11-HO500WT-0023',
+      type:'เครื่องผลิตแก๊สไฮโดรเจน',image:'',installDate:'',warrantyStatus:'Active',warrantyEnd:'',
+      warrantyDaysLeft:182,status:'ใช้งานปกติ',technicalSpecs:{}},
+    assignment:{coordinator:'',technician:null,assignedAt:''},
+    appointment:{date:'',time:'',location:'',contact:'',status:'pending'},
+    quotation:{required:false,quotationNo:'',total:0,status:'not_required'},
+    service:{fieldStatus:'',partsStatus:'none',partsItems:[],qcStatus:'',reportStatus:''},
+    closing:{qcCompleted:false,customerSignature:false,technicianSignature:false,serviceReportReady:false,
+      beforeAfterComplete:false,partsCompleted:false,customerAccepted:false},
+    attachments:[],activity:[],feedback:null,internalNotes:[],history:[],isMock:true
+  };
+}
+
+/* =======================================================================
+   5. load — data in, ViewModel out. No DOM here.
+   ======================================================================= */
+function buildModel(c){
+  var m=caseDetailModel;
+  m.case={id:c.id,caseNo:c.ticket||c.id,status:c.status||'',subStatus:c.fieldStatus||'',
+    priority:c.priority||'',issueTitle:c.issue||'',issueDescription:'',customerNote:c.note||'',
+    source:c.channel||'',createdAt:c.createdAt||'',updatedAt:c.updatedAt||''};
+  m.service.fieldStatus=c.fieldStatus||'';
+  m.service.partsStatus=c.status==='รออะไหล่'?'waiting':'none';
+  m.isMock=false;
+  return Promise.all([
+    CaseDetailData.loadCustomer(c.customerId),
+    CaseDetailData.loadMachine(c.machineId),
+    CaseDetailData.loadTechnician(c.assignee),
+    CaseDetailData.loadWarranty(c.machineId),
+    CaseDetailData.loadAssignment(c),
+    CaseDetailData.loadAppointment(c),
+    CaseDetailData.loadQuotation(c.id),
+    CaseDetailData.loadAttachments(c),
+    CaseDetailData.loadActivity(c),
+    CaseDetailData.loadFeedback(c.id),
+    CaseDetailData.loadInternalNotes(c),
+    CaseDetailData.loadMachineHistory(c.machineId),
+    CaseDetailData.loadReports(c.id)
+  ]).then(function(r){
+    var cu=r[0],ma=r[1],te=r[2],wa=r[3];
+    m.customer={id:cu&&cu.id||c.customerId||'',name:cu&&cu.name||c.customer||'-',
+      address:cu&&(cu.address||cu.location||cu.branch)||c.location||'',
+      contactName:c.contact||cu&&cu.contact||'',phone:c.phone||cu&&cu.phone||'',
+      email:c.email||cu&&cu.email||'',lineUserId:cu&&cu.lineUserId||'',whatsapp:cu&&cu.whatsapp||''};
+    var days=wa&&wa.endDate?daysBetween(wa.endDate,new Date()):null;
+    m.machine={id:ma&&ma.id||c.machineId||'',name:ma&&(ma.nameTh||ma.name)||c.machine||'-',
+      model:ma&&ma.model||c.model||'-',serialNumber:ma&&ma.serial||c.serial||'-',
+      type:ma&&(ma.nameTh||ma.name)||'',
+      image:(ma&&String(ma.photo||'').trim())||familyPhoto(ma),
+      imageIsReference:!(ma&&String(ma.photo||'').trim())&&!!familyPhoto(ma),
+      installDate:wa&&wa.installDate||'',status:ma&&ma.serviceStatus||'',
+      warrantyStatus:days==null?(ma&&ma.warranty||'-'):(days<0?'หมดประกัน':'Active'),
+      warrantyEnd:wa&&wa.endDate||'',warrantyDaysLeft:days,
+      technicalSpecs:{}};
+    m.assignment={coordinator:r[4].coordinator,technician:te,assignedAt:r[4].assignedAt};
+    m.appointment=r[5];
+    var q=r[6];
+    m.quotation={required:!!q,quotationNo:q&&q.quoteNo||q&&q.id||'',total:q&&q.grand||0,
+      status:q?(q.status||'draft'):'not_required'};
+    m.attachments=r[7];
+    m.activity=r[8];
+    m.feedback=r[9];
+    m.internalNotes=r[10];
+    m.history=r[11];
+    var reports=r[12];
+    m.service.reportStatus=reports.length?'ready':'';
+    m.closing={
+      qcCompleted:false,
+      customerSignature:reports.some(function(x){return !!x.customerSignature}),
+      technicianSignature:reports.some(function(x){return !!x.techSignature}),
+      serviceReportReady:!!reports.length,
+      beforeAfterComplete:reports.some(function(x){return (x.beforePhotos||[]).length&&(x.afterPhotos||[]).length}),
+      partsCompleted:m.service.partsStatus!=='waiting',
+      customerAccepted:reports.some(function(x){return !!x.customerAccept})
+    };
+    return m;
+  });
+}
+
+function load(){
+  var caseId=getCaseIdFromUrl();
+  if(!caseId)return Promise.resolve({error:'no-id'});
+  if(USE_CLOUD){
+    /* Seam: the same shape, resolved from Supabase. Nothing else on the page changes. */
+    return Promise.resolve({error:'cloud-not-enabled'});
+  }
+  return CaseDetailData.loadCase(caseId).then(function(c){
+    if(c)return buildModel(c);
+    if(USE_MOCK_DATA){var mm=mockModel(caseId);for(var k in mm)caseDetailModel[k]=mm[k];return caseDetailModel}
+    return {error:'not-found'};
+  });
+}
+
+/* =======================================================================
+   6. render — one function per region, no data access
+   ======================================================================= */
+var STEPS=[
+  {th:'รับแจ้งปัญหา',statuses:['เคสใหม่']},
+  {th:'ตรวจสอบ / มอบหมาย',statuses:['มอบหมายแล้ว']},
+  {th:'นัดหมายบริการ',statuses:['นัดหมายแล้ว']},
+  {th:'กำลังให้บริการ',statuses:['กำลังดำเนินการ','รออะไหล่']},
+  {th:'งานเสร็จ / ตรวจรับ',statuses:['รอส่งงาน','เสร็จสิ้น']},
+  {th:'ปิดเคส',statuses:['ปิดเคส']}
+];
+/* Hold states are shown as their own badges. They are never one of the six steps: a case
+   that is waiting for parts is still at "กำลังให้บริการ". */
+var HOLD_STATES={'รออะไหล่':'📦 รออะไหล่'};
+
+function stepIndex(status){
+  for(var i=0;i<STEPS.length;i++)if(STEPS[i].statuses.indexOf(status)>=0)return i;
+  return 0;
+}
+
+function renderCaseHeader(m){
+  var c=m.case,isDone=['เสร็จสิ้น','ปิดเคส'].indexOf(c.status)>=0;
+  var hold=HOLD_STATES[c.status];
+  return '<nav class="scd-crumb" aria-label="breadcrumb">'
+    +'<a href="'+APP+'?page=cases">เคสงานบริการ</a><span>›</span><b>'+esc(c.caseNo)+'</b></nav>'
+    +'<div class="scd-headcard">'
+    +'<section class="scd-headmain">'
+      +'<div class="scd-title-row">'
+        +'<h1>'+esc(c.caseNo)+'</h1>'
+        +'<span class="badge badge-status'+(isDone?' is-done':hold?' is-hold':'')+'">'
+        +(isDone?'✔':'⟳')+' '+esc(c.status||'-')+'</span>'
+        +'<span class="badge badge-prio'+(c.priority==='ด่วนมาก'?' is-urgent':'')+'">◷ '+esc(c.priority||'ปกติ')+'</span>'
+        +(hold?'<span class="badge badge-sub">'+esc(hold)+'</span>':'')
+      +'</div>'
+      +'<p class="scd-customer">'+esc(m.customer.name)+'</p>'
+      +'<div class="scd-meta">'
+        +'<div><i>📅</i><small>รับแจ้ง:</small> '+esc(fmtDateTime(c.createdAt))+'</div>'
+        +'<div><i>💬</i><small>ช่องทาง:</small> '+esc(c.source||'-')+'</div>'
+        +'<div><i>👤</i><small>ผู้ติดต่อ:</small> '+esc(m.customer.contactName||'-')
+          +(m.customer.phone?'&nbsp;&nbsp;'+esc(m.customer.phone):'')+'</div>'
+      +'</div>'
+    +'</section>'
+    +renderSla(m)
+    +'</div>';
+}
+
+/* SLA is computed from what the case actually carries: a case nobody has picked up is on
+   the response clock, a scheduled case counts down to its appointment, anything else has
+   no target and says so rather than inventing "On Time". */
+function renderSla(m){
+  var c=m.case,cls='',state='On Time',line='';
+  if(['เสร็จสิ้น','ปิดเคส'].indexOf(c.status)>=0){
+    state='Closed';line='ปิดงานแล้ว '+esc(fmtDateTime(c.updatedAt));
+  }else if(!m.assignment.technician&&c.status==='เคสใหม่'){
+    var mins=30,left=new Date(c.createdAt).getTime()+mins*60000-Date.now();
+    if(left<0){cls='is-over';state='Overdue';line='เกินเวลาตอบกลับ '+fmtLeft(-left);}
+    else{cls=left<=10*60000?'is-risk':'';state=left<=10*60000?'At Risk':'On Time';
+         line='ต้องตอบกลับภายใน '+fmtLeft(left);}
+  }else if(c.status==='รออะไหล่'){
+    cls='is-risk';state='On Hold';line='รออะไหล่ · นาฬิกางานหยุดชั่วคราว';
+  }else if(m.appointment.date){
+    var d=new Date(m.appointment.date)-Date.now();
+    if(d<0){cls='is-over';state='Overdue';line='เลยเวลานัด '+fmtLeft(-d);}
+    else{cls=d<=2*3600000?'is-risk':'';state=d<=2*3600000?'At Risk':'On Time';
+         line='เหลืออีก '+fmtLeft(d)+' ถึงเวลานัด';}
+  }else{
+    cls='is-risk';state='No target';line='ยังไม่มีนัดหมาย จึงยังไม่มีกำหนด SLA';
+  }
+  return '<aside class="scd-sla '+cls+'"><h3>SLA</h3>'
+    +'<div class="scd-sla-state"><span class="dot"></span>'+esc(state)+'</div>'
+    +'<p>'+esc(line)+'</p></aside>';
+}
+function fmtLeft(ms){
+  var mins=Math.floor(ms/60000),h=Math.floor(mins/60),m2=mins%60;
+  return h?(h+' ชม. '+m2+' นาที'):(m2+' นาที');
+}
+
+function renderProgress(m){
+  var idx=stepIndex(m.case.status),closed=m.case.status==='ปิดเคส';
+  var times=stepTimes(m);
+  var lis=STEPS.map(function(s,i){
+    var cls=i<idx?'done':i===idx?'now':'pending';
+    var mark=i<idx?'✔':String(i+1);
+    return '<li class="'+cls+'"><span class="mark">'+mark+'</span><b>'+(i+1)+'. '+esc(s.th)+'</b>'
+      +(times[i]?'<small>'+esc(times[i])+'</small>':'')+'</li>';
+  }).join('');
+  var subs='';
+  if(HOLD_STATES[m.case.status])subs+='<span class="badge badge-sub">'+esc(HOLD_STATES[m.case.status])+'</span>';
+  if(m.case.subStatus)subs+='<span class="badge badge-prio">หน้างาน: '+esc(m.case.subStatus)+'</span>';
+  return '<section class="scd-progress" aria-label="ความคืบหน้าของเคส">'
+    +'<ol class="scd-steps">'+lis+'</ol>'
+    +(subs?'<div class="scd-substates">'+subs+'</div>':'')
+    +'<div class="scd-after"><span class="mark">★</span>'
+    +(closed?'<button class="scd-mod" style="box-shadow:none;padding:6px 12px" type="button" data-action="open-feedback">ประเมินความพึงพอใจ</button>'
+            :'ประเมินความพึงพอใจ (หลังปิดเคส)')
+    +'</div></section>';
+}
+/* Only the timestamps the case really has are shown under a step. */
+function stepTimes(m){
+  var out=[];
+  out[0]=m.case.createdAt?fmtDateTime(m.case.createdAt):'';
+  out[1]=m.assignment.technician?fmtDateTime(m.assignment.assignedAt):'';
+  out[2]=m.appointment.date?fmtDateTime(m.appointment.date):'';
+  var log=(m.activity||[]).filter(function(a){return a.type==='field_status'});
+  out[3]=log.length?fmtDateTime(log[log.length-1].timestamp):'';
+  out[4]=m.closing.serviceReportReady?'มีใบตรวจแล้ว':'';
+  out[5]=m.case.status==='ปิดเคส'?fmtDateTime(m.case.updatedAt):'';
+  return out;
+}
+
+var ACTIONS=[
+  {act:'assign-technician',icon:'👥',label:'มอบหมายงาน',cls:'primary'},
+  {act:'schedule-service', icon:'📅',label:'นัดหมายบริการ',cls:'green'},
+  {act:'contact-customer', icon:'📞',label:'ติดต่อลูกค้า',cls:'green'},
+  {act:'open-quotation',   icon:'📄',label:'ทำใบเสนอราคา',cls:''},
+  {act:'open-field-service',icon:'🔧',label:'เริ่มงานหน้างาน',cls:''},
+  {act:'change-status',    icon:'⇄',  label:'เปลี่ยนสถานะ',cls:''}
+];
+function renderActionBar(){
+  return '<div class="scd-actions">'+ACTIONS.map(function(a){
+    return '<button type="button" class="scd-act '+a.cls+'" data-action="'+a.act+'">'
+      +'<i aria-hidden="true">'+a.icon+'</i>'+esc(a.label)+'</button>';
+  }).join('')+'</div>';
+}
+
+function renderProblem(m){
+  var c=m.case;
+  var imgs=m.attachments.filter(function(a){return a.type==='image'});
+  var vids=m.attachments.filter(function(a){return a.type==='video'});
+  var thumbs=imgs.slice(0,3).map(function(a){
+    return a.data?'<div class="media-thumb" style="background-image:url('+JSON.stringify(a.data)+')"></div>'
+                 :'<div class="media-thumb">รูป</div>';
+  }).join('');
+  return '<section class="card problem" aria-label="ปัญหาที่ลูกค้าแจ้ง">'
+    +'<div class="card-head"><span class="ic">❗</span><h2>ปัญหาที่ลูกค้าแจ้ง</h2><span class="spacer"></span>'
+    +(c.priority==='ด่วนมาก'?'<span class="badge badge-prio is-urgent">เร่งด่วน</span>':'')+'</div>'
+    +'<h3>'+esc(c.issueTitle||'-')+'</h3>'
+    +(c.issueDescription?'<p class="desc">'+esc(c.issueDescription)+'</p>':'')
+    +'<div class="media-row">'+thumbs
+      +'<button type="button" class="media-add" data-action="add-attachment">＋<br>เพิ่มไฟล์</button></div>'
+    +'<div class="media-meta"><span>📷 รูปภาพ '+imgs.length+' ไฟล์</span><span>🎬 วิดีโอ '+vids.length+' ไฟล์</span>'
+      +'<button type="button" data-action="open-attachments">📍 ดูทั้งหมด</button></div>'
+    +'<div class="note-box"><b>หมายเหตุจากลูกค้า</b><p>'+esc(c.customerNote||'-')+'</p></div>'
+    +'</section>';
+}
+
+function renderMachine(m){
+  var ma=m.machine;
+  var pill='warranty-pill',label=ma.warrantyStatus||'-';
+  if(ma.warrantyDaysLeft!=null){
+    if(ma.warrantyDaysLeft<0){pill+=' is-expired';label='หมดประกัน';}
+    else if(ma.warrantyDaysLeft<=60){pill+=' is-expiring';label='Active';}
+  }
+  var specs=Object.keys(ma.technicalSpecs||{});
+  var specHTML=specs.length?specs.map(function(k){
+    return '<div class="spec"><small>'+esc(k)+'</small><b>'+esc(ma.technicalSpecs[k])+'</b></div>';
+  }).join(''):'<div class="spec"><small>ข้อมูลทางเทคนิค</small><b>ยังไม่มีในระบบ</b></div>';
+  return '<section class="card" aria-label="ข้อมูลเครื่องจักร">'
+    +'<div class="card-head"><span class="ic">⚙</span><h2>ข้อมูลเครื่องจักร</h2></div>'
+    +'<div class="machine-body">'
+      +'<div class="machine-photo">'+(ma.image
+          ?'<img src="'+esc(ma.image)+'" alt="'+esc(ma.name)+'" onerror="this.remove()">'
+           +(ma.imageIsReference?'<b class="ref-tag">ภาพอ้างอิง</b>':'')
+          :'<span>No Image</span>')+'</div>'
+      +'<div><h3 class="machine-title">'+esc(ma.name)+'</h3>'
+      +'<dl class="kv">'
+        +'<dt>Model:</dt><dd>'+esc(ma.model)+'</dd>'
+        +'<dt>S/N:</dt><dd>'+esc(ma.serialNumber)+'</dd>'
+        +'<dt>ประเภท:</dt><dd>'+esc(ma.type||'-')+'</dd>'
+        +'<dt>ติดตั้งเมื่อ:</dt><dd>'+esc(fmtDay(ma.installDate))+'</dd>'
+        +'<dt>สถานะ:</dt><dd>'+esc(ma.status||'-')+'</dd>'
+        +'<dt>ประกัน:</dt><dd><span class="'+pill+'">'+esc(label)
+          +(ma.warrantyDaysLeft!=null&&ma.warrantyDaysLeft>=0?' · เหลือ '+ma.warrantyDaysLeft+' วัน':'')+'</span></dd>'
+      +'</dl>'
+      +'<button type="button" class="scd-back" style="margin-top:14px;padding:9px 15px" data-action="open-machine-history">ดูประวัติเครื่องนี้</button>'
+      +'</div></div>'
+    +'<div class="spec-strip">'+specHTML+'</div>'
+    +'</section>';
+}
+
+var MODULES=[
+  {act:'open-customer-detail',   icon:'🏢',label:'ข้อมูลลูกค้า'},
+  {act:'open-assignment-detail', icon:'👤',label:'ผู้รับผิดชอบ'},
+  {act:'open-machine-history',   icon:'🕘',label:'ประวัติการบริการเครื่องนี้'},
+  {act:'open-case-attachments',  icon:'📄',label:'เอกสาร & รูปภาพ'},
+  {act:'open-internal-notes',    icon:'📝',label:'หมายเหตุภายใน'}
+];
+function renderSecondaryActions(){
+  return '<div class="scd-modules">'+MODULES.map(function(m){
+    return '<button type="button" class="scd-mod" data-action="'+m.act+'" aria-expanded="false">'
+      +'<i aria-hidden="true">'+m.icon+'</i><span>'+esc(m.label)+'</span><u>›</u></button>';
+  }).join('')+'</div><div class="scd-panel" id="scdPanel"></div>';
+}
+
+function renderTopbar(m){
+  var u=CaseDetailData.currentUser();
+  el('scdUserName').textContent=u&&u.name||'ยังไม่ได้เข้าสู่ระบบ';
+  el('scdUserRole').textContent=u&&(u.permissionRole||u.role)||'Guest';
+  el('scdUserAv').textContent=(u&&u.name?String(u.name).trim().split(/\s+/).slice(0,2)
+    .map(function(w){return w.charAt(0)}).join(''):'--');
+  el('scdBell').textContent=CaseDetailData.unreadNotifications();
+}
+
+function renderPage(m){
+  renderTopbar(m);
+  el('scdMain').innerHTML=
+     renderCaseHeader(m)
+    +renderProgress(m)
+    +renderActionBar()
+    +'<div class="scd-grid">'+renderProblem(m)+renderMachine(m)+'</div>'
+    +renderSecondaryActions()
+    +'<div class="scd-foot">'
+      +'<a class="scd-back" href="'+APP+'?page=cases">← กลับไปหน้ารายการ</a>'
+      +'<p class="scd-note-foot">'
+      +(m.isMock?'ยังไม่พบเคสนี้ในเครื่องนี้ — กำลังแสดงโครงหน้าตัวอย่าง'
+               :'หน้านี้อ่านข้อมูลจากระบบเท่านั้น การแก้ไขทั้งหมดยังทำในระบบหลัก')
+      +'</p></div>'
+    +(m.isMock?'<div class="mock-flag">⚠ ตัวอย่างข้อมูล (USE_MOCK_DATA)</div>':'');
+  document.title=(m.case.caseNo||'เคสงานบริการ')+' · I-MODE Plus Service';
+}
+
+function renderError(kind){
+  el('scdMain').innerHTML='<div class="scd-state">'
+   +'<h2>'+(kind==='no-id'?'ไม่พบหมายเลขเคส':'ไม่พบเคสนี้ในระบบ')+'</h2>'
+   +'<p>'+(kind==='no-id'?'ลิงก์นี้ไม่มีพารามิเตอร์ caseId'
+                        :'เคสอาจถูกลบไปแล้ว หรือยังไม่ได้ซิงก์มาที่เครื่องนี้')+'</p>'
+   +'<a class="scd-back" href="'+APP+'?page=cases">← กลับไปหน้าเคสงานบริการ</a></div>';
+}
+
+/* =======================================================================
+   7. actions
+   Named as the integration prompt specifies. Each either navigates to the module that
+   already does the job in the application, or opens a panel on this page. None of them
+   pretends to have written anything.
+   ======================================================================= */
+function appLink(page,extra){
+  return APP+'?page='+encodeURIComponent(page)+(extra||'');
+}
+function goApp(page,extra){window.location.href=appLink(page,extra)}
+
+function assignTechnician(){goApp('assign','&caseId='+encodeURIComponent(caseDetailModel.case.id))}
+function scheduleService(){goApp('cases','&caseId='+encodeURIComponent(caseDetailModel.case.id)+'&intent=schedule')}
+function openQuotation(){goApp('quotation','&caseId='+encodeURIComponent(caseDetailModel.case.id))}
+function openFieldService(){goApp('field-service')}
+function changeCaseStatus(){goApp('cases','&caseId='+encodeURIComponent(caseDetailModel.case.id)+'&intent=status')}
+function openMachineHistory(){panel('ประวัติการบริการเครื่องนี้',historyHTML())}
+function openCustomerDetail(){panel('ข้อมูลลูกค้า',customerHTML())}
+function openAssignmentDetail(){panel('ผู้รับผิดชอบและนัดหมาย',assignmentHTML())}
+function openCaseAttachments(){panel('เอกสาร & รูปภาพ',attachmentsHTML())}
+function openInternalNotes(){panel('หมายเหตุภายใน (เฉพาะเจ้าหน้าที่)',notesHTML())}
+function openFeedback(){panel('ประเมินความพึงพอใจ',feedbackHTML())}
+
+/* ติดต่อลูกค้า — the channels exist as data on the customer; sending is not implemented
+   anywhere in this application yet, so a channel with no destination says so. */
+function contactCustomer(channel){
+  var cu=caseDetailModel.customer;
+  if(channel==='phone'){
+    if(!cu.phone)return toast('เคสนี้ยังไม่มีเบอร์โทรของผู้ติดต่อ');
+    window.location.href='tel:'+String(cu.phone).replace(/[^0-9+]/g,'');return;
+  }
+  if(channel==='email'){
+    if(!cu.email)return toast('ลูกค้ารายนี้ยังไม่มีอีเมลในระบบ');
+    window.location.href='mailto:'+cu.email+'?subject='+encodeURIComponent(caseDetailModel.case.caseNo);return;
+  }
+  if(channel==='line'){
+    if(!cu.lineUserId)return toast('ลูกค้ารายนี้ยังไม่ได้เชื่อม LINE OA');
+    return toast('การส่งข้อความ LINE จะเชื่อมกับ LINE Messaging API ในขั้นถัดไป');
+  }
+  if(channel==='whatsapp'){
+    if(!cu.whatsapp)return toast('ลูกค้ารายนี้ยังไม่มี WhatsApp ในระบบ');
+    window.open('https://wa.me/'+String(cu.whatsapp).replace(/[^0-9]/g,''),'_blank','noopener');return;
+  }
+}
+function openContactPicker(){
+  var cu=caseDetailModel.customer;
+  panel('ติดต่อลูกค้า','<div class="scd-actions" style="grid-template-columns:repeat(4,1fr);margin-top:0">'
+   +['phone|📞|โทรศัพท์|'+(cu.phone||'ยังไม่มีเบอร์'),
+     'line|💬|LINE|'+(cu.lineUserId?'เชื่อมแล้ว':'ยังไม่เชื่อม'),
+     'email|✉|อีเมล|'+(cu.email||'ยังไม่มีอีเมล'),
+     'whatsapp|🟢|WhatsApp|'+(cu.whatsapp||'ยังไม่มี')].map(function(row){
+      var p=row.split('|');
+      return '<button type="button" class="scd-act" data-contact="'+p[0]+'"><i>'+p[1]+'</i>'
+        +esc(p[2])+'<small style="display:block;font-weight:400;color:var(--muted)">'+esc(p[3])+'</small></button>';
+     }).join('')+'</div>');
+}
+
+function panel(title,html){
+  var host=el('scdPanel');
+  host.innerHTML='<section class="card"><div class="card-head"><span class="ic">▤</span><h2>'
+    +esc(title)+'</h2><span class="spacer"></span>'
+    +'<button type="button" class="scd-chip-btn" data-action="close-panel">ปิด</button></div>'+html+'</section>';
+  host.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function customerHTML(){
+  var cu=caseDetailModel.customer;
+  return '<dl class="kv">'
+   +'<dt>ชื่อลูกค้า</dt><dd>'+esc(cu.name)+'</dd>'
+   +'<dt>ที่อยู่</dt><dd>'+esc(cu.address||'-')+'</dd>'
+   +'<dt>ผู้ติดต่อ</dt><dd>'+esc(cu.contactName||'-')+'</dd>'
+   +'<dt>โทรศัพท์</dt><dd>'+esc(cu.phone||'-')+'</dd>'
+   +'<dt>อีเมล</dt><dd>'+esc(cu.email||'-')+'</dd>'
+   +'<dt>LINE</dt><dd>'+(cu.lineUserId?'เชื่อมแล้ว':'ยังไม่เชื่อม')+'</dd>'
+   +'</dl>';
+}
+function assignmentHTML(){
+  var a=caseDetailModel.assignment,ap=caseDetailModel.appointment;
+  return '<dl class="kv">'
+   +'<dt>ผู้ประสานงาน</dt><dd>'+esc(a.coordinator||'-')+'</dd>'
+   +'<dt>ช่างผู้รับผิดชอบ</dt><dd>'+esc(a.technician&&a.technician.name||'ยังไม่มอบหมาย')+'</dd>'
+   +'<dt>ทีม</dt><dd>'+esc(a.technician&&a.technician.team||'-')+'</dd>'
+   +'<dt>เบอร์ช่าง</dt><dd>'+esc(a.technician&&a.technician.phone||'-')+'</dd>'
+   +'<dt>มอบหมายเมื่อ</dt><dd>'+esc(a.technician?fmtDateTime(a.assignedAt):'-')+'</dd>'
+   +'<dt>วันเวลานัดหมาย</dt><dd>'+esc(ap.date?fmtDateTime(ap.date):'ยังไม่นัดหมาย')+'</dd>'
+   +'<dt>สถานที่</dt><dd>'+esc(ap.location||caseDetailModel.customer.address||'-')+'</dd>'
+   +'<dt>สถานะนัดหมาย</dt><dd>'+(ap.date?'Confirmed':'Pending')+'</dd>'
+   +'</dl>';
+}
+function historyHTML(){
+  var h=caseDetailModel.history;
+  if(!h.length)return '<p class="scd-empty">ยังไม่มีประวัติงานของเครื่องนี้</p>';
+  return '<ul class="scd-list">'+h.map(function(c){
+    return '<li><b>'+esc(c.ticket||c.id)+' · '+esc(c.status||'')+'</b>'
+      +'<small>'+esc(fmtDateTime(c.createdAt))+' · '+esc(c.serviceType||'')+'</small></li>';
+  }).join('')+'</ul>'
+  +'<p class="scd-empty" style="margin-top:12px">เอกสารเครื่อง คู่มือ สเปก และเอกสารประกันของเครื่องนี้'
+  +' จะรวมอยู่ในมุมมองนี้ ไม่แยกเป็นการ์ดของตัวเองบนหน้าเคส</p>';
+}
+function attachmentsHTML(){
+  var a=caseDetailModel.attachments;
+  if(!a.length)return '<p class="scd-empty">ยังไม่มีรูปหรือวิดีโอในเคสนี้</p>';
+  return '<div class="media-row">'+a.slice(0,24).map(function(x){
+    return x.type==='image'&&x.data
+      ?'<div class="media-thumb" style="background-image:url('+JSON.stringify(x.data)+')"></div>'
+      :'<div class="media-thumb">'+esc(x.type==='video'?'วิดีโอ':'ไฟล์')+'</div>';
+  }).join('')+'</div>';
+}
+function notesHTML(){
+  var n=caseDetailModel.internalNotes;
+  return (n.length?'<ul class="scd-list">'+n.map(function(x){
+      return '<li><b>'+esc(x.text)+'</b><small>'+esc(fmtDateTime(x.at))+'</small></li>';
+    }).join('')+'</ul>'
+   :'<p class="scd-empty">ยังไม่มีหมายเหตุภายในสำหรับเคสนี้</p>')
+   +'<p class="scd-empty" style="margin-top:12px">⚠ หมายเหตุภายในสำหรับเจ้าหน้าที่เท่านั้น'
+   +' และจะไม่แสดงในหน้าหลักลูกค้า</p>';
+}
+function feedbackHTML(){
+  var f=caseDetailModel.feedback;
+  if(!f)return '<p class="scd-empty">ยังไม่มีการประเมินความพึงพอใจ ระบบยังไม่ได้เก็บข้อมูลส่วนนี้</p>';
+  return '<dl class="kv"><dt>คะแนน</dt><dd>'+esc(f.rating)+' / 5</dd></dl>';
+}
+
+/* =======================================================================
+   8. wiring
+   ======================================================================= */
+var HANDLERS={
+  'assign-technician':assignTechnician,
+  'schedule-service':scheduleService,
+  'contact-customer':openContactPicker,
+  'open-quotation':openQuotation,
+  'open-field-service':openFieldService,
+  'change-status':changeCaseStatus,
+  'open-machine-history':openMachineHistory,
+  'open-customer-detail':openCustomerDetail,
+  'open-assignment-detail':openAssignmentDetail,
+  'open-case-attachments':openCaseAttachments,
+  'open-attachments':openCaseAttachments,
+  'open-internal-notes':openInternalNotes,
+  'open-feedback':openFeedback,
+  'add-attachment':function(){toast('การแนบไฟล์เพิ่มจะทำผ่านใบตรวจ / สถานะหน้างานในระบบหลัก')},
+  'close-panel':function(){el('scdPanel').innerHTML='';},
+  'open-app':function(){window.location.href=APP},
+  'open-notifications':function(){goApp('notifications')},
+  'toggle-language':function(){toast('ภาษาเปลี่ยนได้จากระบบหลัก · หน้านี้ยังใช้ภาษาไทย')}
+};
+document.addEventListener('click',function(e){
+  var contact=e.target.closest('[data-contact]');
+  if(contact){contactCustomer(contact.getAttribute('data-contact'));return}
+  var btn=e.target.closest('[data-action]');
+  if(!btn)return;
+  var fn=HANDLERS[btn.getAttribute('data-action')];
+  if(fn){e.preventDefault();fn()}
+});
+el('scdSearch').addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&this.value.trim())goApp('cases','&q='+encodeURIComponent(this.value.trim()));
+});
+
+/* Expose the pieces the integration prompt names, so they can be driven from a console
+   or a future test without reaching into the closure. */
+window.CaseDetailData=CaseDetailData;
+window.caseDetailModel=caseDetailModel;
+window.getCaseIdFromUrl=getCaseIdFromUrl;
+window.contactCustomer=contactCustomer;
+window.scdReady=false;
+
+load().then(function(res){
+  if(res&&res.error){renderError(res.error);window.scdReady=true;return}
+  renderPage(res);
+  window.scdReady=true;
+}).catch(function(err){
+  renderError('not-found');
+  window.scdReady=true;
+});
+})();
+</script>
+</body>
+</html>

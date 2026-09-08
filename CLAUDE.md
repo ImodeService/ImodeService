@@ -2574,3 +2574,232 @@ V6.8 strings unchanged.
    boot. Harmless — the registration is `.catch(()=>{})` — but it is real console noise.
 4. A machine added on one device now does reach the others, but only because that device
    can write. Nothing reconciles a conflicting edit; last write wins.
+
+---
+
+## Session Change Log — 2026-09-09 (part 16): Beta Service focus
+
+Ten requested items plus the version rename. Four new patch scripts, one new standalone
+page, and small edits to five existing files. No storage key renamed, no Supabase setting
+touched, no existing function body rewritten.
+
+| File | What |
+|---|---|
+| `service-case-detail.html` | **new** — the full-page Service Case workspace |
+| `js/25-v70BetaScript.js` | **new** — beta technician records + the role-aware bottom bar |
+| `js/26-v70CaseFlowScript.js` | **new** — response clock, assignment notice, status stepper |
+| `js/27-v70RowClickScript.js` | **new** — the row is the button |
+| `js/28-v70CaseDetailLink.js` | **new** — list to detail page, and `?page=` back |
+| `index.html` | version strings, `data-perm` on เพิ่มนัดหมาย, 4 script tags |
+| `js/06`, `js/09`, `js/10`, `js/12` | version override, 2 accounts, clickable identity block, permission repair |
+
+### Version
+
+`V6.8 Service focus` becomes **`Beta Service focus`**, in all four places it is written:
+`<title>`, the sidebar `Version Beta`, the topbar `Service focus · Beta`, and the
+sidebar rewrite inside `js/06` that runs on every render — editing the markup alone would
+have silently reverted, the same trap as the technicians label in part 6.
+
+### 1. `service-case-detail.html` — the case is a page, not a popup
+
+A standalone document with its own scoped CSS and JS, opened as
+`service-case-detail.html?caseId=<id>`. It does **not** reuse `css/01`; the theme tokens
+are restated at the top of the file, which is what keeps it editable without touching the
+application.
+
+- **It reads real data.** `CaseDetailData` is a **read-only** adapter over the same
+  localStorage keys the application persists to, so a case opened here is the real case.
+  It never writes. `USE_CLOUD` is the Supabase seam (off); `USE_MOCK_DATA` is the third
+  fallback and is used **only** when the id resolves to nothing, so the layout is still
+  reviewable on an empty device — and it says so on screen when it does.
+- Layout follows the approved reference: breadcrumb, case header (number, customer,
+  status, priority, รับแจ้ง / ช่องทาง / ผู้ติดต่อ) beside an SLA card, the 6-step progress
+  bar, 6 large action buttons, ปัญหาที่ลูกค้าแจ้ง (the strongest card) beside a large
+  machine card, 5 compact module buttons, back link.
+- **Customer Satisfaction is not one of the six steps.** It sits after ปิดเคส as an
+  after-service item, and hold states (รออะไหล่, the field sub-status) are badges, never
+  steps — a case waiting for parts is still at กำลังให้บริการ.
+- **No standalone เอกสารเครื่อง card.** Machine documents belong inside
+  ประวัติการบริการเครื่องนี้, per the brief.
+- **Machine image priority is preserved** — own `m.photo`, then a family reference
+  (labelled ภาพอ้างอิง, `object-fit:contain`), then No Image. A reference image is only
+  displayed, never written back.
+- **SLA is computed, not decorated.** New and unassigned uses the 30-minute response clock;
+  scheduled counts down to the appointment; รออะไหล่ reads On Hold; with nothing to measure
+  it says ยังไม่มีกำหนด SLA rather than inventing "On Time".
+- Actions carry `data-action` and are named as the brief specifies
+  (`assignTechnician`, `scheduleService`, `contactCustomer(channel)`, `openQuotation`,
+  `openFieldService`, `changeCaseStatus`, `openMachineHistory` and the rest). They either
+  open a panel on the page or hand off to the module that really does the job. **Nothing
+  fakes a successful write.** `contactCustomer` opens `tel:` / `mailto:` when the customer
+  has one and says what is missing when they do not; LINE says the Messaging API is not
+  connected rather than pretending to send.
+- Missing `caseId` gives a clean ไม่พบหมายเลขเคส state with a way back. It never throws.
+
+### 2. The list opens the page — `js/28`
+
+`window.imodeOpenCase` is the single seam every list already calls; it now navigates to
+the page. **`openCaseDetail()` itself is deliberately not redirected** — `advanceCase()`
+and several related lists reopen it as a popup mid-flow, and navigating away from those
+would be a regression. `openCaseFromRow` and `imodeOpenAssignedCase` point at the seam.
+
+Coming back, `?page=<module>` lands on that module (`?caseId=` and `?intent=` are
+conveniences that no-op when the case is not on this device). js/21 keeps `customer-entry`.
+
+### 3. The row is the button — `js/27`
+
+Every master list lost its trailing button column; the row opens the record and the
+buttons that were in it are cloned into the popup that opens.
+
+Done by reading each rendered row **after the fact** rather than by rewriting ten row
+templates in `js/03`: the button whose `onclick` matches the list's "open" action becomes
+the row's activation, the rest travel to the popup, and the cell they lived in plus its
+`<th>` are hidden. Nothing is invented, permission-dependent buttons (the quotation
+button) keep working, and a button a later patch adds is carried along for free. A moved
+button is skipped when the popup already offers the same `onclick`, so the warranty popup
+does not end up with two แก้ไข.
+
+Covered: cases, customers, machines, QC, warranty, petty cash, machine documents, spare
+parts, quotations, service reports, purchase orders — table and mobile card.
+
+**Buttons in a content column are left alone** — 🗺 Maps in the customer address cell and
+ใบรับประกัน in the warranty เอกสาร cell are data, not the trailing action cluster.
+
+### 4. Response clock on a new case — `js/26`
+
+An open, unassigned `เคสใหม่` carries `⏱ ตอบกลับภายใน 30 นาที` plus a live countdown on
+its own row (cases table, mobile card, and the มอบหมายงาน page). At **10 minutes** left
+the chip and the whole row turn light red; past the deadline they turn deeper red and read
+เกินกำหนด. Assigning the case stops the clock and clears the highlight — the clock measures
+the office's response, not the repair. Configurable in `settings.slaResponse`
+(`minutes`, `warnMinutes`); one 1-second tick updates text and two class names only, never
+a re-render.
+
+### 5. THE ASSIGNMENT NOTICE NEVER LEFT THE COORDINATOR'S PC
+
+`notifications` is written locally and **`js/03` never uploads that table** —
+`syncCloud()` downloads `notifications`, but there is no `cloudUpsertNotification` and
+`cloudUpsert` is never called for it. So the notice written by `notifyAssignment()` in
+js/16 existed only on the device that did the assigning. On the same device it worked,
+which is why the existing suite passed.
+
+Fixed by **deriving** the notice from the case instead of syncing a table: the case
+already travels and its `assignee` is the whole message. `assignedNotices()` emits
+`auto_assigned_<id>` for a technician's own cases while they are still at
+`มอบหมายแล้ว` / `นัดหมายแล้ว`, so every device computes the same notice, it clears itself
+once the technician starts the job, and a stored notice for the same case is de-duplicated.
+
+### 6. Beta accounts
+
+| Username | Password | Role | Technician record |
+|---|---|---|---|
+| `tech_test1` | `tech_test1` | Technician | `T-TEST-1` ช่างทดสอบ 1 |
+| `R&D_test1` | `R&D_test1` | Technician - R&D | `T-RD-1` R&D ทดสอบ 1 |
+
+R&D holds **exactly** the technician module set — it points at the existing
+`Technician - R&D` role rather than a new permission list, so only the name differs.
+`findAccount()` lower-cases both sides, so the username may be typed in any case; the hash
+is of the exact string, so the **password stays case sensitive** (asserted). The two
+technician records are seeded by `js/25` with the same one-time guard js/13 uses.
+
+### 7. The mobile bottom bar is built from the role
+
+It was five hard-coded buttons over `grid-template-columns:repeat(5,1fr)`.
+`applyRoleVisibility()` hides a button whose page the role may not open, and a
+`display:none` child is removed from the grid — which is why the reported phone showed a
+bar with two buttons pinned left and an empty half.
+
+Now: candidates filtered by the role's own permissions, 5 slots (the FAB costs one),
+always ending in เพิ่มเติม, with the column count set inline from what is really visible.
+
+- technician / R&D: งานของฉัน · หน้างาน · QC · ปฏิทิน · แจ้งเตือน · เพิ่มเติม
+- admin: หน้าหลัก · เคส · ＋รับเคส · มอบหมาย · ปฏิทิน · เพิ่มเติม
+
+Six columns on a 390px phone ellipsised the Thai labels, so `is-tight` drops the label to
+7.6px at six or more.
+
+### 8. Status goes one step at a time, and finished work does not vanish
+
+- **The nine-value dropdown is a stepper.** A primary `ถัดไป: <next status>` button, a
+  visual step strip, and รออะไหล่ as its own branch button. The main path **skips
+  รออะไหล่** deliberately — waiting for parts is a branch, not a stage every job passes
+  through. The full list is still there under เลือกสถานะเอง, because the workflow branches
+  and a technician sometimes has to go back.
+- The modal is rebuilt rather than wrapped (the dropdown is the thing being replaced), but
+  **every id the save path reads keeps its name** — the `<select id="fieldStatusSelect">`
+  is still there inside the disclosure — so `saveFieldStatus()` in js/03 runs untouched.
+- **`renderFieldService()` drops any case at ปิดเคส**, which is what "the job disappeared"
+  was: closing a job removed it from the technician's only screen. Closed jobs now sit in
+  a collapsed งานที่ปิดแล้ว group.
+- **`renderAll()` does not refresh งานของฉัน / มอบหมายงาน** — they are rendered only by the
+  `goPage` wrapper in js/16 — so a status change made from either page left a stale list on
+  screen. Both are re-rendered now when they are the active page.
+
+### 9. เพิ่มนัดหมาย is hidden for a plain technician
+
+One attribute: `data-perm="calendar.edit"` on the calendar button. `TECHNICIAN_PERMS` has
+`calendar.view` but not `calendar.edit`, so a technician loses it while admins and team
+leads keep it. `openScheduleModal()` already required the same permission.
+
+### 10. The Home identity block opens the Dashboard
+
+It is a real `<button>` with an `aria-label`, a focus ring and a `แดชบอร์ด ›` chip. On a
+phone the sidebar is behind the drawer, so this was the only thing on the Home board with
+nowhere to go. A role without `dashboard.view` is not dead-ended — the `goPage` wrapper in
+js/12 sends it to the first page the role can open.
+
+### THE PERMISSION BUG BEHIND "QC หายจาก sidebar ของ admin"
+
+On a fresh profile the Admin / Coordinator role is correct — 33 permissions, `qc.view`
+included — and the QC nav item, the roles editor and `saveRoles()` were all verified
+correct in a browser. So the reported symptom was a **saved settings object that had lost
+keys**, not a rendering bug; the same phone had also lost `dashboard.view` and `case.view`,
+which is why its bottom bar had collapsed to two buttons.
+
+`ADMIN_ADD` in js/12 only ever re-added the seven keys it introduced. The admin migration
+now adds back the **whole documented Admin / Coordinator preset**, and `SCOPE_VERSION` is
+bumped 3 to 4 so it runs once. It is add-only: a permission an admin deliberately unticked
+is not in the preset either — asserted, along with stability across three reloads.
+
+### Tests
+
+Nine suites, ten headless runs, **195 assertions, 0 failures, 0 JS errors**, at
+1440x1000 and 390x844 plus a forced `prefers-reduced-motion` run:
+
+beta items — version, both new accounts, case-sensitive passwords, both bottom bars,
+calendar button gating, identity block to dashboard (29) · permission repair against a
+deliberately stripped copy of the reported state, including that a real untick survives
+(12) · response clock at three ages, counting down, stopping on assign; the assignment
+notice reaching the right technician and no one else; the stepper; closed jobs kept (28) ·
+row click across every list, buttons moved into the popup, keyboard Enter, no duplicates,
+survives a re-render (23) · the detail page from real data, 6 steps, 6 actions, 5 modules,
+the adapter's named loaders, both error states (38) · round trip back into the app and the
+390px layout (12) · regression: 19 pages, the machines pager, cases KPI, the QR popup with
+two codes and one combined print button, stable QR tokens, `?serial=`, `?machineToken=`,
+sign-out to the door (19 desktop + 19 mobile) · งานของฉัน through five status changes (8) ·
+reduced motion (7).
+
+`node --check` passes on every file in `js/`, `auth/` and `pages/`, and on the detail
+page's extracted script.
+
+### Harness note worth keeping
+
+Give every headless Chrome its **own** `--remote-debugging-port` (bind port 0 and read it
+back). Killing `chrome.exe` and reusing 9222 is not enough — a dying instance still owns
+the port long enough for the next launch to attach to it, and the symptom is a page that
+looks half-loaded with `window.imodeSignIn` undefined. Also: `websocket-client` sends an
+`Origin` header that Chrome's DevTools endpoint rejects, so pass `suppress_origin=True`;
+and wrap stdout with `line_buffering=True` or a piped suite writes nothing until it exits.
+
+### Open / risk
+
+1. **A case row no longer opens the popup**; it leaves for `service-case-detail.html`. The
+   popup code is untouched and still reachable from `openCaseDetail()` elsewhere, per the
+   brief's "keep the legacy popup".
+2. The detail page **reads** localStorage and cannot write. Every edit still happens in the
+   application; the action buttons hand the visitor there.
+3. `settings.slaResponse` has no editor — 30 / 10 minutes are the defaults in code.
+4. The derived assignment notice covers `มอบหมายแล้ว` / `นัดหมายแล้ว` only. A case
+   reassigned while already in progress is not re-announced.
+5. Unchanged from part 11: the customer Home page still shows any machine to anyone who has
+   its serial or QR.

@@ -30,7 +30,7 @@
    const lang=settings.language==='en';
    const techBtn=document.querySelector('.nav-item[data-page="technicians"] b');if(techBtn)techBtn.textContent=lang?'Service Team':'ทีมช่าง';
    const onsiteBtn=document.querySelector('.nav-item[data-page="onsite"] b');if(onsiteBtn)onsiteBtn.textContent=lang?'Onsite Service':'หน้างาน';
-   const ver=document.querySelector('.sidebar-version b');if(ver)ver.textContent='Version 6.8';
+   const ver=document.querySelector('.sidebar-version b');if(ver)ver.textContent='Version Beta';
    const verSub=document.querySelector('.sidebar-version span');if(verSub)verSub.textContent='Service focus';
    const heroLogo=document.querySelector('.v68-global-logo');if(heroLogo&&typeof IMODE_UI_LOGO!=='undefined')heroLogo.src=IMODE_UI_LOGO;
  }

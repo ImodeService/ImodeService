@@ -39,7 +39,15 @@
   /* Team leads. v69TeamScopeScript creates the two placeholder technician records these
      point at, and the two lead roles. Password follows the same UAT convention. */
   {username:'lead_technical',hash:'ce542514170e4e614884d486436664ec3c3ed92197b3609772f45c171ed9c80f',accountType:'technician',technicianId:'T-LEAD-TECH',role:'Technical Lead',team:'Technical'},
-  {username:'lead_rd',hash:'004ea2bba79120446757cc6c80353031afd496f86352c34402884e007b06c938',accountType:'technician',technicianId:'T-LEAD-RD',role:'R&D Lead',team:'R&D'}
+  {username:'lead_rd',hash:'004ea2bba79120446757cc6c80353031afd496f86352c34402884e007b06c938',accountType:'technician',technicianId:'T-LEAD-RD',role:'R&D Lead',team:'R&D'},
+  /* Beta test accounts. R&D holds exactly the technician module set — the role name is the
+     only difference, which is why it points at the existing 'Technician - R&D' role rather
+     than at a new permission list. The two technician records they point at are seeded by
+     v70BetaScript. findAccount() lower-cases both sides, so 'R&D_test1' is matched however
+     it is typed; the hash is of the exact string, so the password itself stays case
+     sensitive. Same UAT convention as every other account here: password = username. */
+  {username:'tech_test1',hash:'2d42d1649d3e6ea478491a8a70ad1145e972cc1a7d76b9f4bce98a365224f0d5',accountType:'technician',technicianId:'T-TEST-1',role:'Technician',team:'Technical'},
+  {username:'R&D_test1',hash:'fd03830ab24e7008a66b2f7b3208a4b2fef5d672607bb1cbd0eed4a360eba4ba',accountType:'technician',technicianId:'T-RD-1',role:'Technician - R&D',team:'R&D'}
  ];
 
  /* Every customer in the system gets an account. CUST-0001 -> customer_test1, and so on. */

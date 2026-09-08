@@ -45,6 +45,18 @@
     what a technician sees. */
  var ADMIN_ADD=['quotation.view','quotation.create','onsite.view','parts.view','pettycash.view',
                 'users.manage','settings.manage'];
+ /* 4 (2026-09-09): reported from a live browser — QC เครื่อง was missing from the admin
+    sidebar, and on one phone the bottom nav had lost หน้าหลัก and เคส as well. On a fresh
+    profile the role is correct (33 permissions, qc.view included), so this is a saved
+    settings object that has lost keys, not a rendering bug. The base preset is the
+    documented Admin / Coordinator set; adding it back is add-only, so anything the admin
+    deliberately granted on top of it survives, and it runs once. */
+ function adminBaseline(){
+  var base=typeof permissionPresetForRoleName==='function'
+   ?(basePreset?basePreset('Admin / Coordinator'):permissionPresetForRoleName('Admin / Coordinator'))
+   :[];
+  return (base||[]).concat(ADMIN_ADD);
+ }
 
  /* Keep the "ชุดสิทธิ์มาตรฐาน" button in Settings in step with the same sets. */
  var basePreset=window.permissionPresetForRoleName;
@@ -68,7 +80,7 @@
  /* 3 (2026-09-08): installs that had already run version 2 lost onsite.view /
     parts.view / pettycash.view (and mywork.view) to the mergeSettings() strip described in
     js/20, and saved the stripped set back. Bumping restores them once. */
- var SCOPE_VERSION=3;   /* bump to re-run the migration when these sets change */
+ var SCOPE_VERSION=4;   /* bump to re-run the migration when these sets change */
  function migrate(){
   if(settings.v69RoleScope===SCOPE_VERSION)return false;
   var roles=Array.isArray(settings.roles)?settings.roles:[];
@@ -79,10 +91,10 @@
    if(n.indexOf('technician')>=0||n==='r&d'||n.indexOf('engineer')>=0){
     perms=TECHNICIAN_PERMS.slice();
    }else if(n.indexOf('admin')>=0||n.indexOf('coordinator')>=0){
-    ADMIN_ADD.forEach(add);
+    adminBaseline().forEach(add);
    }else if(n.indexOf('manager')>=0||n.indexOf('supervisor')>=0){
     NEW_PERMS.forEach(function(p){add(p[0])});
-    ADMIN_ADD.forEach(add);
+    adminBaseline().forEach(add);
    }
    r.permissions=perms;
   });

@@ -12,7 +12,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b2f8f">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>I-MODE Plus Service & Maintenance · V6.8 Service focus</title>
+  <title>I-MODE Plus Service & Maintenance · Beta Service focus</title>
 <link rel="stylesheet" href="./css/01-base-theme.css">
 <link rel="stylesheet" href="./css/02-v6.1-sales-easy-mode.css">
 <link rel="stylesheet" href="./css/03-service-focus-badge.css">
@@ -85,7 +85,7 @@
     </nav>
 
     <div class="sidebar-version" title="Current application version">
-      <b>Version 6.8</b>
+      <b>Version Beta</b>
       <span>Service focus</span>
     </div>
 
@@ -95,7 +95,7 @@
     <header class="topbar v68-topbar">
       <div class="topbar-left v68-topbar-left">
         <button class="icon-btn v68-menu-btn" id="menuBtn" aria-label="เปิด/ปิดเมนู">☰</button>
-        <div class="v68-topbar-brand"><b>I-MODE SERVICE</b><small>Service focus · V6.8</small></div>
+        <div class="v68-topbar-brand"><b>I-MODE SERVICE</b><small>Service focus · Beta</small></div>
       </div>
       <div class="topbar-actions v68-topbar-actions">
         <button class="orange-btn action-3d-orange ui-emphasis-action v68-top-accept" data-perm="case.create" onclick="openCaseModal()">＋ รับเคสใหม่</button>
@@ -355,7 +355,7 @@
     <section class="page" id="page-calendar">
       
       <div class="panel">
-        <div class="panel-head toolbar-head"><div><h3>ปฏิทินงานช่าง</h3><p>ดูนัดหมายตามวัน สัปดาห์ เดือน ปี และกรองตามทีม</p></div><button class="primary-btn action-3d-orange ui-emphasis-action" onclick="openScheduleModal()">＋ เพิ่มนัดหมาย</button></div>
+        <div class="panel-head toolbar-head"><div><h3>ปฏิทินงานช่าง</h3><p>ดูนัดหมายตามวัน สัปดาห์ เดือน ปี และกรองตามทีม</p></div><button class="primary-btn action-3d-orange ui-emphasis-action" data-perm="calendar.edit" onclick="openScheduleModal()">＋ เพิ่มนัดหมาย</button></div>
         <div class="calendar-toolbar calendar-toolbar-v2">
           <div class="calendar-main-controls">
             <button class="soft-btn" onclick="changeCalendar(-1)">← ก่อนหน้า</button>
@@ -730,6 +730,22 @@
      under RLS returns 200 with zero rows instead of an error. This reports it.
      Must stay after js/23 so it wraps a cloudUpsert that already has a client. -->
 <script src="./js/24-v69CloudHealthScript.js"></script>
+
+<!-- Beta Service focus: technician records for the beta accounts, and a bottom bar built
+     from the role's own permissions instead of five hard-coded buttons. -->
+<script src="./js/25-v70BetaScript.js"></script>
+
+<!-- Beta Service focus: response clock on a new case, an assignment notice derived from
+     the case so it reaches every device, and a one-step-at-a-time field status. -->
+<script src="./js/26-v70CaseFlowScript.js"></script>
+
+<!-- Beta Service focus: the row opens the record; the buttons that used to sit in it are
+     moved into the popup that opens. -->
+<script src="./js/27-v70RowClickScript.js"></script>
+
+<!-- Beta Service focus: a case opens the standalone full-page workspace
+     (service-case-detail.html?caseId=...), and ?page=<module> brings the visitor back. -->
+<script src="./js/28-v70CaseDetailLink.js"></script>
 
 </body>
 </html>

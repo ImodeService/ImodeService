@@ -182,6 +182,8 @@
     ${mods.length?'':`<p class="rhome-empty">${esc(L('บัญชีนี้ยังไม่ได้รับสิทธิ์เข้าถึงโมดูลใด','This account has not been granted access to any module'))}</p>`}
    </div>`;
   host.querySelectorAll('.rhome-modcard[data-page]').forEach(btn=>{btn.onclick=()=>launchStaff(btn.dataset.page,btn)});
+  const profileBtn=host.querySelector('.rhome-profile[data-action="open-dashboard"]');
+  if(profileBtn)profileBtn.onclick=()=>goPage('dashboard');
   const more=document.getElementById('rhomeMoreBtn'),restGrid=document.getElementById('rhomeRestGrid');
   if(more&&restGrid)more.onclick=()=>{
    const open=restGrid.hidden;
@@ -254,13 +256,20 @@
   const initials=String(u.name||'?').trim().split(/\s+/).slice(0,2).map(w=>w.charAt(0)).join('');
   /* Name and role only: this is a shortcut board, and team, username and module counts
      were noise above the cards. */
-  return `<section class="rhome-profile" aria-label="${esc(L('ข้อมูลผู้ใช้งาน','Your account'))}">
+  /* The block is the way into the Dashboard from the Home board — on a phone the sidebar
+     is behind the drawer, so this was the only thing on screen with nowhere to go. It is a
+     real <button> for keyboard and screen readers. A role without dashboard.view is not
+     dead-ended: the goPage wrapper in v69RoleScopeScript sends it to the first page the
+     role can actually open. */
+  return `<button type="button" class="rhome-profile" data-action="open-dashboard"
+     aria-label="${esc(L('เปิดแดชบอร์ด','Open dashboard'))}">
     <div class="rhome-avatar">${photo?`<img src="${esc(photo)}" alt="${esc(u.name||'')}">`:`<span>${esc(initials||'?')}</span>`}</div>
     <div class="rhome-profile-body">
      <h2>${esc(u.name||'')}</h2>
      <p class="rhome-profile-role">${esc(u.permissionRole||u.role||roleLabel())}</p>
     </div>
-   </section>`;
+    <span class="rhome-profile-go" aria-hidden="true">${esc(L('แดชบอร์ด','Dashboard'))} ›</span>
+   </button>`;
  }
 
  function moduleCard(m,i){
@@ -796,7 +805,12 @@
 
  /* ---------- Card Home (replaces the circle stage for staff) ---------- */
  .rhome-cardhome{max-width:920px}
- .rhome-profile{display:flex;gap:16px;align-items:stretch;background:#fff;border:1px solid #dfe9f8;border-radius:18px;padding:16px;box-shadow:0 14px 34px rgba(18,58,128,.09)}
+ .rhome-profile{display:flex;gap:16px;align-items:stretch;background:#fff;border:1px solid #dfe9f8;border-radius:18px;padding:16px;box-shadow:0 14px 34px rgba(18,58,128,.09);width:100%;text-align:inherit;font:inherit;cursor:pointer;position:relative;transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
+ .rhome-profile:hover{transform:translateY(-2px);border-color:#b9d2f4;box-shadow:0 18px 40px rgba(18,58,128,.14)}
+ .rhome-profile:active{transform:translateY(0)}
+ .rhome-profile:focus-visible{outline:3px solid #0b63e5;outline-offset:3px}
+ .rhome-profile-go{align-self:center;flex:none;font-size:12px;font-weight:800;color:#0b63e5;background:#eef4ff;border:1px solid #dce8fa;border-radius:999px;padding:6px 12px;white-space:nowrap}
+ @media (prefers-reduced-motion:reduce){.rhome-profile{transition:none}.rhome-profile:hover{transform:none}}
  .rhome-avatar{flex:none;width:118px;height:118px;border-radius:14px;overflow:hidden;display:grid;place-items:center;background:linear-gradient(160deg,#0b63e5,#073763);color:#fff;font-size:38px;font-weight:800;letter-spacing:1px}
  .rhome-avatar img{width:100%;height:100%;object-fit:cover;display:block}
  .rhome-profile-body{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:9px}
@@ -834,7 +848,9 @@
  }
  @media (max-width:640px){
   /* The photo stays beside the details, never above them. */
-  .rhome-profile{gap:12px;padding:13px}
+  .rhome-profile{gap:10px;padding:13px}
+  .rhome-profile-go{font-size:0;padding:6px 9px}
+  .rhome-profile-go::after{content:'›';font-size:18px;line-height:1}
   .rhome-avatar{width:78px;height:78px;font-size:26px;border-radius:12px}
   .rhome-profile-body h2{font-size:16px}
   .rhome-profile-role{font-size:12px;padding:4px 11px}

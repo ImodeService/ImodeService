@@ -74,6 +74,35 @@
   return restored;
  }
  window.imodeRepairRolePermissions=repairStrippedRolePermissions;
+
+ /* The same strip happens again every time mergeSettings() is called with a fresh raw
+    object — syncCloud() does exactly that with the settings row pulled from Supabase, and
+    importSystemBackup() does it with a backup file. The boot snapshot cannot help there:
+    the roles came from somewhere else. So the restore is attached to mergeSettings itself,
+    which fixes every present and future caller in one place.
+
+    mergeSettings is a top-level function declaration in js/03, so this override is the
+    binding its own callers resolve. */
+ function restoreInto(merged,raw){
+  if(!merged||!raw||!Array.isArray(raw.roles)||!Array.isArray(merged.roles))return merged;
+  var known={};
+  try{allPermissionKeys().forEach(function(k){known[k]=1})}catch(e){return merged}
+  merged.roles.forEach(function(r){
+   var src=raw.roles.filter(function(x){return String(x.name||'')===String(r.name||'')})[0];
+   if(!src||!Array.isArray(src.permissions))return;
+   r.permissions=Array.isArray(r.permissions)?r.permissions:[];
+   src.permissions.forEach(function(k){
+    if(known[k]&&r.permissions.indexOf(k)<0)r.permissions.push(k);
+   });
+  });
+  return merged;
+ }
+ var baseMerge=window.mergeSettings;
+ if(typeof baseMerge==='function'){
+  window.mergeSettings=function(raw){
+   return restoreInto(baseMerge.apply(this,arguments),raw);
+  };
+ }
  if(repairStrippedRolePermissions()){
   if(typeof applyRoleVisibility==='function')applyRoleVisibility();
  }

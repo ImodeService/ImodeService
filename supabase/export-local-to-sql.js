@@ -1,14 +1,21 @@
 /* I-MODE Plus Service & Maintenance — V6.8 Service focus
    export-local-to-sql.js — turn the data already in this browser into SQL INSERTs.
 
-   WHY: connecting to an empty Supabase wipes local data, because syncCloud() overwrites
-   `customers`, `machines`, `cases` and the rest with whatever the cloud returns — even an
-   empty array. Seeding the database FIRST removes that risk entirely: the first sync then
-   pulls real rows instead of nothing.
+   WHY: connecting to an empty Supabase leaves the office PC as the only place the data
+   exists. syncCloud() is download-only, and every line is guarded by `data.length`:
 
-   It also preserves each machine's existing `qrToken`. That matters: ensureMasters() runs
-   inside renderAll(), so a machine that comes back from the cloud without a token gets a
-   brand new random one on every sync, and any QR code already printed stops working.
+       if(!c.error && c.data.length) customers = c.data.map(fromCustomerDb)
+
+   so an empty cloud does NOT wipe local data (an earlier version of this note said it did
+   — checked on 2026-09-08, it does not). What it does mean is that connecting alone shares
+   nothing: the phone still sees only the seeded demo rows until real rows are in the
+   database. Seeding it with this file is what makes the customer's phone and the office PC
+   see the same machines.
+
+   qrToken is no longer a worry: js/21-v69StableQrScript.js derives it from the machine id
+   (QR-<id>), so a machine that comes back from the cloud without one gets the same token
+   every device computes, and printed labels keep working. This file still carries the
+   tokens, which is harmless.
 
    HOW TO USE
    1. Open the application in the browser that holds the data you want to keep.

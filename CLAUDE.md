@@ -2393,3 +2393,77 @@ Suite c2, 16 assertions: the photo button and its input are gone, the scan butto
 box remain, the success banner with its ticket, the case list growing from one to two
 reports, the status chip, the toast, and กลับหน้าหลัก returning to the Home page through the
 new history entry.
+
+### Follow-up (same day): the Supabase project state, measured
+
+Project `service_Imode_test`, ref `ywlrlfudlxsallanoroq`. Probed over the REST API with the
+publishable key the user supplied (the new name for the anon key; the app's placeholder
+already reads `sb_publishable_...`).
+
+| Check | Result |
+|---|---|
+| API URL | `https://ywlrlfudlxsallanoroq.supabase.co` — the user had been reading the **dashboard** URL, which is not it |
+| The 11 data tables | all present, all empty (`00-tables.sql` was run) |
+| `profiles`, `auth_audit` | present — so **`01-schema.sql` and `02-rls.sql` were run too** |
+| Read | 200 everywhere, but that proves nothing: RLS filters rows, so a blocked read and an empty table look identical |
+| Write | **`42501 new row violates row-level security policy`** on `service_cases`, `line_customer_requests`, `customers`, `machines` |
+
+So RLS is on and its policies grant writes `to authenticated` only. Nobody in this
+application is ever `authenticated` in Supabase's sense — customers have had no accounts
+since part 12, and staff sign in against the local UAT registry, not Supabase Auth. **Every
+`cloudUpsert()` would therefore fail silently** (it only `console.warn`s), which is worse
+than staying in Local Mode.
+
+Three ways out, in order of how much work they are:
+
+1. **UAT now:** `alter table public.<t> disable row level security;` on the 11 data tables.
+   Everything works immediately; anyone holding the publishable key can read and write, so
+   no real customer data until this is revisited.
+2. **Scoped anon policies:** the same posture as (1) but explicit — insert for `anon` on
+   `service_cases` and `line_customer_requests`, read where needed.
+3. **Production:** move the staff login to Supabase Auth (`auth/auth-supabase.js` is
+   already written and switches on by itself once a URL and key are configured), which
+   makes the `to authenticated` policies in `02-rls.sql` meaningful again, and add one
+   anon-insert policy for the two tables a customer with no account has to write to.
+
+Not run from here: disabling RLS is a security change on someone else's database and
+belongs to the project owner. The test row used to prove the write path was deleted.
+
+### Follow-up (same day): the shared database is live — `js/23-v69CloudConfigScript.js`
+
+The owner disabled RLS on the 11 data tables (`Success. No rows returned` is the right
+answer for `alter table`). Re-probed: **all 11 tables now accept writes** (201), reads work,
+and the test rows were deleted again.
+
+One thing still stood between that and a working flow. `cloudSettings` is read from
+`localStorage.imode_v5_cloud` **per device** (js/03:189). Staff can type the URL and key
+into ตั้งค่าระบบ → ฐานข้อมูล Cloud; **a customer scanning a machine QR on their own phone
+never can**, so that phone stayed in Local Mode and the case it wrote never left it. That
+was the actual reason a reported case did not reach the office.
+
+`js/23` ships the connection with the application: if this device has no cloud config and
+has not deliberately disconnected, it fills `cloudSettings` in before `initCloud()` runs in
+the boot sequence. `disconnectCloud()` is wrapped to remember an explicit
+ใช้ข้อมูลในเครื่อง in `imode_v69_cloud_optout`, and `saveCloudSettings()` clears it, so the
+script never silently reconnects a device someone chose to take offline.
+
+**The publishable key is in the repo on purpose.** It is public by design — every browser
+that opens a configured app receives it. What protects the data is Row Level Security, and
+RLS is off right now, so *anyone who reads the file can read and write this database*. That
+is a deliberate UAT choice on a project named `service_Imode_test`; the header of js/23
+says so, and says not to put real customer records in it until RLS is back on with policies
+that match how people actually sign in.
+
+**Verified end to end against the real project** (suite e2, 15 assertions, three separate
+browser profiles):
+
+customer's phone auto-connects → QR → แจ้งปัญหา → the case is in Supabase
+(`SRV-…`, `assignee: null`) along with its `line_customer_requests` row → **the admin's PC,
+a different profile, boots, syncs, and has the case**: the เคสใหม่รอมอบหมาย notification, a
+row on มอบหมายงาน, and the ticket on the Service Cases page → assign → `assignee: T001`,
+`status: มอบหมายแล้ว` back in Supabase → **the technician's phone, a third profile, sees it
+in งานของฉัน**. Test rows deleted afterwards; the tables are empty again.
+
+Harness note: `cdp.py` now sets `imode_v69_cloud_optout` on every test document, so the
+other suites stay offline and never write to the live project. A suite that means to
+exercise the cloud sets `cdp.CLOUD = True` first (e1, e2).

@@ -2299,3 +2299,48 @@ resolution all work, because every path in the project is relative. So the rich-
 is **`https://imodeservice.github.io/ImodeService/#/customer-entry`**.
 
 Suite q3, 10 assertions, covers the sub-path deployment.
+
+### Follow-up (same day): the Android Back button — `js/22-v69HistoryScript.js`
+
+The application had **no routing at all** — `goPage()` only toggles `.page.active` and
+nothing had ever touched `history`. On a phone the hardware / gesture Back button therefore
+did the only thing left to it: leave the site. A customer who opened แจ้งปัญหาเครื่อง and
+pressed Back lost the page; a technician who opened a module from the Home board left the
+app.
+
+**One history entry per screen, and nothing else.**
+
+- The `goPage()` wrapper pushes an entry whenever the visible page actually changed. It is
+  the **outermost** wrapper (js/22 loads last) because several earlier ones redirect —
+  `customer-home` → `customer-portal`, `dashboard` → the first page a role may open — so
+  the requested name is not always the name that ends up on screen.
+- Detail views inside the customer Home page (แจ้งปัญหา, เช็คประกัน, ประวัติ …) never go
+  through `goPage()`: js/08 swaps `#portalContent` and adds `.imode-portal-detail-mode` to
+  the shell. A `MutationObserver` on that class is the choke point every path shares,
+  including any added later.
+- `popstate` leaves the detail view first (it is drawn *inside* the page, not instead of
+  it), then restores the page.
+- The portal's own ← button calls `history.back()` instead of returning home directly, so
+  it consumes its entry rather than leaving a stale one behind.
+
+**Deliberately not a router.** The URL never changes: pushing a path would 404 on a GitHub
+Pages refresh and need a rewrite rule, and pushing a hash would fight `initPortalFromUrl()`,
+which reads `#/customer-portal`. Every entry carries the same URL and a state object, which
+is all Back needs.
+
+**Boot replaces, it does not push.** The app routes itself several times while starting —
+the QR guard, `bootRoute()` sending a session-less visitor to the staff door,
+`initPortalFromUrl()` opening a scanned machine. Those would leave Back presses that appear
+to do nothing, so until `load` + 500 ms every navigation `replaceState`s the single initial
+entry. Measured: two entries at the login door, not five.
+
+**Gotcha:** `window.imodePortalBackHome` is defined inside js/08's own DOMContentLoaded
+`install()`, so it does **not** exist while js/22 is being parsed. Capturing it at parse
+time silently produced a Back button that left the page but not the detail view — the first
+version did exactly that. It is captured in `start()` instead, which runs after js/08's
+listener because js/08 registered its one first.
+
+Suites b1 (16) and b2 (17): module → module → Back through the staff Home board, sidebar
+navigation three deep, the customer report form, **Back straight after submitting a case**,
+the entry page → machine → Back, the portal's own ← arrow consuming its entry, and the boot
+not stacking dead entries.

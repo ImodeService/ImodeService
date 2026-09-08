@@ -1,0 +1,331 @@
+/* =====================================================================
+   V6.9 — Customer Home page, built to the design the user supplied
+
+   Only #page-customer-portal is touched. The structure is the one in
+   pages/customer-home.html; the machine information card is rendered at runtime by
+   js/19-v69CustomerHomeScript.js.
+
+   Loaded after css/21, which is itself loaded after css/20 and after the <style> blocks
+   js/10 and js/16 append to <head> — so these rules win at equal specificity. The few
+   !important declarations here are answering an !important rule in css/20.
+
+   The entrance animation (each button popping in one after another) is driven by
+   --chome-i, an index js/19 stamps on every button before the first paint.
+   ===================================================================== */
+
+.chome{
+  --chome-ink:#0c225e;
+  --chome-muted:#68789a;
+  --chome-line:#dbe6f8;
+  background:linear-gradient(180deg,#eef4ff 0%,#f7faff 40%,#ffffff 100%);
+}
+
+/* ---------------------------------------------------------------------
+   1. Header — logo | name + tagline | close
+   White, with the type in the logo's own navy and the accent in its orange.
+   The base rule in css/01 paints it I-MODE blue and sets white type; everything that
+   assumed a dark ground is restated here. The grid (78px / 1fr / 38px) is untouched.
+   --------------------------------------------------------------------- */
+.chome-header{
+  padding:16px 16px 18px;
+  background:linear-gradient(180deg,#ffffff 0%,#f7faff 100%);
+  color:#0c225e;
+  border-bottom:1px solid #e3ebf8;
+  box-shadow:0 6px 18px rgba(16,54,128,.06);
+}
+/* The wordmark is already navy on transparent, so the white chip it wore on the blue
+   header (js/14, .centry-portal-logo) is not needed and would show as a box. */
+.chome-header .centry-portal-logo{
+  background:transparent;
+  padding:0;
+  box-shadow:none;
+}
+.chome-headline{
+  min-width:0;
+  padding-left:14px;
+  border-left:1px solid #dbe6f8;
+}
+.chome-headline b{
+  display:block;
+  font-size:18px;
+  line-height:1.2;
+  letter-spacing:.01em;
+  color:#0c225e;
+}
+.chome-headline small{
+  display:block;
+  font-size:12px;
+  margin-top:1px;
+  color:#2b5fae;
+  opacity:1;
+}
+.chome-headline em{
+  display:block;
+  margin-top:6px;
+  font-style:normal;
+  font-size:10.5px;
+  line-height:1.45;
+  color:#6b7d9e;
+}
+/* Close button: a light chip instead of the translucent white one. */
+.chome-header .portal-close{
+  background:#eef3fb;
+  border:1px solid #dce6f6;
+  color:#3b4d73;
+  font-weight:700;
+}
+.chome-header .portal-close:hover{
+  background:#e2ebf9;
+  color:#0c225e;
+}
+
+/* The green LINE / QR strip under the header is removed from the design.
+   #portalLineIdentity stays in the DOM: renderCustomerPortal() in js/03 and
+   updateLineIdentity() in js/08 both write to it by id and would throw without it. */
+.chome .portal-line-identity{display:none !important}
+
+/* ---------------------------------------------------------------------
+   2. Machine information card
+   --------------------------------------------------------------------- */
+.chome-machine{
+  margin:14px;
+  padding:14px;
+  border-radius:20px;
+  background:linear-gradient(160deg,#ffffff,#f4f8ff);
+  border:1px solid var(--chome-line);
+  box-shadow:0 12px 26px rgba(16,54,128,.09);
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);
+  gap:14px;
+  align-items:start;
+}
+.chome-machine-photo{
+  border-radius:16px;
+  overflow:hidden;
+  background:linear-gradient(150deg,#e9f1ff,#ffffff);
+  border:1px solid #e2ebf9;
+  aspect-ratio:4/3;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.chome-machine-photo img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+/* A reference picture of the model is not this machine, so it is shown whole. */
+.chome-machine-photo img.is-reference{object-fit:contain;background:#fff;padding:6px}
+.chome-machine-photo .chome-noimg{
+  font-size:11px;
+  font-weight:700;
+  color:#5571ab;
+}
+.chome-machine-head{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:10px;
+}
+.chome-machine-head span{
+  width:38px;height:38px;
+  flex:0 0 38px;
+  border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:19px;
+  background:linear-gradient(160deg,#2b7bf0,#0b46b0);
+  box-shadow:0 6px 14px rgba(11,70,176,.30);
+}
+.chome-machine-head b{
+  display:block;
+  font-size:15px;
+  color:var(--chome-ink);
+  line-height:1.25;
+}
+.chome-machine-head small{
+  display:block;
+  font-size:9.5px;
+  letter-spacing:.16em;
+  color:#8ea3c6;
+  margin-top:2px;
+}
+.chome-row{
+  display:grid;
+  grid-template-columns:minmax(74px,auto) minmax(0,1fr);
+  gap:8px;
+  padding:7px 0;
+  border-bottom:1px dashed #e5edf9;
+  font-size:12px;
+  align-items:baseline;
+}
+.chome-row:last-child{border-bottom:0}
+.chome-row dt{color:var(--chome-muted);font-size:11.5px}
+.chome-row dd{margin:0;color:var(--chome-ink);font-weight:700;overflow-wrap:anywhere}
+.chome-row dd.is-plain{font-weight:600;color:#33456d}
+.chome-warranty{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:5px 11px;
+  border-radius:999px;
+  font-size:11.5px;
+  font-weight:800;
+}
+.chome-warranty.active{background:#e6f7ec;color:#12784a;border:1px solid #bde9cf}
+.chome-warranty.expiring{background:#fff4e2;color:#9a5b06;border:1px solid #f6d9ab}
+.chome-warranty.expired,
+.chome-warranty.none{background:#fdeceb;color:#9d2b26;border:1px solid #f5c9c6}
+.chome-warranty-sub{
+  display:block;
+  margin-top:4px;
+  font-size:10.5px;
+  font-weight:600;
+  color:var(--chome-muted);
+}
+.chome-refnote{
+  margin:6px 0 0;
+  font-size:10px;
+  color:#8ea3c6;
+}
+
+/* ---------------------------------------------------------------------
+   3. Action cards
+   --------------------------------------------------------------------- */
+.chome-grid{gap:12px !important}
+.chome-grid > button{
+  position:relative;
+  display:grid;
+  grid-template-columns:56px minmax(0,1fr);
+  grid-template-rows:auto auto auto;
+  column-gap:12px;
+  row-gap:2px;
+  align-content:center;
+  min-height:118px !important;
+  padding:15px 42px 13px 15px !important;
+  border-radius:18px;
+}
+.chome-grid > button > span:first-child{
+  grid-row:1 / span 3;
+  align-self:center;
+  width:52px !important;
+  height:52px !important;
+  font-size:26px;
+}
+.chome-grid > button b{margin-top:0 !important;font-size:14.5px;line-height:1.25}
+.chome-grid > button small{margin-top:2px !important;font-size:10.5px}
+/* The small caps label, with the coloured rule above it from the design. */
+.chome-grid > button i{
+  grid-column:2;
+  font-style:normal;
+  margin-top:9px;
+  padding-top:8px;
+  font-size:8.5px;
+  font-weight:800;
+  letter-spacing:.14em;
+  color:#93a6c7;
+  position:relative;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.chome-grid > button i::before{
+  content:"";
+  position:absolute;
+  top:0;left:0;
+  width:26px;height:3px;
+  border-radius:2px;
+  background:#0b63e5;
+}
+.chome-grid > button:nth-child(1) i::before{background:#2b7bf0}
+.chome-grid > button:nth-child(2) i::before{background:#22b6d8}
+.chome-grid > button:nth-child(3) i::before{background:#f79009}
+.chome-grid > button:nth-child(4) i::before{background:#e2591f}
+.chome-grid > button:nth-child(5) i::before{background:#7a5af0}
+.chome-grid > button:nth-child(6) i::before{background:#0f9d6b}
+.chome-grid > button:nth-child(7) i::before{background:#07b154}
+.chome-grid > button:nth-child(8) i::before{background:#f2911c}
+/* The chevron the design puts in the top right corner. */
+.chome-grid > button::after{
+  content:"›";
+  position:absolute;
+  top:12px;right:12px;
+  width:22px;height:22px;
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:15px;
+  font-weight:700;
+  line-height:1;
+  color:#2b7bf0;
+  background:#eaf2ff;
+  border:1px solid #d5e6fd;
+  transition:transform .16s ease, background .16s ease;
+}
+.chome-grid > button:hover::after{transform:translateX(2px);background:#ddeaff}
+
+/* The announcement card spans the row. */
+.chome-grid > button.chome-wide{
+  grid-column:1 / -1;
+  min-height:96px !important;
+  background:linear-gradient(160deg,#eef5ff 0%,#ffffff 60%,#f2f7ff 100%);
+}
+.chome-grid > button.chome-wide b{font-size:14px}
+
+/* ---------------------------------------------------------------------
+   4. Entrance — every button pops in, one after the next
+   --chome-i is stamped per button by js/19 before the first paint.
+   --------------------------------------------------------------------- */
+@keyframes chomePopIn{
+  0%  {opacity:0;transform:translateY(14px) scale(.92)}
+  62% {opacity:1;transform:translateY(-3px) scale(1.02)}
+  100%{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes chomeFadeIn{from{opacity:0}to{opacity:1}}
+.chome-anim .chome-grid > button{
+  animation:chomePopIn .42s cubic-bezier(.2,.9,.3,1.15) backwards;
+  animation-delay:calc(var(--chome-i,0) * 70ms);
+}
+.chome-anim .chome-machine{
+  animation:chomePopIn .44s cubic-bezier(.2,.9,.3,1.15) backwards;
+}
+.chome-anim .chome-header{animation:chomeFadeIn .3s ease backwards}
+
+/* ---------------------------------------------------------------------
+   5. Footer
+   --------------------------------------------------------------------- */
+.chome-footer{
+  padding:18px 16px 22px;
+  line-height:1.7;
+}
+.chome-motto{
+  display:block;
+  margin-bottom:5px;
+  font-size:9.5px;
+  font-weight:800;
+  letter-spacing:.2em;
+  color:#7d93bb;
+}
+
+/* ---------------------------------------------------------------------
+   6. Narrow phones — the card stacks, everything else already fits
+   --------------------------------------------------------------------- */
+@media (max-width:420px){
+  .chome-machine{grid-template-columns:minmax(0,1fr)}
+  .chome-grid > button{
+    grid-template-columns:46px minmax(0,1fr);
+    min-height:112px !important;
+    padding:13px 38px 12px 13px !important;
+  }
+  .chome-grid > button > span:first-child{width:44px !important;height:44px !important;font-size:22px}
+  .chome-headline em{display:none}
+}
+
+/* ---------------------------------------------------------------------
+   7. Reduced motion — the page simply appears
+   --------------------------------------------------------------------- */
+@media (prefers-reduced-motion:reduce){
+  .chome-anim .chome-grid > button,
+  .chome-anim .chome-machine,
+  .chome-anim .chome-header{animation:chomeFadeIn .2s ease backwards;animation-delay:0s}
+  .chome-grid > button:hover::after{transform:none}
+}

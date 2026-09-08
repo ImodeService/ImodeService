@@ -1,0 +1,24 @@
+<!-- I-MODE Plus · Customer Portal page (#page-customer-portal)
+     The one page a customer ever sees. It has no sidebar and no topbar, so it lives in
+     its own file and can be edited without touching index.html.
+     This is a fragment, not a whole document: ./pages/pages.js inserts it into <main>
+     at the position it used to occupy. Keep the ids — portalLineIdentity,
+     portalMachineHero and portalContent are filled in by renderCustomerPortal(). -->
+    <section class="page customer-portal-page" id="page-customer-portal">
+      <div class="portal-shell">
+        <div class="portal-header"><img src="./assets/imode-ui-logo-v532.png" alt="I-MODE"><div><b>I-MODE Plus</b><small>Customer Service Portal</small></div><button class="portal-close" onclick="exitCustomerPortal()">×</button></div>
+        <div id="portalLineIdentity" class="portal-line-identity"></div>
+        <div id="portalMachineHero"></div>
+        <div class="portal-action-grid">
+          <button onclick="openPortalIssueForm()"><span>🔧</span><b>แจ้งปัญหาเครื่อง</b><small>เปิด Service Case ผ่าน LINE</small></button>
+          <button onclick="showPortalWarranty()"><span>🛡</span><b>เช็คประกัน</b><small>วันเริ่ม/หมดอายุ Warranty</small></button>
+          <button onclick="openPortalServiceQuoteRequest()"><span>💰</span><b>ขอราคา Service</b><small>ให้ทีมจัดทำใบเสนอราคาบริการ</small></button>
+          <button onclick="openPortalWarrantyRequest()"><span>฿</span><b>ซื้อ / ต่อ Warranty</b><small>ขอใบเสนอราคา Warranty</small></button>
+          <button onclick="showPortalHistory()"><span>🕘</span><b>ประวัติ Service</b><small>ซ่อม PM และเปลี่ยนอะไหล่</small></button>
+          <button onclick="showPortalDocuments()"><span>📘</span><b>คู่มือเครื่อง</b><small>Manual / Datasheet / PM</small></button>
+          <button onclick="contactServiceFromPortal()"><span>💬</span><b>ติดต่อ Service</b><small>โทร / LINE Official Account</small></button>
+        </div>
+        <div id="portalContent" class="portal-content"></div>
+        <div class="portal-footer">บริษัท ไอโมด พลัส จำกัด • I-MODE Plus Service & Maintenance</div>
+      </div>
+    </section>

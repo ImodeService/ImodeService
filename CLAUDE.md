@@ -2833,11 +2833,22 @@ repairs the row.
 - **A `‹` back button in the modal head**, left of the title, on every popup.
 - **The phone Back button closes the popup instead of leaving the page.** js/22 gives every
   screen a history entry; a modal is a screen too. A `MutationObserver` on `#modal`'s class
-  pushes one entry on the closed → open transition only — `openCaseDetail()` calls
-  `openModal()` again for every tab, and those must not stack — and `popstate` closes it
-  before js/22 restores anything else, so Back returns to the page the popup was opened
-  from. `closeModal()` (the `×` and the new `‹`) calls `history.back()` instead, so the
-  entry is consumed rather than left behind for a Back press that would do nothing.
+  pushes one entry on the closed → open transition, and `popstate` closes the popup before
+  js/22 restores anything else, so Back returns to the page it was opened from.
+- **Popups stack, and `‹` steps down one level.** QR, QC and แก้ไข are all opened from the
+  machine popup, so back from them has to mean *that* popup, not an empty page.
+  `openModal()` is wrapped: when it is called while a popup is already open it snapshots
+  the outgoing title / sub / body / panel class, pushes it on a stack and adds a history
+  entry. Going back restores the snapshot — no function is re-run and nothing needs to know
+  which popup it came from. A snapshot is raw markup, so a half-filled form is not
+  preserved; that is what "back" means, and the popup being returned to in practice is a
+  static record detail.
+  - `‹` (`imodeModalBack()`) goes one level down, or closes when it is the last one.
+  - `×` means done with all of it: `history.go(-depth)` rewinds the whole stack, so one
+    Back press afterwards leaves the page instead of reopening what was just closed.
+  - **A tab switch is not a new screen.** `openCaseDetail()` calls `openModal()` again for
+    every tab it draws; the title is what tells a re-render from a new popup, because a tab
+    switch keeps it. Three tab renders still cost one Back press.
 
 ### Follow-up: the case workspace has a back button
 
@@ -2849,9 +2860,14 @@ to the same place and two 40px buttons plus the brand and three tools do not fit
 
 ### Tests after the follow-ups
 
-Three new suites — cloud settings repair (7), modal back button run at 1440 and 390 (16
-each), detail page back button (9) — plus every earlier suite re-run. **243 assertions,
-0 failures, 0 JS errors.**
+Four new suites — cloud settings repair (7), modal back button at 1440 and 390 (16 each),
+nested popups at 1440 and 390 (18 each), detail page back button (9) — plus every earlier
+suite re-run. **279 assertions, 0 failures, 0 JS errors.**
+
+The nested-popup suite walks the reported path exactly: machine popup → QR → back → the
+machine popup with its buttons intact, the same for QC and แก้ไข, then a second back to
+close; the phone Back button stepping the same way; `×` closing the whole stack and leaving
+nothing that reopens it; and three case-detail tab renders still costing one Back press.
 
 ### Open / risk
 

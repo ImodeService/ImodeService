@@ -75,23 +75,62 @@
  window.imodeReapplyRoleMigrations=reapply;
 
  /* =======================================================================
-    2. a modal is a screen: Back closes it
+    2. a modal is a screen, and popups stack
     ======================================================================= */
- var modal=null,restoring=false,wasOpen=false,pushed=0;
+ /* QR, QC and แก้ไข are all opened from the machine popup, so "back" from them means the
+    machine popup, not an empty page. openModal() replaces the modal body, so the outgoing
+    one is snapshotted first and restored from that snapshot — no function has to be
+    re-run and nothing needs to know which popup it came from.
+
+    A snapshot is raw markup, so a half-filled form is not preserved. That is what "back"
+    means, and the popup being returned to in practice (the record detail) is static. */
+ var modal=null,restoring=false,wasOpen=false,depth=0,stack=[];
 
  function isOpen(){return !!(modal&&modal.classList.contains('open'))}
+ function el(id){return document.getElementById(id)}
 
- /* js/22 owns the history entries for pages and portal detail views. A modal entry is
-    stacked on top of whatever it recorded, and is popped before anything else, so the two
-    never fight: closing the popup returns to the page it was opened from. */
+ function snapshot(){
+  var t=el('modalTitle'),sub=el('modalSub'),body=el('modalBody'),panel=el('modalPanel');
+  if(!t||!body)return null;
+  return {title:t.textContent||'',sub:sub?sub.textContent||'':'',
+          body:body.innerHTML,panel:panel?panel.className:''};
+ }
+ function restore(snap){
+  if(!snap)return false;
+  var t=el('modalTitle'),sub=el('modalSub'),body=el('modalBody'),panel=el('modalPanel');
+  if(!t||!body)return false;
+  t.textContent=snap.title;
+  if(sub)sub.textContent=snap.sub;
+  body.innerHTML=snap.body;
+  if(panel&&snap.panel)panel.className=snap.panel;
+  return true;
+ }
+
  function pushEntry(){
-  try{
-   history.pushState({imodeModal:true,depth:++pushed},'',location.href);
-  }catch(e){}
+  depth++;
+  try{history.pushState({imodeModal:true,depth:depth},'',location.href)}catch(e){}
+ }
+
+ /* A popup opened on top of another one. openCaseDetail() calls openModal() again for
+    every tab it draws, and those are the same popup re-rendering, not a new screen — the
+    title is what tells them apart, because a tab switch keeps it. */
+ var baseOpenModal=window.openModal;
+ if(typeof baseOpenModal==='function'){
+  window.openModal=function(title){
+   if(!restoring&&isOpen()){
+    var cur=el('modalTitle');
+    var same=cur&&String(cur.textContent||'')===String(title==null?'':title);
+    if(!same){
+     var snap=snapshot();
+     if(snap){stack.push(snap);pushEntry()}
+    }
+   }
+   return baseOpenModal.apply(this,arguments);
+  };
  }
 
  function watch(){
-  modal=document.getElementById('modal');
+  modal=el('modal');
   if(!modal||modal.__v70ModalHistory)return;
   modal.__v70ModalHistory=true;
   wasOpen=isOpen();
@@ -101,36 +140,49 @@
     var open=isOpen();
     if(open===wasOpen)return;
     wasOpen=open;
-    /* Only the closed → open transition pushes. openModal() is called again for every tab
-       inside a popup (openCaseDetail does exactly that), and those must not stack. */
+    /* Only the closed → open transition pushes here; a popup opened over another one is
+       pushed by the openModal wrapper above, which also keeps the snapshot. */
     if(open)pushEntry();
+    else if(depth>0&&!restoring){depth=0;stack.length=0}
    }).observe(modal,{attributes:true,attributeFilter:['class']});
   }catch(e){}
  }
 
- /* The × and the ‹ ask the browser to go back, so the entry this modal added is consumed
-    rather than left behind for a Back press that would then appear to do nothing. */
  var baseClose=window.closeModal;
+ /* × means "done with all of this": rewind every entry this popup stack added, so one
+    Back press afterwards leaves the page rather than re-opening what was just closed. */
  if(typeof baseClose==='function'){
   window.closeModal=function(){
-   if(!restoring&&pushed>0&&isOpen()){
-    try{history.back();return}catch(e){}
+   if(!restoring&&depth>0&&isOpen()){
+    try{history.go(-depth);return}catch(e){}
    }
    return baseClose.apply(this,arguments);
   };
  }
+ /* ‹ means "one step back": to the popup underneath if there is one, else close. */
+ window.imodeModalBack=function(){
+  if(!restoring&&depth>1&&stack.length&&isOpen()){
+   try{history.back();return}catch(e){}
+  }
+  if(typeof window.closeModal==='function')window.closeModal();
+ };
 
  window.addEventListener('popstate',function(ev){
   var st=(ev&&ev.state)||{};
-  if(isOpen()&&!st.imodeModal){
-   restoring=true;
-   try{if(typeof baseClose==='function')baseClose.call(window)}catch(e){}
-   restoring=false;
-   wasOpen=false;
-   if(pushed>0)pushed--;
-  }else if(!st.imodeModal){
-   pushed=0;
-  }
+  var target=st.imodeModal?(Number(st.depth)||0):0;
+  if(depth<=target)return;
+  restoring=true;
+  try{
+   while(depth>target){
+    if(target>0&&stack.length){restore(stack.pop());depth--}
+    else{
+     if(typeof baseClose==='function')baseClose.call(window);
+     wasOpen=false;depth=0;stack.length=0;
+     break;
+    }
+   }
+  }catch(e){}
+  restoring=false;
  });
 
  var style=document.createElement('style');

@@ -105,6 +105,10 @@
   return true;
  }
  migrate();
+ /* syncCloud() replaces `settings` wholesale with the copy in system_settings, which is
+    saved from whichever device wrote last and can be older than this migration. Exposed so
+    v70SettingsSyncGuard can run it again on what the cloud sent. */
+ window.imodeRoleScopeMigrate=migrate;
 
  /* ---------- 4. do not send anyone to a page their role cannot open ----------
     The Home centre used to go straight to the Dashboard, which a technician no longer

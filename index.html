@@ -643,7 +643,7 @@
 
 <div class="modal" id="modal">
   <div class="modal-panel" id="modalPanel">
-    <div class="modal-head"><div><h2 id="modalTitle"></h2><p id="modalSub"></p></div><button class="close-btn" onclick="closeModal()">×</button></div>
+    <div class="modal-head"><button class="modal-back-btn" id="modalBackBtn" onclick="closeModal()" aria-label="ย้อนกลับ">‹</button><div><h2 id="modalTitle"></h2><p id="modalSub"></p></div><button class="close-btn" onclick="closeModal()">×</button></div>
     <div class="modal-body" id="modalBody"></div>
   </div>
 </div>
@@ -746,6 +746,11 @@
 <!-- Beta Service focus: a case opens the standalone full-page workspace
      (service-case-detail.html?caseId=...), and ?page=<module> brings the visitor back. -->
 <script src="./js/28-v70CaseDetailLink.js"></script>
+
+<!-- Beta Service focus: re-applies the role migrations to the settings copy syncCloud()
+     brings down (it replaced them wholesale a moment after they were repaired), and makes
+     the phone Back button close a popup instead of leaving the page. -->
+<script src="./js/29-v70ModalHistoryScript.js"></script>
 
 </body>
 </html>

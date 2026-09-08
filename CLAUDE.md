@@ -2791,6 +2791,68 @@ looks half-loaded with `window.imodeSignIn` undefined. Also: `websocket-client` 
 `Origin` header that Chrome's DevTools endpoint rejects, so pass `suppress_origin=True`;
 and wrap stdout with `line_buffering=True` or a piped suite writes nothing until it exits.
 
+### Follow-up (same day): the cloud copy of settings was undoing every permission repair
+
+Reported from a live browser: an **admin** got "คุณไม่มีสิทธิ์ใช้งานฟังก์ชันนี้" when
+pressing **QC** in the machine popup, while QR and แก้ไข on the same popup worked and
+QC เครื่อง was visible in the sidebar.
+
+On a fresh profile everything passes, so the row in `system_settings` was read directly:
+
+```
+Admin / Coordinator  ->  31 permissions
+  qc.view      true      <- why the sidebar looked fine
+  qc.edit      FALSE     <- why openQcModal() denied it
+  qc.approve   FALSE
+v69RoleScope: 3
+```
+
+**Boot order is the whole bug.** js/12, js/16 and js/20 all repair `settings` at parse
+time; a moment later `initCloud()` → `syncCloud()` does
+`settings = mergeSettings(cloudCopy)` and **replaces the repaired object wholesale** with
+the copy in `system_settings`, which still carried the stripped role and the old version
+number. Every repair was correct and every repair was thrown away on the same page load,
+which is why reloading never helped and why the previous session's `SCOPE_VERSION` bump
+appeared to do nothing on this device.
+
+`js/29-v70ModalHistoryScript.js` wraps `syncCloud` and re-applies the same three
+migrations to what the cloud actually sent. When they change something it saves locally
+**and pushes the corrected settings back up**, so the shared copy stops being wrong for
+every other device too. It converges: the copy it uploads carries the current version
+number, so the next sync leaves it alone. A fingerprint of the role permissions decides
+whether anything really moved, so a sync that changes nothing never writes.
+
+**No manual database edit was needed or made** — the first device to load the fixed build
+repairs the row.
+
+### Follow-up: one close button, and Back closes a popup
+
+- **The QR popup had two dismiss buttons.** `openMachineQR()` in js/05 appended its own
+  `✕ ปิดหน้าต่าง` row under the modal that already has `×`. Removed. Note this is not the
+  ยกเลิก rule from 2026-09-05: a data-entry form's explicit Cancel button still stays.
+- **A `‹` back button in the modal head**, left of the title, on every popup.
+- **The phone Back button closes the popup instead of leaving the page.** js/22 gives every
+  screen a history entry; a modal is a screen too. A `MutationObserver` on `#modal`'s class
+  pushes one entry on the closed → open transition only — `openCaseDetail()` calls
+  `openModal()` again for every tab, and those must not stack — and `popstate` closes it
+  before js/22 restores anything else, so Back returns to the page the popup was opened
+  from. `closeModal()` (the `×` and the new `‹`) calls `history.back()` instead, so the
+  entry is consumed rather than left behind for a Back press that would do nothing.
+
+### Follow-up: the case workspace has a back button
+
+`service-case-detail.html` gained a `‹` at the top left. It calls `history.back()` when the
+visitor came from the application — so the button and the browser's own Back do the same
+thing and no entry dangles — and falls back to `index.html?page=cases` for a bookmark or a
+pasted link that has nothing to go back to. At ≤640px the `☰` steps aside for it; both went
+to the same place and two 40px buttons plus the brand and three tools do not fit 390px.
+
+### Tests after the follow-ups
+
+Three new suites — cloud settings repair (7), modal back button run at 1440 and 390 (16
+each), detail page back button (9) — plus every earlier suite re-run. **243 assertions,
+0 failures, 0 JS errors.**
+
 ### Open / risk
 
 1. **A case row no longer opens the popup**; it leaves for `service-case-detail.html`. The

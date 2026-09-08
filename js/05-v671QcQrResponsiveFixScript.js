@@ -48,7 +48,7 @@
           </div>
         </div>
       </div>
-      <div class="v671-modal-close-row"><button type="button" class="soft-btn" onclick="closeModal()">✕ ปิดหน้าต่าง</button></div>`
+      `
     );
     modalPanel?.classList.add('large');
     setTimeout(()=>renderQR('machineQRCode',url),60);

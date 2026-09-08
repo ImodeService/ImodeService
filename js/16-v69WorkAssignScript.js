@@ -48,6 +48,8 @@
   if(typeof saveLocal==='function')saveLocal();
  }
  migrate();
+ /* Re-applied after a cloud sync by v70SettingsSyncGuard, for the same reason as js/12. */
+ window.imodeWorkMigrate=migrate;
 
  if(typeof PAGE_INFO!=='undefined'){
   PAGE_INFO.th['my-work']=['งานของฉัน','เคสงานที่ได้รับมอบหมายให้คุณ'];

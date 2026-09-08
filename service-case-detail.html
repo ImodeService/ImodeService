@@ -56,6 +56,9 @@ a{color:var(--imode-blue)}
 }
 .scd-topbar-in{max-width:1440px;margin:0 auto;padding:10px 20px;display:flex;align-items:center;gap:14px}
 .scd-menu{width:40px;height:40px;border:1px solid var(--line);border-radius:11px;background:#fff;cursor:pointer;font-size:17px;flex:none}
+.scd-menu:hover{border-color:#b9d2f4;background:#f4f8ff}
+.scd-menu:focus-visible{outline:3px solid var(--imode-blue);outline-offset:2px}
+.scd-backbtn{font-size:24px;line-height:1;color:var(--imode-navy);font-weight:700}
 .scd-brand{display:flex;flex-direction:column;line-height:1.2;flex:none}
 .scd-brand b{color:var(--imode-navy);font-size:15px;letter-spacing:.2px}
 .scd-brand small{color:var(--muted);font-size:11px}
@@ -236,6 +239,12 @@ a{color:var(--imode-blue)}
   .scd-modules{grid-template-columns:1fr}
   .machine-body{grid-template-columns:120px minmax(0,1fr);gap:13px}
   .scd-user span{display:none}
+  /* Two 40px buttons plus the brand and three tools do not fit 390px. The back arrow is
+     the useful one on a phone; ☰ went to the same place, so it steps aside. */
+  .scd-menu:not(.scd-backbtn){display:none}
+  .scd-brand b{font-size:13px}
+  .scd-brand small{font-size:10px}
+  .scd-chip-btn{min-width:36px;height:36px;padding:0 9px}
 }
 @media (prefers-reduced-motion:reduce){
   .scd-act,.scd-mod{transition:none}
@@ -248,6 +257,7 @@ a{color:var(--imode-blue)}
 
 <header class="scd-topbar">
   <div class="scd-topbar-in">
+    <button class="scd-menu scd-backbtn" type="button" data-action="go-back" aria-label="ย้อนกลับไปหน้ารายการเคส">‹</button>
     <button class="scd-menu" type="button" data-action="open-app" aria-label="กลับไปที่ระบบหลัก">☰</button>
     <div class="scd-brand"><b>I-MODE SERVICE</b><small>Service Focus · Beta</small></div>
     <label class="scd-search">🔍<input id="scdSearch" type="search" placeholder="ค้นหาเคส / ลูกค้า / Serial / รุ่นเครื่อง ..." aria-label="ค้นหา"></label>
@@ -967,6 +977,15 @@ var HANDLERS={
   'open-feedback':openFeedback,
   'add-attachment':function(){toast('การแนบไฟล์เพิ่มจะทำผ่านใบตรวจ / สถานะหน้างานในระบบหลัก')},
   'close-panel':function(){el('scdPanel').innerHTML='';},
+  /* Back to the list. history.back() when the visitor came from the app, so the browser's
+     own Back and this button do the same thing and no entry is left dangling; a direct
+     link (a bookmark, a pasted URL) has nothing to go back to, so it goes to the list. */
+  'go-back':function(){
+    if(document.referrer&&document.referrer.indexOf(location.origin)===0&&history.length>1){
+      history.back();return;
+    }
+    goApp('cases');
+  },
   'open-app':function(){window.location.href=APP},
   'open-notifications':function(){goApp('notifications')},
   'toggle-language':function(){toast('ภาษาเปลี่ยนได้จากระบบหลัก · หน้านี้ยังใช้ภาษาไทย')}

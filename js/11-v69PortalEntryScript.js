@@ -208,7 +208,36 @@
    if(typeof window.imodeQrBootRelease==='function')window.imodeQrBootRelease();
   }
  };
+ /* Every URL that belongs to a customer, not just ?machineToken=. js/21 added
+    #/customer-entry and ?serial= for the LINE rich menu, and those visitors have the same
+    right not to see the internal dashboard on the way in. */
+ function customerRoute(){
+  try{
+   var p=new URLSearchParams(location.search);
+   if(p.get('machineToken'))return true;
+   if(p.get('serial'))return true;
+   var page=p.get('page');
+   if(page==='customer-entry'||page==='scan'||page==='customer-portal'||page==='customer-home')return true;
+   return /#\/(customer-portal|customer-home|customer-entry|scan)/.test(location.hash)
+       || /customer-portal/.test(location.hash);
+  }catch(e){return false}
+ }
+ window.imodeIsCustomerRoute=customerRoute;
+
+ /* THE 3-5 SECOND DASHBOARD FLASH.
+
+    Boot is  load -> renderAll() -> await initCloud() -> initPortalFromUrl().  js/03
+    registers that listener while it is being parsed, so it runs before this one; it is
+    async, so it yields at the await and this listener runs *during* the cloud round-trip.
+    Releasing the boot guard here therefore uncovered the internal dashboard and left it
+    on screen for as long as Supabase took to answer — the reported 3-5 seconds — until
+    initPortalFromUrl() finally swapped in the customer page.
+
+    A customer route now keeps the splash until the wrapper above releases it in its
+    finally block, which is after initPortalFromUrl() has decided where they belong. The
+    12-second safety timeout in js/01 still applies, so nobody can be stranded on it. */
  window.addEventListener('load',function(){
+  if(customerRoute())return;
   setTimeout(function(){if(typeof window.imodeQrBootRelease==='function')window.imodeQrBootRelease()},0);
  });
 
@@ -239,8 +268,10 @@
     first. Signing out returns to the same door. */
  function bootRoute(){
   try{
-   if(new URLSearchParams(location.search).get('machineToken'))return false;
-   if(/customer-portal/.test(location.hash))return false;
+   /* Any customer URL is exempt, not only ?machineToken=: js/21 routes #/customer-entry
+      and ?serial= a moment later, and sending that visitor to the staff door first only
+      made the page change twice. */
+   if(customerRoute())return false;
    if(sessionUser())return false;
    if(typeof window.goPage!=='function')return false;
    window.goPage('staff-login');
@@ -261,7 +292,10 @@
   wireBrandHome();
   decorateClose();
   bootRoute();
-  if(typeof window.imodeQrBootRelease==='function'&&!new URLSearchParams(location.search).get('machineToken')){
+  /* Same rule as the load listener: a customer route keeps the splash until the portal
+     entry has run. Anyone else has already been routed by bootRoute() above, so the shell
+     underneath is the right one to show. */
+  if(typeof window.imodeQrBootRelease==='function'&&!customerRoute()){
    window.imodeQrBootRelease();
   }
  }

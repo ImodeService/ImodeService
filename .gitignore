@@ -25,3 +25,6 @@ Desktop.ini
 
 # Dependencies (this project has none, kept as a guard)
 node_modules/
+
+# Claude Code local machine settings — not part of the app
+.claude/settings.local.json

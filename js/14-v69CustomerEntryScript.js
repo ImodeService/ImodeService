@@ -69,6 +69,37 @@
  function inLineClient(){
   try{return typeof liff!=='undefined'&&liff&&typeof liff.isInClient==='function'&&liff.isInClient()}catch(e){return false}
  }
+ /* LINE's own in-app browser, which is NOT the same thing as a LIFF app.
+    A rich-menu link that is a plain https URL opens here. liff.init() is only ever called
+    when settings.lineConfig.liffId is set (js/03 initLiffPortal), and no LIFF ID is
+    configured, so liff.isInClient() is false, liff.scanCodeV2() is unavailable, and the
+    code below falls through to getUserMedia — which this webview refuses outright with a
+    NotAllowedError. That refusal is the reported "เบราว์เซอร์ไม่อนุญาตให้ใช้กล้อง": there
+    is no permission prompt to accept, so "กดอนุญาตกล้อง" was advice nobody could follow.
+    The way out that does work is LINE's own openExternalBrowser=1 parameter, which makes
+    LINE hand the link to Chrome or Safari, where the camera prompt appears normally. */
+ function inLineInApp(){
+  try{return /\bLine\//i.test(navigator.userAgent||'')&&!inLineClient()}catch(e){return false}
+ }
+ function externalBrowserUrl(){
+  try{
+   var u=new URL(location.href);
+   u.searchParams.set('openExternalBrowser','1');
+   return u.href;
+  }catch(e){
+   return location.href+(location.href.indexOf('?')>=0?'&':'?')+'openExternalBrowser=1';
+  }
+ }
+ window.imodeOpenInExternalBrowser=function(){
+  var url=externalBrowserUrl();
+  try{
+   if(typeof liff!=='undefined'&&liff&&typeof liff.openWindow==='function'&&inLineClient()){
+    liff.openWindow({url:url,external:true});
+    return;
+   }
+  }catch(e){}
+  location.href=url;
+ };
  function canScan(){
   /* Inside LINE the LIFF scanner is used. In a browser a camera scan needs a secure
      context — https, localhost, or a file:// page, all three of which Chrome treats as
@@ -116,6 +147,10 @@
    +'<p>'+esc2(tl('ระบุเครื่องของคุณเพื่อเข้าใช้บริการ','Tell us which machine you have'))+'</p>'
    +(canScan()?'<button type="button" class="centry-scan" id="centryScan">📷 '+esc2(tl('สแกน QR ที่ตัวเครื่อง','Scan the QR on the machine'))+'</button>'
               :'<div class="centry-scan-off">'+esc2(noScanReason())+'</div>')
+   /* Inside LINE the camera is refused before any prompt appears, so the way out is
+      offered up front instead of only after the failure. */
+   +(inLineInApp()?'<button type="button" class="centry-external" id="centryExternal">🌐 '
+     +esc2(tl('เปิดกล้องไม่ได้ใน LINE — เปิดด้วยเบราว์เซอร์','Camera blocked in LINE — open in a browser'))+'</button>':'')
    +'<div class="rhome-login-or">'+esc2(tl('หรือ','or'))+'</div>'
    +'<form id="centryForm" autocomplete="off">'
    +'<div class="rhome-field"><span aria-hidden="true">🔎</span><input id="centrySerial" placeholder="'+esc2(tl('หมายเลขเครื่อง (S/N)','Machine serial number'))+'" aria-label="'+esc2(tl('หมายเลขเครื่อง','Machine serial number'))+'"></div>'
@@ -132,6 +167,8 @@
   if(scan)scan.onclick=startScan;
   var stop=document.getElementById('centryStop');
   if(stop)stop.onclick=stopScan;
+  var ext=document.getElementById('centryExternal');
+  if(ext)ext.onclick=window.imodeOpenInExternalBrowser;
  }
  window.imodeRenderCustomerEntry=renderEntry;
 
@@ -140,6 +177,17 @@
   if(!box)return;
   box.textContent=msg||'';
   box.classList.toggle('show',!!msg);
+ }
+ /* An error the visitor can actually act on: the message plus the one button that fixes it. */
+ function entryErrorWithExternal(msg){
+  var box=document.getElementById('centryError');
+  if(!box){entryError(msg);return}
+  box.classList.add('show');
+  box.innerHTML=esc2(msg)
+   +'<button type="button" class="centry-external" id="centryExternalFix">🌐 '
+   +esc2(tl('เปิดด้วยเบราว์เซอร์ (Chrome / Safari)','Open in a browser (Chrome / Safari)'))+'</button>';
+  var b=document.getElementById('centryExternalFix');
+  if(b)b.onclick=window.imodeOpenInExternalBrowser;
  }
  function submitSerial(e){
   if(e&&e.preventDefault)e.preventDefault();
@@ -297,7 +345,12 @@
   },function(err){
    stopScan();
    var name=err&&err.name||'';
-   if(name==='NotAllowedError'||name==='SecurityError')
+   if((name==='NotAllowedError'||name==='SecurityError')&&inLineInApp())
+    /* Not a permission the visitor can grant — LINE's webview never asks. Say so, and
+       give them the button that actually opens the camera. */
+    entryErrorWithExternal(tl('เบราว์เซอร์ใน LINE ไม่อนุญาตให้ใช้กล้อง กรุณาเปิดหน้านี้ด้วยเบราว์เซอร์ หรือกรอกหมายเลขเครื่องด้านล่าง',
+                              'The browser inside LINE does not allow the camera. Open this page in a browser, or type the serial below.'));
+   else if(name==='NotAllowedError'||name==='SecurityError')
     entryError(tl('เบราว์เซอร์ไม่อนุญาตให้ใช้กล้อง กรุณากดอนุญาตกล้องแล้วลองใหม่ หรือกรอกหมายเลขเครื่อง','Camera permission was refused — allow the camera and try again, or type the serial'));
    else if(name==='NotFoundError'||name==='OverconstrainedError')
     entryError(tl('ไม่พบกล้องบนอุปกรณ์นี้ กรุณากรอกหมายเลขเครื่องด้านล่าง','No camera on this device — please type the serial below'));
@@ -386,8 +439,22 @@
   };
  }
 
- /* With no session there is nothing to remember, so the remember-me prompt is replaced by
-    a plain close: back to LINE inside the app, otherwise back to the entry page. */
+ /* The × on the customer page.
+
+    A customer reaches this page from our LINE Official Account — a rich-menu link or a
+    machine QR they scanned inside LINE — so "close" means "go back to LINE", not "go to
+    another page of a web app they never asked to be in".
+
+    It used to call openPortalLineOfficial(), which does window.open() first. In LINE's
+    in-app browser and in Safari a pop-up opened this way is commonly blocked, and the
+    line right after it moved the page to the machine-entry form — so the visitor pressed
+    × and simply landed on another screen of the same app. Navigating this tab straight to
+    the OA cannot be blocked, and it is what "เด้งกลับไปที่ไลน์" asks for.
+
+    Order: close the LIFF window if we are one; otherwise navigate to the Official Account;
+    only when no OA is configured at all is there nothing to go back to, and the visitor is
+    left on the entry page rather than on a dead screen. Staff previewing the portal never
+    reach here — decorateClose() leaves their × alone. */
  window.imodePortalExitPrompt=function(){
   stopScan();
   if(inLineClient()&&typeof liff.closeWindow==='function'){
@@ -399,11 +466,8 @@
    var id=String(cfg.officialAccountId||'').trim();
    if(id)url='https://line.me/R/ti/p/'+encodeURIComponent(id.charAt(0)==='@'?id:'@'+id);
   }
-  /* Open the Official Account, then leave the app on the machine-entry page rather than
-     on a portal the visitor has finished with. If the browser blocks the pop-up,
-     openExternal() navigates away instead and this simply never runs. */
-  if(url&&typeof window.openPortalLineOfficial==='function')window.openPortalLineOfficial();
   try{portalMachineToken=''}catch(e){}
+  if(url){location.href=url;return}
   window.goPage('customer-entry');
  };
 
@@ -420,6 +484,10 @@
  +'.centry-choice b{display:block;font-size:13px;color:#0c225e}'
  +'.centry-choice small{display:block;font-size:11px;color:#68789a;margin-top:2px}'
  +'.centry-scan-off{padding:11px;border-radius:12px;background:#fff7ec;border:1px solid #f6dcb8;color:#8a5a17;font-size:12px;line-height:1.5}'
+ +'.centry-external{display:block;width:100%;margin-top:9px;border:1px solid #cfe0fa;border-radius:12px;padding:11px;'
+ +'font-size:12.5px;font-weight:700;color:#0b3f9e;background:#f2f7ff;cursor:pointer;line-height:1.4}'
+ +'.centry-external:hover{background:#e7f0ff;border-color:#0b63e5}'
+ +'.centry-external:focus-visible{outline:2px solid #0b63e5;outline-offset:2px}'
  +'.centry-scanbox{margin-top:14px;border-radius:14px;overflow:hidden;background:#04122e;position:relative}'
  +'.centry-scanbox video{width:100%;display:block;max-height:320px;object-fit:cover}'
  +'.centry-scan-stop{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);border:none;border-radius:999px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.92);color:#0c225e}'

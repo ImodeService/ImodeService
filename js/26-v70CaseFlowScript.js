@@ -169,6 +169,11 @@
   if(i<0)return MAIN[0];
   return i>=MAIN.length-1?'':MAIN[i+1];
  }
+ /* Exported so the single-job หน้างาน page in js/32 draws the same ladder from the same
+    list instead of keeping a second copy of the field workflow. */
+ window.imodeFieldSteps=function(){return MAIN.slice()};
+ window.imodeFieldHoldStatus=HOLD;
+ window.imodeFieldNextStatus=nextStatus;
  function stepperHTML(c){
   var cur=c.fieldStatus||'',nx=nextStatus(cur);
   var steps=MAIN.map(function(s,i){

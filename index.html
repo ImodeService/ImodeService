@@ -752,5 +752,19 @@
      the phone Back button close a popup instead of leaving the page. -->
 <script src="./js/29-v70ModalHistoryScript.js"></script>
 
+<!-- Beta: every uploaded photo and video is shrunk before it is stored as a data URL.
+     Must load after js/03 so it can replace compressPhoto() and wrap the three upload
+     handlers. -->
+<script src="./js/30-v70MediaShrinkScript.js"></script>
+
+<!-- Beta: the notification date moves up beside the title and is bold. -->
+<script src="./js/31-v70NotifyDateScript.js"></script>
+
+<!-- Beta: หน้างาน is one job, opened by tapping a bar in งานของฉัน — status bar, action
+     buttons, machine information, then the inspection sheet on the page itself.
+     Loads last on purpose: its openModal / goPage / renderFieldService wrappers have to
+     sit outside the ones in js/26 and js/29. -->
+<script src="./js/32-v70FieldWorkspaceScript.js"></script>
+
 </body>
 </html>

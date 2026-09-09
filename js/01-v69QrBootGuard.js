@@ -22,7 +22,14 @@
    where the visitor belongs. window.imodeQrBootRelease() clears it. */
 (function(){
  try{
-  var qr=/[?&]machineToken=/.test(location.search)||/customer-portal/.test(location.hash);
+  /* Every customer entry URL, not only the machine QR. js/21 added #/customer-entry and
+     ?serial= for the LINE rich menu; a device where staff had signed in once would
+     otherwise skip the splash on those and show the dashboard while the cloud syncs. */
+  var qr=/[?&]machineToken=/.test(location.search)
+      || /[?&]serial=/.test(location.search)
+      || /[?&]page=(customer-entry|scan|customer-portal|customer-home)\b/.test(location.search)
+      || /#\/(customer-portal|customer-home|customer-entry|scan)/.test(location.hash)
+      || /customer-portal/.test(location.hash);
   var signedIn=false;
   try{signedIn=!!JSON.parse(localStorage.getItem('imode_v5_current_user')||'null')}catch(e){}
   /* Hide the shell for a QR visitor, and for anyone arriving without a session — that

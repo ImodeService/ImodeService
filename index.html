@@ -795,5 +795,9 @@
      the outermost one. js/16 and js/32 call its helpers at render time, not parse time. -->
 <script src="./js/38-v70TeamAssignScript.js"></script>
 
+<!-- Beta: the admin owns the login accounts. Must load after js/09 (the registry it takes
+     over), js/33 (the Settings modal it extends) and auth/*.js (the policy it uses). -->
+<script src="./js/39-v70AccountManageScript.js"></script>
+
 </body>
 </html>

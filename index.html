@@ -790,5 +790,10 @@
      are lexical globals this file cannot reach. -->
 <script src="./js/37-v70ImageCropScript.js"></script>
 
+<!-- Beta: a job can belong to several technicians, across teams. Loads after js/03 so it
+     can wrap cloudUpsertCase / fromCaseDb, and after js/29 so its syncCloud wrapper is
+     the outermost one. js/16 and js/32 call its helpers at render time, not parse time. -->
+<script src="./js/38-v70TeamAssignScript.js"></script>
+
 </body>
 </html>

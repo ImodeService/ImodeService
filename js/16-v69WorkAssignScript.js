@@ -16,6 +16,23 @@
  function myTechId(){var u=me();return (u&&u.technicianId)||''}
  function caseList(){try{return Array.isArray(cases)?cases:[]}catch(e){return[]}}
  function techList(){try{return Array.isArray(technicians)?technicians:[]}catch(e){return[]}}
+ /* js/38 owns the one-or-many assignee shape. It loads after this file, so these are
+    resolved when they are called, never captured at parse time. The fallbacks keep this
+    module working on its own if js/38 is ever removed. */
+ function idsOf(c){
+  return (typeof window.imodeCaseAssignees==='function')
+   ? window.imodeCaseAssignees(c)
+   : (c&&c.assignee?[c.assignee]:[]);
+ }
+ function assignedTo(c,tid){
+  return (typeof window.imodeIsAssignedTo==='function')
+   ? window.imodeIsAssignedTo(c,tid)
+   : !!(tid&&c&&c.assignee===tid);
+ }
+ function setIds(c,ids){
+  if(typeof window.imodeSetCaseAssignees==='function')return window.imodeSetCaseAssignees(c,ids);
+  c.assignees=ids.slice();c.assignee=ids[0]||'';return c.assignees;
+ }
  function techById(id){return techList().filter(function(t){return t.id===id})[0]||null}
  function caseById(id){return caseList().filter(function(c){return c.id===id})[0]||null}
  function isClosed(c){return ['เสร็จสิ้น','ปิดเคส'].indexOf(c.status)>=0}
@@ -100,7 +117,8 @@
  function myCases(){
   var id=myTechId();
   if(!id)return [];
-  return caseList().filter(function(c){return c.assignee===id}).sort(function(a,b){
+  /* Any of the technicians on the job, not only its lead. */
+  return caseList().filter(function(c){return assignedTo(c,id)}).sort(function(a,b){
    var ax=isClosed(a)?1:0,bx=isClosed(b)?1:0;
    if(ax!==bx)return ax-bx;
    return new Date(b.updatedAt||b.createdAt||0)-new Date(a.updatedAt||a.createdAt||0);
@@ -111,6 +129,21 @@
   var x=new Date(v);
   return x.getFullYear()===d.getFullYear()&&x.getMonth()===d.getMonth()&&x.getDate()===d.getDate();
  }
+ /* Who is on this job, and whether it spans more than one team. Drawn for one person too:
+    "ช่าง (1): …" reads better on a row than a bare name with no label. */
+ function crewLine(c){
+  var ids=idsOf(c);
+  if(!ids.length)return '<small class="work-crew is-none">'+esc2(tl('ยังไม่มอบหมาย','Not assigned yet'))+'</small>';
+  var teams=(typeof window.imodeAssigneeTeams==='function')?window.imodeAssigneeTeams(c):[];
+  var names=ids.map(function(id,i){
+   var t=techById(id);
+   return '<span class="work-crew-chip'+(i===0?' is-lead':'')+'">'+esc2((t&&t.name)||id)
+    +(i===0&&ids.length>1?'<em>'+esc2(tl('หัวหน้างาน','Lead'))+'</em>':'')+'</span>';
+  }).join('');
+  return '<small class="work-crew">'+esc2(tl('ช่าง','Technicians'))+' ('+ids.length+'): '+names
+   +(teams.length>1?'<span class="work-crew-cross">'+esc2(tl('ข้ามทีม','Cross-team'))+' · '+esc2(teams.join(' + '))+'</span>':'')
+   +'</small>';
+ }
  function caseRow(c,actions){
   var st=esc2(c.status||'-');
   return '<div class="work-row" data-case="'+esc2(c.id)+'">'
@@ -119,6 +152,7 @@
    +'<span class="work-status status-'+st+'">'+st+'</span>'
    +(c.priority==='ด่วนมาก'?'<span class="work-urgent">'+esc2(tl('ด่วนมาก','Urgent'))+'</span>':'')
    +'<small>'+esc2(c.customer||'-')+' · '+esc2(c.machine||'-')+'</small>'
+   +crewLine(c)
    +'<small>'+esc2(tl('นัดหมาย','Appointment'))+': '+(c.appointment?esc2(typeof fmt==='function'?fmt(c.appointment):c.appointment):esc2(tl('ยังไม่นัด','not scheduled')))+'</small>'
    +'</div><div class="work-row-actions">'+actions+'</div></div>';
  }
@@ -162,12 +196,53 @@
    return new Date(b.createdAt||0)-new Date(a.createdAt||0);
   });
  }
- function techOptions(sel){
+ /* Who this account may hand work to. A team lead stays inside their own team — that is
+    the existing teamScope rule and this change does not loosen it. An admin resolves to
+    null and therefore sees every team, which is what makes a cross-team crew possible. */
+ function pickableTechs(){
   var team=(typeof window.imodeTeamScope==='function')?window.imodeTeamScope():null;
-  return techList().filter(function(t){return !team||(t.team||'Technical')===team})
-   .map(function(t){
-    return '<option value="'+esc2(t.id)+'"'+(t.id===sel?' selected':'')+'>'+esc2(t.name)+' · '+esc2(t.team||'Technical')+'</option>';
-   }).join('');
+  return techList().filter(function(t){return !team||(t.team||'Technical')===team});
+ }
+ function teamsOf(list){
+  var seen={},out=[];
+  list.forEach(function(t){
+   var k=t.team||'Technical';
+   if(seen[k])return;
+   seen[k]=1;out.push(k);
+  });
+  return out;
+ }
+ /* One control per case: a count of the crew, and a panel of check boxes grouped by team.
+    Collapsed by default — an open case list with seven technicians expanded under every
+    row is unusable on a phone. */
+ function pickerHTML(c){
+  var list=pickableTechs(),chosen=idsOf(c),teams=teamsOf(list);
+  var cid=esc2(c.id);
+  var body=teams.map(function(team){
+   var members=list.filter(function(t){return (t.team||'Technical')===team});
+   return '<div class="assign-team">'
+    +'<div class="assign-team-head"><b>'+esc2(tl('ทีม ','Team '))+esc2(team)+'</b>'
+    +'<button type="button" class="assign-mini" data-team="'+esc2(team)+'" data-all="1">'
+    +esc2(tl('เลือกทั้งทีม','Whole team'))+'</button>'
+    +'<button type="button" class="assign-mini" data-team="'+esc2(team)+'" data-all="0">'
+    +esc2(tl('ล้าง','Clear'))+'</button></div>'
+    +'<div class="assign-members">'+members.map(function(t){
+      var on=chosen.indexOf(t.id)>=0;
+      return '<label class="assign-member'+(on?' is-on':'')+'">'
+       +'<input type="checkbox" class="assign-cb" value="'+esc2(t.id)+'"'+(on?' checked':'')+'>'
+       +'<span>'+esc2(t.name)+'</span>'
+       +'<small>'+esc2(t.status||tl('พร้อมรับงาน','Available'))+'</small></label>';
+     }).join('')+'</div></div>';
+  }).join('');
+  return '<div class="assign-ctl" data-case="'+cid+'">'
+   +'<button type="button" class="soft-btn assign-toggle" data-case="'+cid+'">'
+   +esc2(tl('เลือกช่าง','Choose technicians'))+' <b class="assign-count">'+chosen.length+'</b></button>'
+   +'<div class="assign-panel" hidden>'
+   +(list.length?body:'<div class="empty">'+esc2(tl('ไม่มีช่างในขอบเขตของคุณ','No technicians in your scope'))+'</div>')
+   +'<div class="assign-foot"><small>'+esc2(tl('หัวหน้างานคือคนแรกที่เลือก','The first one chosen is the lead'))+'</small>'
+   +'<button type="button" class="primary-btn action-3d-orange" data-assign="'+cid+'">'
+   +esc2(tl('มอบหมาย','Assign'))+'</button></div>'
+   +'</div></div>';
  }
  function renderAssign(){
   var host=document.getElementById('page-assign');
@@ -185,35 +260,118 @@
    +'<div class="work-kpi-box"><small>'+esc2(tl('ช่างในระบบ','Technicians'))+'</small><b>'+techList().length+'</b></div>'
    +'</div>'
    +'<div class="work-list">'+(list.length?list.map(function(c){
-     var cur=techById(c.assignee);
-     var actions='<select class="assign-pick" data-case="'+esc2(c.id)+'">'
-       +'<option value="">'+esc2(tl('เลือกช่าง','Choose a technician'))+'</option>'+techOptions(c.assignee)+'</select>'
-       +' <button class="primary-btn action-3d-orange" onclick="imodeAssignCase(\''+esc2(c.id)+'\')">'
-       +esc2(cur?tl('เปลี่ยนช่าง','Reassign'):tl('มอบหมาย','Assign'))+'</button>'
-       +(cur?'<small class="assign-current">'+esc2(tl('ปัจจุบัน','Now'))+': '+esc2(cur.name)+'</small>':'');
-     return caseRow(c,actions);
+     return caseRow(c,pickerHTML(c));
     }).join(''):'<div class="empty">'+esc2(tl('ไม่มีเคสที่ต้องมอบหมาย','No open cases to assign'))+'</div>')+'</div>'
    +'</div>';
+  wireAssign();
+  seedOrder();
+ }
+ /* Selection order, not DOM order, decides the lead — "คนแรกที่เลือก" has to mean what
+    it says. The order lives on the panel element, seeded from the case when it renders. */
+ function panelOf(caseId){
+  return document.querySelector('.assign-ctl[data-case="'+caseId+'"] .assign-panel');
+ }
+ function chosenIds(caseId){
+  var panel=panelOf(caseId);
+  if(!panel)return [];
+  var checked=[].slice.call(panel.querySelectorAll('.assign-cb:checked')).map(function(b){return b.value});
+  var order=panel.__order||[];
+  var ranked=order.filter(function(id){return checked.indexOf(id)>=0});
+  checked.forEach(function(id){if(ranked.indexOf(id)<0)ranked.push(id)});
+  return ranked;
  }
  window.imodeAssignCase=function(caseId){
   var c=caseById(caseId);
-  var sel=document.querySelector('.assign-pick[data-case="'+caseId+'"]');
-  var tid=sel?sel.value:'';
   if(!c)return;
-  if(!tid){if(typeof toastMsg==='function')toastMsg(tl('กรุณาเลือกช่างก่อน','Please choose a technician'));return}
+  var ids=chosenIds(caseId);
+  if(!ids.length){
+   if(typeof toastMsg==='function')toastMsg(tl('กรุณาเลือกช่างอย่างน้อย 1 คน','Please choose at least one technician'));
+   return;
+  }
   if(typeof requirePermission==='function'&&!requirePermission('case.assign'))return;
-  var before=c.assignee||'';
-  c.assignee=tid;
-  c.serviceTeam=(techById(tid)||{}).team||c.serviceTeam||'Technical';
+  var before=idsOf(c);
+  setIds(c,ids);
   if(c.status==='เคสใหม่'&&(settings.statuses||[]).indexOf('มอบหมายแล้ว')>=0)c.status='มอบหมายแล้ว';
   c.updatedAt=new Date().toISOString();
-  notifyAssignment(c,tid,before);
+  /* One notice per technician who was not already on the job. Somebody who stays on it
+     through a reassignment is not told again — nothing changed for them. */
+  ids.forEach(function(tid){
+   if(before.indexOf(tid)<0)notifyAssignment(c,tid,'');
+  });
   if(typeof saveLocal==='function')saveLocal();
   if(typeof cloudUpsertCase==='function'){try{cloudUpsertCase(c)}catch(e){}}
   if(typeof renderAll==='function')renderAll();
   renderAssign();
-  if(typeof toastMsg==='function')toastMsg(tl('มอบหมายงานให้ ','Assigned to ')+((techById(tid)||{}).name||'')+tl(' แล้ว',''));
+  if(typeof toastMsg==='function'){
+   var names=ids.map(function(id){return (techById(id)||{}).name||id});
+   toastMsg(ids.length===1
+    ? tl('มอบหมายงานให้ ','Assigned to ')+names[0]+tl(' แล้ว','')
+    : tl('มอบหมายงานให้ ','Assigned to ')+ids.length+tl(' คนแล้ว: ',' people: ')+names.join(', '));
+  }
  };
+
+ /* One delegated listener for the whole page rather than inline handlers, because the
+    panel is rebuilt on every render and the check boxes carry no ids. */
+ function wireAssign(){
+  var host=document.getElementById('page-assign');
+  if(!host||host.__assignWired)return;
+  host.__assignWired=true;
+  host.addEventListener('click',function(e){
+   var t=e.target;
+   if(!t||!t.closest)return;
+   var toggle=t.closest('.assign-toggle');
+   if(toggle){
+    var panel=panelOf(toggle.getAttribute('data-case'));
+    if(panel)panel.hidden=!panel.hidden;
+    return;
+   }
+   var go=t.closest('[data-assign]');
+   if(go){window.imodeAssignCase(go.getAttribute('data-assign'));return}
+   var mini=t.closest('.assign-mini');
+   if(mini){
+    var grp=mini.closest('.assign-team'),box=mini.closest('.assign-panel');
+    var on=mini.getAttribute('data-all')==='1';
+    if(!grp||!box)return;
+    [].slice.call(grp.querySelectorAll('.assign-cb')).forEach(function(cb){
+     if(cb.checked===on)return;
+     cb.checked=on;
+     remember(box,cb);
+    });
+    refreshCount(box);
+   }
+  });
+  host.addEventListener('change',function(e){
+   var cb=e.target;
+   if(!cb||!cb.classList||!cb.classList.contains('assign-cb'))return;
+   var box=cb.closest('.assign-panel');
+   if(!box)return;
+   remember(box,cb);
+   refreshCount(box);
+  });
+ }
+ function remember(box,cb){
+  box.__order=box.__order||[];
+  var i=box.__order.indexOf(cb.value);
+  if(cb.checked){if(i<0)box.__order.push(cb.value)}
+  else if(i>=0)box.__order.splice(i,1);
+  var label=cb.closest('.assign-member');
+  if(label)label.classList.toggle('is-on',cb.checked);
+ }
+ function refreshCount(box){
+  var ctl=box.closest('.assign-ctl');
+  var n=box.querySelectorAll('.assign-cb:checked').length;
+  var c=ctl&&ctl.querySelector('.assign-count');
+  if(c)c.textContent=String(n);
+ }
+ /* Seeds each panel's selection order from what the case already holds, so reassigning a
+    two-person job keeps its lead unless the admin unticks them. */
+ function seedOrder(){
+  [].slice.call(document.querySelectorAll('#page-assign .assign-ctl')).forEach(function(ctl){
+   var c=caseById(ctl.getAttribute('data-case')),panel=ctl.querySelector('.assign-panel');
+   if(!c||!panel)return;
+   panel.__order=idsOf(c);
+  });
+ }
 
  /* ---------- 5. addressed notifications ---------- */
  function notifyAssignment(c,tid,before){
@@ -241,14 +399,15 @@
     appointment modal and the assign page all go through the same watch. */
  function snapshot(){
   var m={};
-  caseList().forEach(function(c){m[c.id]=c.assignee||''});
+  caseList().forEach(function(c){m[c.id]=idsOf(c)});
   return m;
  }
  function notifyChanges(before){
   caseList().forEach(function(c){
-   var was=before[c.id];
-   if(was===undefined)was='';
-   if((c.assignee||'')&&(c.assignee||'')!==was)notifyAssignment(c,c.assignee,was);
+   var was=before[c.id]||[];
+   idsOf(c).forEach(function(tid){
+    if(was.indexOf(tid)<0)notifyAssignment(c,tid,'');
+   });
   });
  }
  ['saveCase','saveSchedule'].forEach(function(fn){
@@ -274,8 +433,13 @@
   var tech=myTechId();
   var owner=n.technicianId||'';
   if(!owner&&n.caseId){
+   /* An automatic notice about a case belongs to everybody on that case, not only its
+      lead — otherwise the second technician never hears about their own appointment. */
    var c=caseById(n.caseId);
-   if(c&&c.assignee)owner=c.assignee;
+   if(c&&idsOf(c).length){
+    if(tech)return assignedTo(c,tech);
+    return n.audience!=='technician';
+   }
   }
   if(tech)return owner===tech;
   return n.audience!=='technician';
@@ -344,7 +508,42 @@
  +'.work-urgent{align-self:flex-start;font-size:11px;font-weight:700;color:#b32020;background:#fdeaea;border:1px solid #f6cccc;border-radius:999px;padding:2px 9px}'
  +'.assign-pick{min-width:200px;padding:7px 9px;border:1px solid #d3e0f4;border-radius:10px;font-size:12.5px}'
  +'.assign-current{color:#0b63e5;font-size:11.5px;font-weight:700}'
- +'@media (max-width:640px){.work-row{flex-direction:column;align-items:stretch}.work-row-actions{justify-content:flex-start}.assign-pick{width:100%}}';
+ /* --- the crew line on a row --- */
+ +'.work-crew{display:flex;flex-wrap:wrap;align-items:center;gap:5px;font-size:11.5px;color:#41567c}'
+ +'.work-crew.is-none{color:#98a6bf;font-style:italic}'
+ +'.work-crew-chip{background:#eaf1fd;color:#12356f;border-radius:99px;padding:2px 9px;font-weight:600;'
+ +'display:inline-flex;align-items:center;gap:5px}'
+ +'.work-crew-chip.is-lead{background:#e6f4ec;color:#08603a}'
+ +'.work-crew-chip em{font-style:normal;font-size:9.5px;font-weight:800;letter-spacing:.04em;'
+ +'text-transform:uppercase;opacity:.72}'
+ +'.work-crew-cross{background:#fff2e2;color:#9a4c07;border-radius:99px;padding:2px 9px;font-weight:700}'
+ /* --- the picker --- */
+ +'.assign-ctl{display:flex;flex-direction:column;gap:8px;min-width:260px}'
+ +'.assign-toggle{display:inline-flex;align-items:center;gap:7px;justify-content:center}'
+ +'.assign-count{background:#0b63e5;color:#fff;border-radius:99px;min-width:20px;height:20px;'
+ +'display:inline-grid;place-items:center;font-size:11px;padding:0 6px}'
+ /* .panel and friends carry an author display rule that beats the UA [hidden] rule, and
+    this is a flex container, so the explicit hide is required. Same trap as the
+    โมดูลทั้งหมด grid and the Field Service queue panel. */
+ +'.assign-panel{display:flex;flex-direction:column;gap:10px;padding:11px;border:1px solid #dbe6f7;'
+ +'border-radius:13px;background:#f8fbff}'
+ +'.assign-panel[hidden]{display:none!important}'
+ +'.assign-team-head{display:flex;align-items:center;gap:7px;margin-bottom:6px}'
+ +'.assign-team-head b{font-size:11.5px;color:#12356f;flex:1;min-width:0}'
+ +'.assign-mini{border:1px solid #cfe0fa;background:#fff;color:#0b63e5;border-radius:8px;'
+ +'padding:3px 8px;font-size:10.5px;font-weight:700;cursor:pointer;font-family:inherit}'
+ +'.assign-mini:hover{background:#eaf3ff}'
+ +'.assign-members{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:6px}'
+ +'.assign-member{display:flex;align-items:center;gap:7px;padding:7px 9px;border:1px solid #e0e9f7;'
+ +'border-radius:10px;background:#fff;font-size:12px;cursor:pointer;line-height:1.3}'
+ +'.assign-member span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+ +'.assign-member small{font-size:9.5px;color:#8b9ab5;white-space:nowrap}'
+ +'.assign-member.is-on{border-color:#0b63e5;background:#eff6ff;font-weight:600}'
+ +'.assign-member input{width:15px;height:15px;accent-color:#0b63e5;flex:none}'
+ +'.assign-foot{display:flex;align-items:center;gap:9px;border-top:1px dashed #d8e4f6;padding-top:9px}'
+ +'.assign-foot small{flex:1;min-width:0;font-size:10.5px;color:#7385a5}'
+ +'@media (max-width:640px){.work-row{flex-direction:column;align-items:stretch}.work-row-actions{justify-content:flex-start}.assign-pick{width:100%}'
+ +'.assign-ctl{min-width:0;width:100%}.assign-members{grid-template-columns:1fr}}';
  document.head.appendChild(style);
 
  function install(){ensurePages();ensureNav()}

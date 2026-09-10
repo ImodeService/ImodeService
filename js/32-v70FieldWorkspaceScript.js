@@ -54,7 +54,12 @@
  function autoPick(){
   var tid=myTechId();
   if(!tid)return '';
-  var mine=caseList().filter(function(c){return c.assignee===tid&&!isClosed(c)});
+  /* Any technician on the job, not only its lead — js/38 keeps c.assignees beside the
+     lead and this is the screen a second technician actually works from. */
+  var onIt=(typeof window.imodeIsAssignedTo==='function')
+   ? function(c){return window.imodeIsAssignedTo(c,tid)}
+   : function(c){return c.assignee===tid};
+  var mine=caseList().filter(function(c){return onIt(c)&&!isClosed(c)});
   mine.sort(function(a,b){
    var ap=a.appointment?new Date(a.appointment).getTime():Infinity;
    var bp=b.appointment?new Date(b.appointment).getTime():Infinity;

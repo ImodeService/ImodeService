@@ -799,5 +799,10 @@
      over), js/33 (the Settings modal it extends) and auth/*.js (the policy it uses). -->
 <script src="./js/39-v70AccountManageScript.js"></script>
 
+<!-- Beta: the recycle bin. Loads last so it wraps every delete already in place —
+     js/03's document delete, js/06's employee delete and js/39's account delete — and
+     so its goPage wrapper sits outside js/36's sidebar grouping. -->
+<script src="./js/40-v70TrashScript.js"></script>
+
 </body>
 </html>

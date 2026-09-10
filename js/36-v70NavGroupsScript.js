@@ -53,7 +53,7 @@
   {id:'stock',    th:'คลังและทีมงาน',         en:'Stock & team',
    pages:['spare-parts','technicians']},
   {id:'system',   th:'ระบบ',                 en:'System',
-   pages:['reports','settings']},
+   pages:['reports','settings','trash']},
   {id:'other',    th:'อื่น ๆ',                en:'Other', pages:[]}
  ];
 
@@ -71,10 +71,29 @@
 
  /* Reorders whatever is there right now. Safe to run repeatedly: appendChild moves an
     existing node rather than copying it, so a second pass is a no-op on an already
-    sorted list. */
+    sorted list.
+
+    THE OBSERVER MUST BE OFF WHILE THIS RUNS. Moving a node with appendChild is reported as
+    an addedNode, so the childList observer below sees this function's own work as "a nav
+    item arrived", calls it again, and the two spin forever — the tab locks up with no
+    error. It did not show until js/40 added a nav item after start(), because until then
+    nothing ever called layout() a second time. Disconnecting rather than using a flag is
+    what actually works: a MutationObserver only queues records while it is observing, so
+    records from our own moves are never created instead of being created and ignored. */
+ var obs=null,laying=false;
  function layout(){
+  if(laying)return;
   var n=nav();
   if(!n)return;
+  laying=true;
+  try{if(obs)obs.disconnect()}catch(e){}
+  try{layoutInner(n)}
+  finally{
+   laying=false;
+   try{if(obs)obs.observe(nav()||document.body,{childList:true})}catch(e){}
+  }
+ }
+ function layoutInner(n){
   var items={},loose=[];
   [].slice.call(n.querySelectorAll('.nav-item[data-page]')).forEach(function(b){
    items[b.dataset.page]=b;
@@ -138,9 +157,8 @@
  document.head.appendChild(st);
 
  function start(){
-  layout();
   try{
-   new MutationObserver(function(recs){
+   obs=new MutationObserver(function(recs){
     /* Only a nav item arriving matters; our own appendChild churn must not re-enter. */
     var relevant=recs.some(function(r){
      return [].slice.call(r.addedNodes).some(function(x){
@@ -148,8 +166,10 @@
      });
     });
     if(relevant)layout();
-   }).observe(nav()||document.body,{childList:true});
+   });
+   obs.observe(nav()||document.body,{childList:true});
   }catch(e){}
+  layout();
  }
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
  else start();

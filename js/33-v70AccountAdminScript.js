@@ -81,23 +81,47 @@
     If the convention does not hold — someone used change-password on this device — the
     attempt fails and the username is filled in with the password box focused, which is
     where the visitor would have had to start anyway. */
+ /* Reported: the popup sat there after the switch and could not be closed for a moment.
+    Two separate causes, both fixed here.
+
+    It never closed at all on success — imodeSignIn routes to the Home page underneath and
+    nothing dismissed the popup on top of it. And the wait was real: signing in runs
+    renderAll(), which redraws every module, so the main thread is busy and a click on × does
+    nothing until it finishes.
+
+    So the popup is closed FIRST, synchronously, on the click — before the sign-in starts and
+    therefore before anything can block. A failure then has nowhere to write, so it reopens
+    the login popup with the username filled in and the reason shown, which is also clearer
+    than an error appearing inside a popup the user thought they had left. */
  window.imodeQuickSwitch=function(username){
   if(typeof window.imodeSignIn!=='function'){toast(tl('ระบบเข้าสู่ระบบยังไม่พร้อม','Sign-in is not ready'));return}
-  var err=document.getElementById('uatLoginError');
-  if(err){err.textContent='';err.classList.remove('show')}
+  var acc=null;
+  try{acc=(window.uatAuth&&window.uatAuth.findAccount)?window.uatAuth.findAccount(username):null}catch(e){}
+  var label=(acc&&acc.name)||username;
+  if(typeof closeModal==='function'){try{closeModal()}catch(e){}}
+  toast(tl('กำลังสลับเป็น ','Switching to ')+label+'…');
   Promise.resolve(window.imodeSignIn(username,username)).then(function(res){
    if(res&&res.ok===false)throw new Error(res.error||'');
+   var who=label;
+   try{if(currentUser&&currentUser.name)who=currentUser.name}catch(e){}
+   toast(tl('สลับเป็น ','Switched to ')+who+tl(' แล้ว',''));
   }).catch(function(){
-   /* Looked up now, not captured earlier: a failed sign-in can re-render the popup, and
-      writing to a detached node is how the part-5 staff-login bug hid itself. */
-   var u=document.getElementById('uatLoginUser'),p=document.getElementById('uatLoginPass');
-   if(u)u.value=username;
-   if(p){p.value='';p.focus()}
-   var box=document.getElementById('uatLoginError');
-   if(box){
-    box.textContent=tl('บัญชีนี้ตั้งรหัสผ่านใหม่ไว้ กรุณากรอกรหัสผ่าน','This account has a changed password — please type it');
-    box.classList.add('show');
-   }
+   toast(tl('สลับบัญชีไม่สำเร็จ — บัญชีนี้ตั้งรหัสผ่านใหม่ไว้',
+            'Could not switch — this account has a changed password'));
+   if(typeof window.openUserLoginModal!=='function')return;
+   window.openUserLoginModal();
+   /* Looked up after the popup is rebuilt, never captured earlier: writing to a detached
+      node is how the part-5 staff-login bug hid itself. */
+   setTimeout(function(){
+    var u=document.getElementById('uatLoginUser'),pw=document.getElementById('uatLoginPass');
+    if(u)u.value=username;
+    if(pw){pw.value='';pw.focus()}
+    var box=document.getElementById('uatLoginError');
+    if(box){
+     box.textContent=tl('บัญชีนี้ตั้งรหัสผ่านใหม่ไว้ กรุณากรอกรหัสผ่าน','This account has a changed password — please type it');
+     box.classList.add('show');
+    }
+   },60);
   });
  };
 

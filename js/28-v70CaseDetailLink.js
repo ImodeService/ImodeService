@@ -48,19 +48,43 @@
    customers:1,machines:1,qc:1,calendar:1,warranty:1,documents:1,notifications:1,
    reports:1,settings:1,onsite:1,'spare-parts':1,'petty-cash':1,technicians:1,home:1};
 
+ /* THE LINK IS A ONE-SHOT INSTRUCTION, SO IT HAS TO BE SPENT.
+    Reported: every refresh bounced back to ทำใบเสนอราคา and asked "เริ่มใบเสนอราคาใหม่จาก
+    เคสนี้หรือไม่?" again. The three parameters were read on every load and never removed, so
+    the hand-off from service-case-detail.html repeated itself forever — and with it a
+    confirm that offers to overwrite an unsaved quotation.
+
+    Only these three keys are dropped. `serial` and `machineToken` belong to js/21 and are
+    genuine deep links: reloading a scanned QR should land on the same machine again.
+    replaceState to the same document adds no history entry and cannot 404 the way a pushed
+    path would, which is why js/22 leaves the URL alone otherwise. */
+ function spendUrl(){
+  try{
+   var u=new URL(location.href),had=false;
+   ['page','caseId','intent'].forEach(function(k){
+    if(u.searchParams.has(k)){u.searchParams.delete(k);had=true}
+   });
+   if(!had)return;
+   var q=u.searchParams.toString();
+   history.replaceState(history.state||null,'',u.pathname+(q?'?'+q:'')+u.hash);
+  }catch(e){}
+ }
+
  function routeFromUrl(){
   var p=new URLSearchParams(location.search);
   var page=String(p.get('page')||'').trim();
   if(!page||!INTERNAL[page])return;                  /* customer-entry etc. belong to js/21 */
   if(typeof goPage!=='function')return;
-  goPage(page);
   var cid=String(p.get('caseId')||'').trim();
+  var intentEarly=String(p.get('intent')||'').trim();
+  spendUrl();                                        /* read everything first, then spend it */
+  goPage(page);
   if(!cid)return;
   /* An intent is a convenience, never a promise: if the case is not on this device the
      page is simply left as it is. */
   var c=(Array.isArray(cases)?cases:[]).filter(function(x){return x.id===cid})[0];
   if(!c)return;
-  var intent=String(p.get('intent')||'').trim();
+  var intent=intentEarly;
   setTimeout(function(){
    try{
     if(intent==='schedule'&&typeof openScheduleModal==='function')openScheduleModal(cid);

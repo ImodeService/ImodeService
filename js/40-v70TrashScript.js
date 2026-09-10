@@ -432,12 +432,18 @@
   var known={};order.forEach(function(k){known[k]=1});
   Object.keys(counts).forEach(function(k){if(!known[k]){order.push(k);known[k]=1}});
 
-  var tabs='<button type="button" class="trash-tab'+(filterType==='all'?' is-on':'')+'" onclick="imodeTrashFilter(\'all\')">'
-   +esc2(tl('ทั้งหมด','All'))+' <b>'+list.length+'</b></button>'
+  /* The same .module-kpi-card in a .case-kpi-grid that the cases and QC pages use as a
+     clickable status filter. The pill row this replaced was the only control of its kind in
+     the application and read as a different product. */
+  function card(kind,label,n){
+   return '<button type="button" class="module-kpi-card" data-kind="'+esc2(kind)+'"'
+    +' aria-pressed="'+(filterType===kind)+'" onclick="imodeTrashFilter(\''+esc2(kind)+'\')">'
+    +'<small>'+esc2(label)+'</small><b>'+n+'</b><span>'+esc2(tl('รายการ','items'))+'</span></button>';
+  }
+  var tabs=card('all',tl('ทั้งหมด','All'),list.length)
    +order.map(function(k){
-     var t=typeOf(k),n=counts[k]||0;
-     return '<button type="button" class="trash-tab'+(filterType===k?' is-on':'')+'" onclick="imodeTrashFilter(\''+k+'\')">'
-      +t.icon+' '+esc2(tl(t.th,t.en))+' <b>'+n+'</b></button>';
+     var t=typeOf(k);
+     return card(k,t.icon+' '+tl(t.th,t.en),counts[k]||0);
     }).join('');
 
   var shown=list.filter(function(e){return filterType==='all'||e.type===filterType});
@@ -460,16 +466,20 @@
     +'</div></div>';
   }).join('');
 
-  host.innerHTML='<div class="panel">'
-   +'<div class="panel-head toolbar-head"><div><h3>'+esc2(tl('ถังขยะ','Recycle bin'))+'</h3>'
-   +'<p class="subtext">'+esc2(tl('ข้อมูลที่ลบจะอยู่ที่นี่ '+days+' วัน แล้วระบบจะลบถาวรเอง',
-                                  'Deleted records stay here for '+days+' days, then they are removed for good'))+'</p></div>'
+  /* No <h3> here. The hero above already says ถังขยะ, and every other module had its
+     duplicate panel title removed in an earlier session for exactly that reason — this page
+     was the only one that still repeated it. The action button keeps the panel head. */
+  var empty=filterType==='all'
+   ? '<div class="empty">'+esc2(tl('ถังขยะว่าง — ยังไม่มีข้อมูลที่ถูกลบ','The bin is empty — nothing has been deleted'))+'</div>'
+   : '<div class="empty">'+esc2(tl('ไม่มีรายการในประเภทนี้','Nothing of this kind in the bin'))+'</div>';
+  host.innerHTML='<div class="trash-kpi case-kpi-grid">'+tabs+'</div>'
+   +'<div class="panel">'
+   +'<div class="panel-head toolbar-head"><div><p class="subtext">'
+   +esc2(tl('ข้อมูลที่ลบจะอยู่ที่นี่ '+days+' วัน แล้วระบบจะลบถาวรเอง',
+            'Deleted records stay here for '+days+' days, then they are removed for good'))+'</p></div>'
    +(list.length?'<button class="soft-btn" data-act="purgeall">'+esc2(tl('ล้างถังขยะทั้งหมด','Empty the bin'))+'</button>':'')
    +'</div>'
-   +'<div class="trash-tabs">'+tabs+'</div>'
-   +'<div class="trash-list">'+(shown.length?rows
-     :'<div class="empty">'+esc2(filterType==='all'?tl('ถังขยะว่าง','The bin is empty')
-                                                   :tl('ไม่มีรายการในประเภทนี้','Nothing of this kind in the bin'))+'</div>')+'</div>'
+   +'<div class="trash-list">'+(shown.length?rows:empty)+'</div>'
    +'</div>';
   wire(host);
  }
@@ -519,14 +529,10 @@
  var style=document.createElement('style');
  style.id='v70TrashStyle';
  style.textContent=''
- +'.trash-tabs{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0 4px}'
- +'.trash-tab{border:1px solid #d9e4f5;background:#fff;color:#41567c;border-radius:99px;'
- +'padding:7px 13px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}'
- +'.trash-tab b{background:#eef4ff;color:#0b3f9e;border-radius:99px;padding:1px 7px;margin-left:5px;font-size:11px}'
- +'.trash-tab:hover{background:#f2f7ff}'
- +'.trash-tab.is-on{border-color:#0b63e5;background:#0b63e5;color:#fff}'
- +'.trash-tab.is-on b{background:rgba(255,255,255,.22);color:#fff}'
- +'.trash-list{margin-top:11px;display:grid;gap:7px}'
+ /* .case-kpi-grid brings the grid, the card look and every breakpoint with it; only the
+    margin under the row is this page's own. */
+ +'.trash-kpi{display:grid;margin-bottom:14px}'
+ +'.trash-list{padding:12px;display:grid;gap:7px}'
  +'.trash-row{display:grid;grid-template-columns:34px minmax(0,1fr) 62px auto;align-items:center;gap:10px;'
  +'padding:10px 12px;border:1px solid #e2eaf7;border-radius:12px;background:#fff}'
  +'.trash-row.is-warn{border-color:#f7d9a8;background:#fffdf7}'

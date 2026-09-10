@@ -212,10 +212,27 @@
   });
   return out;
  }
- /* One control per case: a count of the crew, and a panel of check boxes grouped by team.
-    Collapsed by default — an open case list with seven technicians expanded under every
-    row is unusable on a phone. */
+ /* THE PICKER IS A POPUP.
+
+    It used to expand inside the row. Reported, and visible in a screenshot: the panel is
+    squeezed into the narrow right-hand column and stretches the row to several times its
+    height, so the list around it jumps and the check boxes end up in a 200px gutter. A
+    popup gets the full width of the dialog, does not move anything behind it, and matches
+    every other "choose something" surface in this application.
+
+    The markup is unchanged — the same .assign-panel that used to sit in the row is simply
+    rendered into the modal instead. imodeAssignCase() finds it by data-case wherever it is,
+    so nothing else had to know. */
  function pickerHTML(c){
+  var cid=esc2(c.id);
+  return '<div class="assign-ctl" data-case="'+cid+'">'
+   +'<button type="button" class="soft-btn assign-toggle" data-case="'+cid+'">'
+   +esc2(tl('เลือกช่าง','Choose technicians'))
+   +' <b class="assign-count">'+idsOf(c).length+'</b></button></div>';
+ }
+
+ /* The body of the popup. Same classes as before so the CSS and the wiring are shared. */
+ function panelHTML(c){
   var list=pickableTechs(),chosen=idsOf(c),teams=teamsOf(list);
   var cid=esc2(c.id);
   var body=teams.map(function(team){
@@ -234,16 +251,28 @@
        +'<small>'+esc2(t.status||tl('พร้อมรับงาน','Available'))+'</small></label>';
      }).join('')+'</div></div>';
   }).join('');
-  return '<div class="assign-ctl" data-case="'+cid+'">'
-   +'<button type="button" class="soft-btn assign-toggle" data-case="'+cid+'">'
-   +esc2(tl('เลือกช่าง','Choose technicians'))+' <b class="assign-count">'+chosen.length+'</b></button>'
-   +'<div class="assign-panel" hidden>'
+  return '<div class="assign-panel is-modal" data-case="'+cid+'">'
    +(list.length?body:'<div class="empty">'+esc2(tl('ไม่มีช่างในขอบเขตของคุณ','No technicians in your scope'))+'</div>')
    +'<div class="assign-foot"><small>'+esc2(tl('หัวหน้างานคือคนแรกที่เลือก','The first one chosen is the lead'))+'</small>'
+   +'<button type="button" class="soft-btn" onclick="closeModal()">'+esc2(tl('ยกเลิก','Cancel'))+'</button>'
    +'<button type="button" class="primary-btn action-3d-orange" data-assign="'+cid+'">'
    +esc2(tl('มอบหมาย','Assign'))+'</button></div>'
-   +'</div></div>';
+   +'</div>';
  }
+
+ window.imodeOpenAssignPicker=function(caseId){
+  var c=caseById(caseId);
+  if(!c)return;
+  if(typeof openModal!=='function')return;
+  openModal(tl('มอบหมายงานให้ช่าง','Assign technicians'),
+   (c.ticket||c.id)+' · '+(c.customer||'-')+' · '+(c.machine||'-'),
+   panelHTML(c));
+  wireAssign(document.getElementById('modalBody'));
+  /* Seeded after the markup exists, so reassigning a two-person job keeps its lead unless
+     the admin unticks them. */
+  var panel=panelOf(caseId);
+  if(panel)panel.__order=idsOf(c);
+ };
  function renderAssign(){
   var host=document.getElementById('page-assign');
   if(!host)return;
@@ -264,12 +293,13 @@
     }).join(''):'<div class="empty">'+esc2(tl('ไม่มีเคสที่ต้องมอบหมาย','No open cases to assign'))+'</div>')+'</div>'
    +'</div>';
   wireAssign();
-  seedOrder();
  }
  /* Selection order, not DOM order, decides the lead — "คนแรกที่เลือก" has to mean what
     it says. The order lives on the panel element, seeded from the case when it renders. */
+ /* The panel now lives in the modal, not in the row, so it is found by its own data-case
+    rather than through the row that opened it. */
  function panelOf(caseId){
-  return document.querySelector('.assign-ctl[data-case="'+caseId+'"] .assign-panel');
+  return document.querySelector('.assign-panel[data-case="'+caseId+'"]');
  }
  function chosenIds(caseId){
   var panel=panelOf(caseId);
@@ -289,6 +319,10 @@
    return;
   }
   if(typeof requirePermission==='function'&&!requirePermission('case.assign'))return;
+  /* Closed before the work, not after: renderAll() redraws every module and blocks the
+     main thread, so a popup left open until then cannot be dismissed and feels stuck —
+     the same complaint the account switcher had. */
+  if(typeof closeModal==='function'){try{closeModal()}catch(e){}}
   var before=idsOf(c);
   setIds(c,ids);
   if(c.status==='เคสใหม่'&&(settings.statuses||[]).indexOf('มอบหมายแล้ว')>=0)c.status='มอบหมายแล้ว';
@@ -312,8 +346,18 @@
 
  /* One delegated listener for the whole page rather than inline handlers, because the
     panel is rebuilt on every render and the check boxes carry no ids. */
- function wireAssign(){
-  var host=document.getElementById('page-assign');
+ /* TWO HOSTS, AND IT HAS TO BE TWO.
+
+    A single delegated listener on `document` looks right and silently does not work: js/05
+    line 19 puts a click handler on the modal panel that calls e.stopPropagation(), so no
+    click inside a popup ever reaches the document. That guard is the "ต้องกดกากบาทเท่านั้น"
+    rule — it keeps a stray click from closing a half-filled form — and it must stay.
+    Listeners on descendants of the panel still fire, so the popup is wired on #modalBody,
+    which is inside it. The symptom when this is got wrong is exact: the check boxes tick
+    (the change listener is on the panel's own host) but the Assign button does nothing at
+    all, with no error. */
+ function wireAssign(host){
+  host=host||document.getElementById('page-assign');
   if(!host||host.__assignWired)return;
   host.__assignWired=true;
   host.addEventListener('click',function(e){
@@ -321,8 +365,7 @@
    if(!t||!t.closest)return;
    var toggle=t.closest('.assign-toggle');
    if(toggle){
-    var panel=panelOf(toggle.getAttribute('data-case'));
-    if(panel)panel.hidden=!panel.hidden;
+    window.imodeOpenAssignPicker(toggle.getAttribute('data-case'));
     return;
    }
    var go=t.closest('[data-assign]');
@@ -357,21 +400,15 @@
   var label=cb.closest('.assign-member');
   if(label)label.classList.toggle('is-on',cb.checked);
  }
+ /* The count sits on the trigger back on the page, so it is found by case id rather than
+    by walking up from the panel — they are in different trees now. */
  function refreshCount(box){
-  var ctl=box.closest('.assign-ctl');
   var n=box.querySelectorAll('.assign-cb:checked').length;
-  var c=ctl&&ctl.querySelector('.assign-count');
+  var cid=box.getAttribute('data-case');
+  var c=document.querySelector('.assign-ctl[data-case="'+cid+'"] .assign-count');
   if(c)c.textContent=String(n);
  }
- /* Seeds each panel's selection order from what the case already holds, so reassigning a
-    two-person job keeps its lead unless the admin unticks them. */
- function seedOrder(){
-  [].slice.call(document.querySelectorAll('#page-assign .assign-ctl')).forEach(function(ctl){
-   var c=caseById(ctl.getAttribute('data-case')),panel=ctl.querySelector('.assign-panel');
-   if(!c||!panel)return;
-   panel.__order=idsOf(c);
-  });
- }
+
 
  /* ---------- 5. addressed notifications ---------- */
  function notifyAssignment(c,tid,before){
@@ -518,7 +555,7 @@
  +'text-transform:uppercase;opacity:.72}'
  +'.work-crew-cross{background:#fff2e2;color:#9a4c07;border-radius:99px;padding:2px 9px;font-weight:700}'
  /* --- the picker --- */
- +'.assign-ctl{display:flex;flex-direction:column;gap:8px;min-width:260px}'
+ +'.assign-ctl{display:flex;flex-direction:column;gap:8px;min-width:150px}'
  +'.assign-toggle{display:inline-flex;align-items:center;gap:7px;justify-content:center}'
  +'.assign-count{background:#0b63e5;color:#fff;border-radius:99px;min-width:20px;height:20px;'
  +'display:inline-grid;place-items:center;font-size:11px;padding:0 6px}'
@@ -528,6 +565,13 @@
  +'.assign-panel{display:flex;flex-direction:column;gap:10px;padding:11px;border:1px solid #dbe6f7;'
  +'border-radius:13px;background:#f8fbff}'
  +'.assign-panel[hidden]{display:none!important}'
+ /* Inside the modal it already has the dialog's padding and ground, so it drops its own
+    frame and lets the member grid use the full width the popup gives it. */
+ +'.assign-panel.is-modal{border:0;background:transparent;padding:0;gap:14px}'
+ +'.assign-panel.is-modal .assign-members{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}'
+ +'.assign-panel.is-modal .assign-team{padding-bottom:4px}'
+ +'.assign-panel.is-modal .assign-foot{position:sticky;bottom:0;background:#fff;padding:12px 0 2px;'
+ +'margin-top:2px;border-top:1px solid #e6edf8}'
  +'.assign-team-head{display:flex;align-items:center;gap:7px;margin-bottom:6px}'
  +'.assign-team-head b{font-size:11.5px;color:#12356f;flex:1;min-width:0}'
  +'.assign-mini{border:1px solid #cfe0fa;background:#fff;color:#0b63e5;border-radius:8px;'
@@ -543,7 +587,9 @@
  +'.assign-foot{display:flex;align-items:center;gap:9px;border-top:1px dashed #d8e4f6;padding-top:9px}'
  +'.assign-foot small{flex:1;min-width:0;font-size:10.5px;color:#7385a5}'
  +'@media (max-width:640px){.work-row{flex-direction:column;align-items:stretch}.work-row-actions{justify-content:flex-start}.assign-pick{width:100%}'
- +'.assign-ctl{min-width:0;width:100%}.assign-members{grid-template-columns:1fr}}';
+ +'.assign-ctl{min-width:0;width:100%}.assign-members{grid-template-columns:1fr}'
+ +'.assign-panel.is-modal .assign-members{grid-template-columns:1fr}'
+ +'.assign-panel.is-modal .assign-foot{flex-wrap:wrap}}';
  document.head.appendChild(style);
 
  function install(){ensurePages();ensureNav()}

@@ -6,7 +6,14 @@
 (function(){
  'use strict';
 
- function cfg(){return (window.settings&&window.settings.lineConfig)||{}}
+ /* settings and customers are top-level `let` in js/03 and therefore lexical globals that
+    never appear on window — the same trap the comment below already records for
+    currentUser. Reading them as window.settings / window.customers made cfg() return {}
+    on every call, so lineOaUrl() always produced '' and imodeLineAuth.configured() was
+    false even with a LIFF ID configured, which would have kept the whole LINE scaffold
+    inert the day IT supplied one. Read the bindings themselves. */
+ function cfg(){try{return (settings&&settings.lineConfig)||{}}catch(e){return {}}}
+ function customerList(){try{return Array.isArray(customers)?customers:[]}catch(e){return []}}
  function isCustomer(){return !!(window.uatAuth&&window.uatAuth.isCustomerSession&&window.uatAuth.isCustomerSession())}
  /* currentUser is a top-level 'let' in the main script, so it is a lexical global and
     never appears on window. Read the binding itself. */
@@ -149,8 +156,9 @@
   configured:function(){return !!String(cfg().liffId||'').trim()},
   officialUrl:lineOaUrl,
   customerForLineUser:function(uid){
-   if(!uid||!Array.isArray(window.customers))return null;
-   return window.customers.filter(function(c){return c.lineUserId&&c.lineUserId===uid})[0]||null;
+   var list=customerList();
+   if(!uid||!list.length)return null;
+   return list.filter(function(c){return c.lineUserId&&c.lineUserId===uid})[0]||null;
   },
   profile:function(){
    if(!this.configured())return Promise.resolve(null);

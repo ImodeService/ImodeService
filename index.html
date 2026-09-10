@@ -287,7 +287,7 @@
       </div>
       <div class="panel">
         <div class="panel-head toolbar-head machine-master-head"><div class="machine-head-copy"><div class="machine-title-line"><div class="machine-list-meta"><label class="machine-display-control">แสดง <select id="sparePartsDisplayLimit" onchange="setListLimit('spareParts',this.value)"><option value="10">10</option><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option><option value="all">ทั้งหมด</option></select> รายการ</label><span class="machine-total-chip">ทั้งหมด <b id="sparePartsTotalCount">0</b> รายการ</span></div></div></div><div class="button-row"><button class="soft-btn" onclick="openPurchaseOrderModal()">＋ สร้างใบสั่งซื้อ</button><button class="soft-btn" onclick="exportSparePartsCSV()">Export Stock CSV</button><button class="primary-btn action-3d-orange ui-emphasis-action" onclick="openSparePartModal()">＋ เพิ่มอะไหล่</button></div></div>
-        <div class="toolbar" style="grid-template-columns:minmax(280px,1fr) 180px 230px;display:grid;gap:9px"><input id="spSearch" placeholder="ค้นหา Part No., ชื่ออะไหล่, Supplier หรือ Machine..." oninput="renderSpareParts()"><select id="spStatusFilter" onchange="renderSpareParts()"><option value="all">ทุกสถานะสต๊อก</option><option value="low">ต่ำกว่าขั้นต่ำ</option><option value="reorder">ถึงจุดสั่งซื้อ</option><option value="high">เกินค่าสูงสุด</option><option value="normal">ปกติ</option></select><select id="spMachineFilter" onchange="renderSpareParts()"><option value="all">ทุกเครื่อง</option></select></div>
+        <div class="toolbar toolbar-3col"><input id="spSearch" placeholder="ค้นหา Part No., ชื่ออะไหล่, Supplier หรือ Machine..." oninput="renderSpareParts()"><select id="spStatusFilter" onchange="renderSpareParts()"><option value="all">ทุกสถานะสต๊อก</option><option value="low">ต่ำกว่าขั้นต่ำ</option><option value="reorder">ถึงจุดสั่งซื้อ</option><option value="high">เกินค่าสูงสุด</option><option value="normal">ปกติ</option></select><select id="spMachineFilter" onchange="renderSpareParts()"><option value="all">ทุกเครื่อง</option></select></div>
         <div class="table-wrap"><table class="wide-table"><thead><tr><th>Part No.</th><th>อะไหล่</th><th>เครื่อง/Model ที่ใช้</th><th>Supplier</th><th>คงเหลือ</th><th>ต่ำสุด</th><th>สูงสุด</th><th>จุดสั่งซื้อ</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody id="sparePartTable"></tbody></table></div>
         <div id="sparePartCards" class="mobile-card-list"></div>
         <div id="sparePartsPagination" class="machine-pagination" aria-label="Spare parts list pagination"></div>
@@ -684,6 +684,10 @@
 
 <!-- V6.9 — the customer Home page design. Must stay after css/21. -->
 <link rel="stylesheet" href="./css/22-v69-customer-home.css">
+<!-- Beta: tablet and phone corrections. Last on purpose, like css/21: it has to win
+     over the <style> blocks js/10 and js/16 append to <head> at runtime, and over
+     the fixed grid columns in css/01 and css/04. -->
+<link rel="stylesheet" href="./css/23-v70-responsive.css">
 
 <script src="./js/08-imodePortalV691SafeScript.js"></script>
 

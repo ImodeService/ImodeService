@@ -1,0 +1,129 @@
+/* Beta — tablet and phone corrections.
+
+   Found by sweeping every module at 1440 / 1280 / 1024 / 820 / 768 / 430 / 390 / 360 and
+   measuring, per element, whether its content is wider than its box with nothing scrolling
+   above it. No page scrolls sideways at any of those widths — that part was already right.
+   What was wrong was content squeezed inside a box that never wrapped.
+
+   THE MEASUREMENT THAT MATTERS IS NOT THE VIEWPORT
+
+   The sidebar is 208-286px, so the content column is far narrower than the window: at an
+   iPad landscape 1024 the panels are 671px. Two of the toolbars are CSS grids whose
+   responsive rule fires at max-width:1000px, i.e. 24px too late — exactly the width of an
+   iPad in landscape, which is why they overflowed there and nowhere else. Breakpoints here
+   are therefore chosen against the content column, not the window.
+
+   Nothing is redesigned. Every rule below makes something that was already there wrap,
+   ellipsise or grow rather than be cut off. */
+
+/* ---------------------------------------------------------------- 1. panel heads --
+   .panel-head is a flex row of "the copy" and "the buttons". The copy carries the
+   10/25/50/100/ทั้งหมด pager and the total, and it is flex:1 1 0% while the buttons are
+   flex:1 1 140px — so below about 900px the buttons win and the copy collapsed to as
+   little as 27px with 269px of content inside it. Measured on cases, machines, customers,
+   qc, warranty and documents. Giving the copy its own line is the whole fix. */
+@media (max-width:900px){
+  .panel-head,
+  .panel-head.toolbar-head{flex-wrap:wrap}
+  .machine-head-copy{flex:1 1 100% !important;min-width:0}
+  .machine-title-line{width:100%;min-width:0}
+  .machine-list-meta{width:100%;min-width:0;flex-wrap:wrap}
+  .machine-list-meta select{min-width:0;max-width:100%}
+}
+
+/* ------------------------------------------------------------------- 2. toolbars --
+   Three-column grids that could not fit the content column. The QC one is shared by the
+   petty-cash page. 1200px is the window width at which the content column drops to roughly
+   900px, which is where three columns stop fitting. */
+/* index.html carried this grid as an inline style, which beats every stylesheet without
+   !important and is why the page had no responsive behaviour at all. It is a class now. */
+.toolbar.toolbar-3col{display:grid;grid-template-columns:minmax(280px,1fr) 180px 230px;gap:9px}
+@media (max-width:1200px){
+  .qc-toolbar,
+  .toolbar.toolbar-3col{grid-template-columns:minmax(200px,1fr) minmax(150px,1fr) !important}
+}
+@media (max-width:820px){
+  .qc-toolbar,
+  .toolbar.toolbar-3col{grid-template-columns:1fr !important}
+}
+/* A select inside any toolbar must be allowed to shrink; the 145px floor from css/01 is
+   what pushed one past the right edge on an iPad in landscape. */
+@media (max-width:1200px){
+  .toolbar select,
+  .toolbar input{min-width:0}
+}
+
+/* --------------------------------------------------------------- 3. small clipping --
+   Each of these is a fixed-size box holding content that does not fit. */
+
+/* css/01 gives every settings chip a hard 42px square; most hold one emoji, but two hold
+   text — "S/M/L" needs 55 and "LINE" needs 47 — and were cut mid-letter at every width.
+   width:auto on the chip alone does nothing: the card is a grid whose first track is a
+   fixed 42px, so the track is the real constraint and both have to change. Emoji chips
+   still sit in a 42px square; only the two text ones grow. */
+.setting-action-card{grid-template-columns:minmax(42px,auto) 1fr 18px}
+.setting-icon{width:auto;min-width:42px;padding:0 5px;box-sizing:border-box}
+
+/* The mobile card list is a grid inside a padded panel; a card whose top row could not
+   wrap pushed it 10px past its own box at 360px. */
+.mobile-card-list{min-width:0}
+.mobile-data-card{min-width:0;overflow-wrap:anywhere}
+.mobile-data-card .card-top{flex-wrap:wrap;min-width:0;gap:6px}
+.mobile-data-card .card-top>*{min-width:0}
+
+/* white-space:nowrap with a max-width and no overflow rule cuts the word mid-letter.
+   A reference badge is a hint, so an ellipsis is the honest end. */
+.machine-reference-badge{overflow:hidden;text-overflow:ellipsis}
+
+/* The onsite S/M/L cards and the dashboard donut were a few pixels over their box on a
+   1280 laptop; letting the text wrap is enough. */
+.v68-level-card .head{flex-wrap:wrap;min-width:0}
+.v68-level-card .head>div{min-width:0}
+.v68-level-price{overflow-wrap:anywhere}
+.status-donut-wrap{max-width:100%;overflow:hidden}
+
+/* A number input whose spinner pushed it 10px over its cell on the quotation page. */
+#page-quotation .quote-part-line input[type=number]{min-width:0}
+
+/* ------------------------------------------------------------------ 4. tap targets --
+   The language toggle on the Home header was 69x27. Anything below ~32px is hard to hit
+   with a thumb; the rest of the header is already comfortable. */
+.rhome-lang{min-height:32px;padding:6px 13px}
+/* The "sign in with the demo list" link under the staff login was 143x18. */
+.rhome-login-back{min-height:32px;display:inline-flex;align-items:center;justify-content:center;padding:6px 10px}
+
+/* ------------------------------------------------------ 5. the tablet middle ground --
+   901-1200px keeps the full sidebar and the desktop table layout, so the content column is
+   the tightest it ever gets while still showing tables. These only tighten spacing; the
+   layout is unchanged. */
+@media (min-width:901px) and (max-width:1200px){
+  .main{padding-left:14px;padding-right:14px}
+  .panel-head{padding:14px 15px}
+  .toolbar{padding:11px 13px;gap:8px}
+  .wide-table th,.wide-table td{padding-left:9px;padding-right:9px}
+  .module-kpi-card{padding:11px}
+}
+
+/* Tablet portrait (768-900) uses the drawer like a phone but has room for two columns of
+   cards, which the phone rules collapse to one. */
+@media (min-width:768px) and (max-width:900px){
+  .rhome-modgrid{grid-template-columns:repeat(2,1fr)}
+  .chome-grid{grid-template-columns:repeat(2,1fr)}
+  .assign-members{grid-template-columns:repeat(2,1fr)}
+  .acctmg-grid{grid-template-columns:repeat(2,1fr)}
+  .trash-row{grid-template-columns:32px minmax(0,1fr) 58px auto}
+}
+
+
+/* ------------------------------------------------- 6. the [hidden] trap, closed ---
+   This project has been bitten three times by the same thing: a script hides an element
+   with el.hidden=true, but the element also has an author rule giving it a display, and an
+   author rule beats the user-agent's [hidden]{display:none}. The symptom is always a
+   button that appears to do nothing — the โมดูลทั้งหมด grid, the Field Service queue panel
+   and the assign panel each needed their own patch.
+
+   Probing every element the scripts toggle showed two more that would have done it next:
+   #fieldQueue (display:grid) and .trash-list (display:grid). Rather than add a third and
+   fourth one-off, the class of bug is closed here. Anything that must stay visible while
+   carrying the attribute is a bug in its own right. */
+[hidden]{display:none !important}

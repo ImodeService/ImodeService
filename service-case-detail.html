@@ -67,6 +67,14 @@ a{color:var(--imode-blue)}
 .scd-tools{display:flex;align-items:center;gap:9px;flex:none}
 .scd-chip-btn{height:40px;min-width:40px;padding:0 12px;border:1px solid var(--line);border-radius:11px;background:#fff;cursor:pointer;font-size:13px;font-weight:700;color:var(--imode-navy)}
 .scd-chip-btn:hover{border-color:#b9d2f4}
+/* Measured at 1024 / 768 / 390 / 360: the breadcrumb and footer links were 20px tall,
+   which is under the comfortable thumb target. Only the hit area grows; nothing moves. */
+.scd-back{min-height:32px;display:inline-flex;align-items:center;gap:4px;padding:5px 2px}
+.scd-foot .scd-back{padding:5px 8px}
+/* The breadcrumb link and the media "ดูทั้งหมด" button were 20px tall, the two smallest
+   things a finger has to hit on this page. Only the hit area grows. */
+.scd-crumb a,.scd-crumb button{min-height:32px;display:inline-flex;align-items:center;padding:5px 2px}
+.media-meta button{min-height:32px;display:inline-flex;align-items:center;padding:5px 6px}
 .scd-bell{position:relative}
 .scd-bell b{position:absolute;top:-6px;right:-6px;background:var(--danger);color:#fff;border-radius:999px;font-size:10px;padding:1px 5px}
 .scd-user{display:flex;align-items:center;gap:9px;padding:5px 11px 5px 5px;border:1px solid var(--line);border-radius:999px;background:#fff}

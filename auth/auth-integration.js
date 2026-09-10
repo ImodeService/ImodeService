@@ -151,8 +151,13 @@
  }
 
  function checkSession(){
+  /* currentUser is a top-level `let` in js/03, so it is a lexical global and window
+     .currentUser is always undefined — the same trap auth-core.js documents for `settings`.
+     Reading it that way made hadUser permanently false, so endSession('expired') never
+     fired and an expired or idle session was never actually ended: Auth.session() returned
+     null while the application happily kept its signed-in user. */
   var hadUser=false;
-  try{hadUser=!!window.currentUser}catch(e){}
+  try{hadUser=(typeof currentUser!=='undefined')&&!!currentUser}catch(e){}
   var s=Auth.session();
   if(!s&&hadUser){
    /* Only end it when the session really came from ImodeAuth; a legacy currentUser
@@ -188,7 +193,7 @@
    /* Upgrade path: someone already signed in before this file existed keeps their
       session instead of being kicked out, but from now on it expires like any other. */
    var legacy=null;
-   try{legacy=window.currentUser}catch(e){}
+   try{legacy=(typeof currentUser!=='undefined')?currentUser:null}catch(e){}
    if(legacy&&legacy.name){
     Auth.signIn.__migrated=true;
     var migrated={

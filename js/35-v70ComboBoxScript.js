@@ -260,6 +260,37 @@
   };
  }
 
+ /* ------------------------------------------------- 3. the onsite machine picker -
+    หน้างาน lists every machine in one native <select> — 41 of them, each row being
+    name · model · serial — so finding one meant scrolling. Same upgrade, one difference
+    that matters: renderOnsitePricing() in js/06 rebuilds sel.innerHTML on every
+    renderAll(), and it keeps the element. So imodeCombo() is applied once (its own
+    dataset.comboOn guard sees to that) and only the visible text is resynced afterwards;
+    the list itself is built at open time from the live options, so a machine added while
+    the page is open is already there.
+
+    "— เลือกเครื่อง / ไม่ระบุ — " carries data-keep because options() drops the empty
+    option by default. Here it is a real choice — the calculator works with no machine at
+    all — so it has to stay pickable. */
+ var onsiteCombo=null;
+ var baseRenderOnsite=window.renderOnsitePricing;
+ if(typeof baseRenderOnsite==='function'){
+  window.renderOnsitePricing=function(){
+   var r=baseRenderOnsite.apply(this,arguments);
+   try{
+    var sel=document.getElementById('onsiteMachineSelect');
+    if(sel){
+     if(sel.options[0]&&sel.options[0].value==='')sel.options[0].dataset.keep='1';
+     if(sel.dataset.comboOn==='1'){if(onsiteCombo)onsiteCombo.refresh()}
+     else onsiteCombo=window.imodeCombo(sel,{
+      placeholder:tl('พิมพ์ชื่อเครื่อง รุ่น หรือซีเรียล','Type a machine name, model or serial')
+     });
+    }
+   }catch(e){}
+   return r;
+  };
+ }
+
  var st=document.createElement('style');
  st.id='v70ComboBoxStyle';
  st.textContent=''

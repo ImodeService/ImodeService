@@ -808,5 +808,10 @@
      so its goPage wrapper sits outside js/36's sidebar grouping. -->
 <script src="./js/40-v70TrashScript.js"></script>
 
+<!-- Beta: QC, petty cash, spare parts and purchase orders reach the other devices.
+     Loads last so it wraps the final saveLocal and syncCloud in the chain. Needs
+     supabase/05-v70-operational-tables.sql run once; until then it stays quiet. -->
+<script src="./js/41-v70OpsSyncScript.js"></script>
+
 </body>
 </html>

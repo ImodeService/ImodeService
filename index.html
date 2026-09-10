@@ -780,5 +780,15 @@
      outermost one and the form is already in the DOM when it upgrades the select. -->
 <script src="./js/35-v70ComboBoxScript.js"></script>
 
+<!-- Beta: the sidebar is sorted into named groups. Loads after js/16 so งานของฉัน and
+     มอบหมายงาน are already in the nav, and it wraps applyRoleVisibility so a group with
+     nothing under it hides its own heading. -->
+<script src="./js/36-v70NavGroupsScript.js"></script>
+
+<!-- Beta: pick a photo, then crop it by hand. Wraps the three single-image pickers in
+     js/03 by writing the cropped file back into the <input> — their pending* variables
+     are lexical globals this file cannot reach. -->
+<script src="./js/37-v70ImageCropScript.js"></script>
+
 </body>
 </html>

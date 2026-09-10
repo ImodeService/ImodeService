@@ -291,6 +291,37 @@
   };
  }
 
+ /* ------------------------------------------------- 4. the quotation page -------
+    Two pickers on ทำใบเสนอราคา, both of them long lists of Thai company names:
+    #qCase (every service case, ticket · customer · machine) and #qCustomer.
+
+    Same shape as the onsite one — renderQuotations() in js/03 rebuilds both innerHTMLs on
+    every render and keeps the elements — so the same apply-once / refresh-after pattern.
+    Both keep their empty first row: "ไม่อ้างอิงเคส" is a real answer (a quotation need not
+    come from a case), and "เลือกลูกค้า" is how the required field reads before a choice.
+
+    No allowCreate on #qCustomer. The machine form has it because a machine cannot be saved
+    without a customer, but a quotation for a company that is not in the system yet is a
+    company that still has no address to print on the document. */
+ var quoteCombos={};
+ var baseRenderQuotations=window.renderQuotations;
+ if(typeof baseRenderQuotations==='function'){
+  window.renderQuotations=function(){
+   var r=baseRenderQuotations.apply(this,arguments);
+   try{
+    [['qCase',tl('พิมพ์เลขที่เคส ชื่อลูกค้า หรือชื่อเครื่อง','Type a ticket, customer or machine')],
+     ['qCustomer',tl('พิมพ์ชื่อลูกค้า','Type a customer name')]].forEach(function(pair){
+     var sel=document.getElementById(pair[0]);
+     if(!sel)return;
+     if(sel.options[0]&&sel.options[0].value==='')sel.options[0].dataset.keep='1';
+     if(sel.dataset.comboOn==='1'){if(quoteCombos[pair[0]])quoteCombos[pair[0]].refresh()}
+     else quoteCombos[pair[0]]=window.imodeCombo(sel,{placeholder:pair[1]});
+    });
+   }catch(e){}
+   return r;
+  };
+ }
+
  var st=document.createElement('style');
  st.id='v70ComboBoxStyle';
  st.textContent=''

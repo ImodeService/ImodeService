@@ -3,12 +3,22 @@
 ## Project Identity
 
 Project: I-MODE Plus Service & Maintenance
-Current release: V6.8 Service focus
+Current release: **Beta 1.0 Service focus full system**
 
-This is what `index.html` ships: `<title>… · V6.8 Service focus</title>`, the topbar
-`Service focus · V6.8`, and the sidebar block `Version 6.8 / Service focus`. Do not rename
-it, and do not revert it to "V6.8 UAT".
-Primary application entrypoint: `index.html`
+Seven places carry it and all seven must move together: `index.html`'s `<title>`, its sidebar
+version block (`Version Beta 1.0` / `Service focus full system`), its topbar brand
+(`Service focus full system · Beta 1.0`), two lines in `js/06-v68ModulesScript.js`, and the
+`<title>` and brand line in `service-case-detail.html`, which keeps its own copy.
+
+**Editing the markup alone silently reverts**, because `js/06` rewrites the sidebar version
+block on every render. That trap has been hit twice.
+
+The release was `V6.8 Service focus` until 2026-09-09, then `Beta Service focus`, then this
+on 2026-09-10 — each at the owner's request. Older text further down this file still says
+V6.8; this section is the current one. Do not rename it, and do not "restore" an older
+string.
+
+Primary application entrypoint: `index.html` — **markup only**. See Architecture.
 
 This is an existing Service & Maintenance management system.
 
@@ -43,24 +53,46 @@ Do not migrate the application to React, Vue, Next.js, or another framework unle
 
 ## Architecture
 
-The current application is primarily a large HTML application containing:
+**`index.html` has been markup only since 2026-09-07.** It was a single 1.08 MB file with
+everything inline; the CSS and JavaScript were split out and it is now about 80 KB.
 
-- HTML
-- inline CSS
-- inline JavaScript
-- multiple IIFEs
-- legacy enhancement patches
-- some functions exported to `window`
-- localStorage persistence
-- optional Supabase synchronization
+- `css/NN-*.css` — 23 stylesheets, loaded by `<link>` in numeric order
+- `js/NN-*.js` — 41 scripts, loaded by `<script src>` in numeric order
+- `auth/*.js` — the authentication layer (4 files)
+- `pages/customer-portal…` — see below
+- `vendor/jsQR.min.js` — the QR decoder, vendored rather than fetched from a CDN
+
+**The number prefix IS the load order. Never reorder or renumber.** The whole application
+is patch-over-patch: `js/03-app-core.js` is the original 542 KB application and `js/04`
+onward are patches that wrap or override it, newest last. `css/21` and `css/23` must stay
+the last two stylesheets — they also have to win over `<style>` blocks that `js/10` and
+`js/16` append to `<head>` at runtime.
+
+One page is not in `index.html` at all: the customer page lives in `pages/customer-home.html`
+and is inserted into `<main>` by `pages/pages.js`, a `<script src>` sitting where the
+`<section>` used to be. **The app must therefore be opened over http** (Live Server, GitHub
+Pages); a plain `file://` double-click cannot read the fragment and the portal falls back to
+a notice.
+
+Expect, and do not be surprised by:
+
+- multiple IIFEs, and the same function assigned to `window` by several files
+  (`goPage` is wrapped eleven times — that is the architecture, not a bug)
+- top-level `let` / `const` that are **lexical globals shared across script files but NOT
+  present on `window`** (`settings`, `cases`, `machines`, `customers`, `technicians`,
+  `currentUser`, `qcRecords`, `supa`, `cloudSettings`, `PAGE_PERMISSION`, `MODULES`…).
+  Read and assign them by bare identifier. **`window.settings` is `undefined`** — writing
+  that has silently broken four separate features in this project, most recently session
+  expiry, which never fired for weeks because `window.currentUser` is always undefined.
+- duplicated definitions, and later patches overriding earlier ones
+- localStorage persistence with optional Supabase synchronization
 
 Important:
 
-There may be duplicated or overridden functions.
-
 Do not assume the first function definition is the active one.
 
-Always search the whole file and determine the effective final definition before editing.
+`grep -n "function name" js/*.js` shows every definition; the file order tells you which one
+wins. Search the whole workspace, not one file.
 
 ---
 
@@ -695,24 +727,36 @@ Do not perform broad cleanup unless requested.
 
 ## Validation
 
-After modifying inline JavaScript:
+The JavaScript lives in `js/*.js`, `auth/*.js` and `pages/pages.js`. There is no inline
+script left to extract.
 
-Extract each inline `<script>` without a `src` and run syntax validation using:
+After changing a file, syntax-check the ones you touched:
 
-`node --check`
+`node --check js/<file>.js`
+
+`node` has been present and absent at different times on this machine. When it is missing,
+load the single file in a browser with an `error` listener instead — **a parse error in a
+classic script is silent; its only symptom is that the script's globals are missing.**
 
 Also inspect runtime risks:
 
 - ReferenceError
 - IIFE scope
-- duplicate `const`
-- duplicate `let`
-- undefined globals
+- duplicate `const` / `let`
+- **`window.<name>` where `<name>` is a top-level `let`** — always `undefined`; see
+  Architecture
 - function override order
+- `el.hidden = true` on an element that an author rule gives a `display`. The author rule
+  wins and the element stays visible. `css/23` now ends with
+  `[hidden]{display:none!important}`, which closes this for the whole project — do not add
+  another one-off patch for it.
 
 Syntax check alone is not enough.
 
-Perform relevant UI regression checks after each task.
+Perform UI regression checks after each task, at **desktop, tablet and phone widths**. If
+you drive a headless Chrome, set the viewport with `Emulation.setDeviceMetricsOverride`:
+`--window-size` is clamped to about 500px on Windows, so "390px" runs were really 500px and
+never tested a real phone width.
 
 ---
 
@@ -1222,3 +1266,110 @@ Three small edits, all in `v68UatAccountsScript` and `v68RoleHomeScript`:
    receive mail.
 5. The audit trail is append-only through the API but editable by anyone with database
    access — an operational record, not evidence.
+
+
+---
+
+# STATE OF THE SYSTEM — 2026-09-10
+
+**Read this before the change logs below.** Those logs stop at 2026-09-07 (part 4) and are
+thirteen sessions behind. This section is the current picture; `CLAUDE.md` in the repo root
+carries the full session-by-session history if you need the reasoning behind any of it.
+
+## What exists now that the sections above do not mention
+
+**Modules.** In addition to the list above: `my-work` (งานของฉัน, technicians only —
+an Admin holds no `mywork.view` and `goPage('my-work')` bounces for them), `assign`
+(มอบหมายงาน, needs `case.assign`), and `trash` (ถังขยะ, needs `settings.manage`).
+`field-service` has a sidebar entry now. The sidebar is sorted into six named groups by
+`js/36`; a page it does not list collects under อื่น ๆ rather than disappearing.
+
+**Pages that are their own files.** `service-case-detail.html` is the full-page case
+workspace, opened as `service-case-detail.html?caseId=<id>`. It is **read-only** — it reads
+localStorage and never writes — and it has its own CSS, so `css/*` changes do not reach it.
+`pages/customer-home.html` is the customer page.
+
+**URL entry points.** The application has no router; `goPage()` only toggles `.page.active`
+and the URL never changes. The only URLs that mean anything are `?machineToken=`,
+`?serial=`, `#/customer-entry`, `#/customer-portal`, `?page=<module>` (20 internal pages,
+whitelisted in `js/28`), plus `?openExternalBrowser=1` and `?scan=1` for the LINE path.
+
+**Accounts are data, not code.** Seven staff accounts, password = username, defined in
+`js/09` — but an admin can add, rename, re-password and delete any of them from
+ตั้งค่าระบบ → การจัดการบัญชีผู้ใช้. Created accounts live in `settings.uatAccounts`;
+changes to the seven built-ins live in `settings.uatAccountEdits`. `js/39` reimplements
+`verify` and `findAccount` on `window.uatAuth` because **`js/09`'s own `findAccount()`,
+`verify()` and `login()` call its private closure `allAccounts()`** — replacing only the
+window view leaves an account visible in every list and still unable to sign in.
+
+**A case can belong to several technicians.** `c.assignee` is still one id, the lead, and
+fifteen places in `js/03` read it unchanged. `c.assignees` is the full list. On the wire it
+travels inside the `assignee` column as `"T001,T-LEAD-RD"` because `service_cases` has no
+column for it — two wrappers in `js/38` join and split; nothing else knows.
+
+## Persistence — additions to the list above
+
+`imode_v69_session`, `imode_v69_auth_audit`, `imode_v69_auth_lock`, `imode_v69_local_pw`,
+`imode_v69_sb_auth` (the login system), `imode_v69_cloud_optout`, `imode_v69_home_usage`,
+`imode_v70_trash_blob`.
+
+Two things now live **inside `settings`** rather than in a key of their own, because they
+have to reach every device: the login accounts and the recycle bin (`settings.trash`).
+`mergeSettings()` spreads the saved object wholesale, so unknown top-level keys survive it.
+
+`localStorage.clear()` is still forbidden.
+
+## Supabase — additions to the list above
+
+`qc_records`, `petty_cash`, `spare_parts`, `purchase_orders`, created 2026-09-10 by
+`supabase/05-v70-operational-tables.sql` and already run. They are
+**`{id, data jsonb, updated_at}` with the whole record in `data`**, unlike every other
+table. That is deliberate: field-to-column mapping with a whitelist has twice meant a field
+added in JavaScript was dropped silently. Do not normalise them into columns.
+
+`notifications` is downloaded but never uploaded — there is no `cloudUpsertNotification`.
+Addressed notices are derived from the case instead.
+
+RLS is on but effectively open: `04-anon-uat.sql` and `05-v70-operational-tables.sql` grant
+`anon` everything, and the publishable key ships in `js/23`. **This is a deliberate UAT
+posture on a project named `service_Imode_test`, not an oversight.** Do not "fix" it without
+asking; do not put real financial or personal records in it while it stands.
+
+`settings.authConfig` currently carries `provider:'local'`, `sessionHours:24` and
+`idleMinutes:1440`, set live and pushed to `system_settings`. The provider is pinned because
+Supabase Auth only has users for three of the seven accounts, so the other four could not
+sign in at all on a cloud-connected device. The `allowLocalFallback` switch that
+`auth-integration.js` documents **was never implemented — it exists only in that comment.**
+
+## Traps that have already cost this project real time
+
+1. **`window.<name>` where `<name>` is a top-level `let` is always `undefined`.** It has
+   broken four features. Most recently `checkSession()` read `window.currentUser`, so the
+   session expiry it computes was never acted on — sessions never ended. Read and assign
+   the bare identifier.
+2. **`el.hidden = true` does nothing if an author rule gives the element a `display`.**
+   Patched one element at a time three times before `css/23` closed it with
+   `[hidden]{display:none!important}`. Do not add a fourth one-off.
+3. **A script that pushes a key into `PERMISSION_CATALOG` must load before `js/20`**, which
+   repairs roles against the catalog as it stands at that moment. A key registered after it
+   is stripped from every role on every reload. `PAGE_PERMISSION` maps a page to an
+   *existing* key and is safe to extend.
+4. **`cloudUpsert*` sends an explicit whitelist.** A field you add in JavaScript is dropped
+   silently on the way out and nobody notices until a second device is involved.
+5. **`syncCloud()` replaces its arrays wholesale from the server.** Anything written locally
+   and not yet pushed is destroyed. It also re-applies `mergeSettings()` over the settings
+   object, which is why `js/29` re-runs the role migrations after every sync.
+6. **An inline `style=` attribute beats every stylesheet.** The spare-parts toolbar had its
+   grid inline, so that page had no responsive behaviour at all and no CSS file could have
+   fixed it.
+7. **`--window-size` is clamped to about 500px on Windows.** Set a headless viewport with
+   `Emulation.setDeviceMetricsOverride`, or your "390px" run is really 500px.
+8. **A parse error in a classic script is silent.** The only symptom is that the script's
+   globals are missing. Load the file on its own with an `error` listener to find it.
+
+## Known-benign noise
+
+`sw.js` 404 on every boot (`js/03` registers a service worker that does not exist; the
+registration is `.catch(()=>{})`). `POST /rest/v1/auth_audit` answers 401 on every sign-in
+because `04-anon-uat.sql` covers the eleven data tables and not that one; the local audit
+ring buffer is unaffected.

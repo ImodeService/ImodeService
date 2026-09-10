@@ -5,7 +5,7 @@
 You are the coding agent for an existing project:
 
 I-MODE Plus Service & Maintenance
-Current release: V6.8 Service focus
+Current release: Beta 1.0 Service focus full system  (see ## Version for the history)
 
 Your job is to safely maintain and incrementally improve the existing system.
 
@@ -109,15 +109,30 @@ you which one wins.
 
 Keep:
 
-V6.8
-Service focus
+**Beta 1.0**
+**Service focus full system**
 
-This is what `index.html` actually ships: `<title>… · V6.8 Service focus</title>`, the
-topbar `Service focus · V6.8`, and the sidebar block `Version 6.8 / Service focus`.
-An earlier note in this file said "Service UAT"; that was wrong and has been corrected.
+Seven places carry it, and all seven must move together:
 
-Do not bump or rename the release, and do not revert it to "V6.8 UAT", unless explicitly
-requested.
+| Where | String |
+|---|---|
+| `index.html` `<title>` | `I-MODE Plus Service & Maintenance · Beta 1.0 Service focus full system` |
+| `index.html` sidebar block | `Version Beta 1.0` / `Service focus full system` |
+| `index.html` topbar brand | `Service focus full system · Beta 1.0` |
+| `js/06-v68ModulesScript.js` (×2) | rewrites the sidebar block on **every render** |
+| `service-case-detail.html` `<title>` and brand | its own copy — the page does not share `index.html`'s |
+
+**Editing the markup alone silently reverts**, because `js/06` rewrites the sidebar version
+block on every render. That trap has been hit twice.
+
+History, because older entries in this file say otherwise: `V6.8 Service focus` until
+2026-09-09 (part 16) → `Beta Service focus` → `Beta 1.0 Service focus full system` on
+2026-09-10, each at the owner's request. An entry before all of them said "Service UAT",
+which was wrong. **This section is the current one.** The change logs below record what
+happened on a given day; they are not standing instructions.
+
+Do not bump or rename the release — and in particular do not "restore" an older string —
+unless explicitly requested.
 
 ---
 
@@ -604,8 +619,22 @@ Added by the login system (2026-09-07), same rules apply:
 `imode_v69_local_pw`
 `imode_v69_sb_auth`
 
+Added later, same rules apply:
+
+`imode_v69_cloud_optout`   set by ตั้งค่าระบบ → ใช้ข้อมูลในเครื่อง; while it is set, js/23
+                           will not auto-connect this device to Supabase
+`imode_v69_home_usage`     per-account tally that orders the Home quick board
+`imode_v70_trash_blob`     recycle-bin payloads too large to travel inside `settings`
+
 Clearing `imode_v69_session` signs the user out; clearing `imode_v69_local_pw` restores
-the built-in UAT passwords. Neither destroys business data.
+the built-in UAT passwords; clearing `imode_v70_trash_blob` makes the large entries in the
+bin unrecoverable but leaves their rows visible. None of them destroys business data.
+
+**Two things now live inside `settings` rather than in a key of their own**, because they
+have to reach every device: the login accounts (`settings.uatAccounts`,
+`settings.uatAccountEdits`) and the recycle bin (`settings.trash`). `mergeSettings()`
+spreads the saved object wholesale, so unknown top-level keys survive it — checked, because
+a whitelist there is exactly what silently ate four permissions in an earlier session.
 
 Never run:
 
@@ -641,6 +670,20 @@ machine_warranties
 machine_documents
 line_customer_requests
 service_reports
+
+Added 2026-09-10 by `supabase/05-v70-operational-tables.sql`, already run:
+
+qc_records
+petty_cash
+spare_parts
+purchase_orders
+
+Those four are **`{id, data jsonb, updated_at}` with the whole record in `data`**, unlike
+every table above them. That is deliberate — see part 17 §3 — so do not "normalise" them
+into columns without reading it first.
+
+`notifications` is downloaded but never uploaded; there is no `cloudUpsertNotification`.
+Addressed notices are derived from the case instead.
 
 ---
 
@@ -2881,3 +2924,246 @@ nothing that reopens it; and three case-detail tab renders still costing one Bac
    reassigned while already in progress is not re-announced.
 5. Unchanged from part 11: the customer Home page still shows any machine to anyone who has
    its serial or QR.
+
+---
+
+## Session Change Log — 2026-09-10 (part 17): searchable pickers, crop, teams, accounts, bin, tablet
+
+Nine commits, `adf174d` … `466f906`. Nine new JS files, one new stylesheet, one new SQL
+file. No storage key renamed, no existing function body in `js/03` rewritten, version
+untouched.
+
+| File | What |
+|---|---|
+| `js/33-v70AccountAdminScript.js` | account administration moves to Settings; the login popup becomes a switcher |
+| `js/34-v70CustomerQuoteScript.js` | the customer Home page shows its own quotations |
+| `js/35-v70ComboBoxScript.js` | `window.imodeCombo()` — type-to-filter over any `<select>` |
+| `js/36-v70NavGroupsScript.js` | the sidebar sorted into six named groups |
+| `js/37-v70ImageCropScript.js` | pick a photo, then crop it by hand |
+| `js/38-v70TeamAssignScript.js` | a job can belong to several technicians, across teams |
+| `js/39-v70AccountManageScript.js` | add / rename / re-password / delete any account |
+| `js/40-v70TrashScript.js` | ถังขยะ, categories and a 30-day countdown |
+| `js/41-v70OpsSyncScript.js` | QC, petty cash, spare parts and purchase orders reach every device |
+| `css/23-v70-responsive.css` | tablet and phone corrections — **must stay the last stylesheet, like css/21** |
+| `supabase/05-v70-operational-tables.sql` | the four missing tables — **run and confirmed** |
+
+### 1. `window.imodeCombo()` — the pattern to reuse
+
+Upgrades any `<select>` in place: a text box that filters, arrow keys, Enter to choose,
+optional `allowCreate`. **The original `<select>` is kept, hidden, and stays the single
+source of truth** — every save path here reads these controls by id as bare globals
+(`saveMachine()` does `customerId: maCustomer.value`), so replacing the element would have
+meant editing those functions. `pick()` sets `select.value` and dispatches a real `change`
+event, so inline `onchange` handlers still fire and nothing downstream knows this exists.
+
+Applied to `#maCustomer` (with create-a-customer), the Settings user picker,
+`#onsiteMachineSelect`, `#qCase` and `#qCustomer`.
+
+Three things that will break it:
+
+- `required` has to move from the hidden `<select>` to the visible input. A `display:none`
+  control that is `required` and empty makes Chrome refuse the submit **silently**.
+- Where a render function rebuilds `innerHTML` on every pass — `renderOnsitePricing()`,
+  `renderQuotations()` — apply the combo once (its own `dataset.comboOn` guard) and only
+  `refresh()` afterwards. The list is built at open time from the live options.
+- An empty first option is dropped from the list unless it carries `data-keep="1"`.
+  "— เลือกเครื่อง / ไม่ระบุ —", "ไม่อ้างอิงเคส" and "เลือกลูกค้า" all need it.
+
+### 2. Multi-technician assignment — and the wire format it needed
+
+`c.assignee` **stays one id, the lead**. Fifteen places in `js/03` read it (dashboard
+workload, calendar rows, service report header, the report popups) and none were touched.
+`c.assignees` is the full list, lead first.
+
+`service_cases` has no `assignees` column and `cloudUpsertCase()` sends an explicit
+whitelist, so a new field would be dropped silently. **The list therefore travels inside
+the `assignee` column as `"T001,T-LEAD-RD"`, lead first, and is split apart again on the way
+in.** A single assignee is still written as plain `"T001"`, so nothing about existing rows
+changed. Only two wrappers in `js/38` know this — `cloudUpsertCase` and `fromCaseDb`.
+
+Cost, stated plainly: SQL read directly shows a comma list in that column. When a real
+`assignees jsonb` column exists, delete those two wrappers; everything else already speaks
+arrays.
+
+Assigning a whole team is a **snapshot** taken at that moment, not a live reference.
+`myCases()` in `js/16` and `autoPick()` in `js/32` match any assignee, not only the lead.
+
+### 3. The four operational tables use jsonb, on purpose
+
+`qc_records`, `petty_cash`, `spare_parts`, `purchase_orders` are `{id, data jsonb,
+updated_at}` with the whole record in `data`. Every other table maps field-to-column with a
+whitelist, which has twice meant a field added in JavaScript was dropped silently and nobody
+noticed until a second device was involved. Nothing joins these four and nothing reports on
+them in SQL. `system_settings` already worked this way.
+
+Push is a **diff after `saveLocal()`**, not a hook on each save button: receiving a purchase
+order also increments the part's stock, and the backup restore and clear-test-data buttons
+rewrite all three arrays at once. Pull **merges by id with the newer `updatedAt` winning** —
+replacing wholesale, the way `syncCloud()` does, would discard a QC written seconds ago and
+not yet pushed.
+
+`pettyCashEntries` / `sparePartsStock` / `purchaseOrders` are `let` inside the `js/04`
+IIFE — **not globals of any kind**. `js/04` gained `window.imodeV67Data` (get/set) for this.
+`qcRecords` is a top-level `let` in `js/03`, so it can be read *and assigned* by bare
+identifier from another classic script.
+
+If the SQL is ever missing, `js/41` recognises PGRST205 / 42P01, warns once and stops. The
+application is unaffected — asserted before the tables existed.
+
+### 4. Accounts are data now
+
+`settings.uatAccounts` (created accounts) and `settings.uatAccountEdits` (changes to the
+seven built-ins, keyed by original username, `{deleted:true}` for a tombstone). Inside
+`settings`, so they sync — an account created on the office PC has to work on the
+technician's phone. `mergeSettings()` spreads `raw` wholesale, so unknown top-level keys
+survive it; checked, because a whitelist there is exactly what ate four permissions before.
+
+**`js/09`'s `findAccount()`, `verify()` and `login()` all call its own closure
+`allAccounts()`, not `window.uatAuth.allAccounts`.** Replacing only the window view leaves a
+created account visible in every list and still unable to sign in — the same leak that let a
+deleted customer account keep signing in. `js/39` therefore reimplements `verify` and
+`findAccount` on `window.uatAuth`, and re-points `window.uatSubmitLogin` at
+`window.imodeSignIn`; it called the closure directly and would have bypassed everything.
+
+Refused, each with a reason on screen: deleting the account you are signed in as, deleting
+the last account that can reach the screen, renaming the account you are signed in as
+(`currentUser.id` is `UAT-<username>`).
+
+### 5. THE BUG THAT MATTERED MOST: `window.<lexical global>` is always `undefined`
+
+Top-level `let` / `const` in a classic script are **lexical globals and never properties of
+`window`**. This file has recorded that for `currentUser` since part 5. Three more places
+were doing it anyway, and each was silently dead:
+
+| Where | Effect |
+|---|---|
+| `auth-integration.js` `checkSession()` — `window.currentUser` | `hadUser` permanently false, so `endSession('expired')` never fired. **The absolute expiry and the idle timeout were computed correctly and then never acted on. Sessions never ended.** |
+| `auth-integration.js` legacy-migration branch | dead code |
+| `js/11` `cfg()` — `window.settings` | always `{}`, so `lineOaUrl()` always returned `''` and `imodeLineAuth.configured()` was **false even with a LIFF ID set** — the LINE scaffold would have stayed inert the day IT supplied one |
+| `js/11` `customerForLineUser()` — `window.customers` | always `null`; a LINE profile could never match a customer |
+
+Grep for `window.` followed by any of `settings cases machines customers technicians
+currentUser notifications quotations warranties machineDocuments serviceReports supa
+cloudSettings qcRecords lineRequests` before believing any of them works. Clean as of this
+session.
+
+### 6. The `[hidden]` trap is closed for the whole project
+
+An author `display` rule beats the UA `[hidden]{display:none}`, so `el.hidden=true` silently
+does nothing and a button appears dead. Patched one element at a time three times already
+(the โมดูลทั้งหมด grid, the Field Service queue panel, the assign panel). Probing everything
+the scripts toggle found two more waiting to do it — `#fieldQueue` and `.trash-list` — so
+`css/23` ends with `[hidden]{display:none!important}`. **Do not add a fourth one-off.**
+
+### 7. `--window-size` does not give the viewport you asked for
+
+Chrome on Windows clamps a window to about 500px, so `--window-size=390,844` produced a
+**500px** viewport. Every "tested at 390px" claim before this session was really 500px, and
+the app had never been checked at true phone width. Use
+`Emulation.setDeviceMetricsOverride` instead. Half the responsive findings below only exist
+under 500px.
+
+### 8. Tablet and phone
+
+Swept every module at 1440 / 1280 / 1024 / 820 / 768 / 430 / 390 / 360, measuring per
+element whether content is wider than its box with nothing scrolling above it.
+**Clipped elements 41 → 4**, and all four remaining are verified false positives: the
+calendar sits inside a deliberate horizontal scroller, and the case-detail bell badge is
+absolutely positioned to overhang its chip. No page scrolls sideways at any width, before
+or after.
+
+- **The measurement that matters is the content column, not the viewport.** The sidebar is
+  208–286px, so at an iPad landscape 1024 the panels are 671px. `.qc-toolbar` (shared with
+  petty cash) and the spare-parts toolbar are 3-column grids whose responsive rule fires at
+  `max-width:1000px` — 24px too late, i.e. exactly an iPad in landscape.
+- The spare-parts grid was an **inline style in `index.html`**, which beats every
+  stylesheet, so that page had no responsive behaviour at all. It is `.toolbar-3col` now.
+- `.machine-head-copy` (the 10/25/50/100 pager) is `flex:1 1 0%` beside buttons that are
+  `flex:1 1 140px`, so below 900px it collapsed to as little as 27px around 269px of
+  content, on six pages. It gets its own line.
+- `.setting-icon` held "S/M/L" (55px) and "LINE" (47px) in a 42px box — the **card's grid
+  track** was the real constraint, so both had to change.
+- Tap targets under 28px raised to 32 on the language toggle, the staff-login back link and
+  two links on the case detail page.
+
+### 9. `settings.authConfig` — three values set live, not in code
+
+- **`provider:'local'`.** On a cloud-connected device Supabase Auth becomes the only door,
+  and only the three accounts from `03-users.sql` exist there, so **`lead_technical`,
+  `lead_rd`, `tech_test1` and `R&D_test1` could not sign in on the live site at all** while
+  the other three could. The `allowLocalFallback` switch that `auth-integration.js`
+  documents **was never implemented — it exists only in that comment.** `provider` is
+  implemented, so it is pinned. Undo by creating the four missing users in Supabase →
+  Authentication → Users and clearing this.
+- **`sessionHours:24` and `idleMinutes:1440`**, for a fair stand left running all day.
+  Raising `idleMinutes` alone would have done nothing: the absolute lifetime kills the
+  session first. Offline grace is still 7 days on top of that.
+
+All three are pushed to `system_settings`, so every device picks them up on sync.
+
+### 10. Recycle bin
+
+`settings.trash` + `settings.trashRetentionDays` (30). Categories: case, document, account,
+employee. Gated on **`settings.manage`, deliberately an existing key** — a script that
+pushes a new key into `PERMISSION_CATALOG` must load **before `js/20`**, which repairs roles
+against the catalog as it stands at that moment; `js/40` loads after it, so a new key would
+be stripped from every role on every reload. `PAGE_PERMISSION` maps a page to an existing
+key and is safe to extend.
+
+A payload over 120 KB stays in a device-local overflow store (`imode_v70_trash_blob`) and
+only its description travels. A deleted machine document can carry megabytes of base64, and
+a few of those would bloat the `system_settings` row until settings sync broke for
+everybody — a worse failure than losing an undo. That row says so on screen.
+
+**Delete-forever on a built-in account drops the bin entry and KEEPS the tombstone.**
+Clearing the tombstone is what restore does, so purging that way would resurrect the
+account.
+
+Cases had no delete anywhere in the application; one was added to the case edit form, gated
+on `case.edit`. `deleteMachineDocument()` and `deleteRelatedEmployee()` **removed the row
+locally and never touched Supabase**, so a deleted document came back at the next sync.
+Both now delete the cloud row too.
+
+### 11. A hang with no error
+
+`js/36`'s `layout()` moves nav items with `appendChild`, which is reported as an
+**addedNode**, so its own childList observer read that as "a nav item arrived" and called
+`layout()` again — the two spun forever and the tab locked up silently, with nothing in the
+console. It never fired until `js/40` added a nav item after `start()`. The observer is
+disconnected around `layout()`: a MutationObserver only queues records while it is
+observing, so our own moves are never recorded rather than recorded and filtered.
+
+### Tests
+
+330+ assertions across 20 runs at 1440×1000 and 390×844, plus the live site. New suites:
+quotation combos (18), sidebar groups (13), cropping (20, plus 9 driving the drag with real
+CDP mouse events), multi-assign (23, plus 13 cross-device against the live database),
+account management (38 + 17), recycle bin (38), ops sync (15 + 11 live), the responsive
+sweep and a code-health probe. Known-benign failures, unchanged: the `sw.js` 404, and
+`my-work` bouncing for an admin who holds no `mywork.view`.
+
+Two testing notes worth keeping:
+
+- Drive animation and press-feel with **real CDP mouse events**, not `element.click()`. The
+  crop overlay painted above `#modal` but sat at z-index 4000 against its 10000, so every
+  pointer event landed on the form underneath and the frame would not drag. A screenshot
+  could not have shown it.
+- `auth_audit` answers **401** on every sign-in, because `04-anon-uat.sql` covers the eleven
+  data tables and not that one. Console noise like the `sw.js` 404; the local audit ring
+  buffer is unaffected.
+
+### Open
+
+1. **`04-anon-uat.sql` and `05-v70-operational-tables.sql` mean anyone on the internet can
+   read and write this database.** Unchanged, deliberate, UAT only. `petty_cash` is the
+   first of the new tables to carry financial figures.
+2. The eleven customer records in the live database are **real companies** — pilot customers
+   of I-MODE Plus itself, which the owner has confirmed is intended for the fair.
+3. `notifications` is still downloaded but never uploaded; addressed notices are derived
+   from the case instead (part 16 §5).
+4. `renderFieldService()` in `js/03` still filters its queue by the lead only. It matters
+   only when an admin previews a technician's queue from ทีมช่าง; the technician's own path
+   goes through `js/32`, which was fixed.
+5. A team lead still assigns only within their own team. Only an admin can build a
+   cross-team crew.
+6. `settings.portalNews` and `settings.slaResponse` still have no editor in the UI.

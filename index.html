@@ -591,6 +591,7 @@
       <div class="settings-section-head settings-section-accent"><div><b>การจัดการระบบและขั้นตอนงาน</b><small>ผู้ใช้งาน สิทธิ์ ขั้นตอนงาน ข้อมูลหลัก ภาษา และข้อมูลบริษัท</small></div></div>
       <div class="settings-card-grid">
         <button class="setting-action-card" onclick="openRolesSettingModal()"><span class="setting-icon">👥</span><div><b>ผู้ใช้งานและสิทธิ์</b><small id="setRolesSummary">กำหนดบทบาทและสิทธิ์การใช้งาน</small></div><strong>›</strong></button>
+        <button class="setting-action-card" data-perm="users.manage" onclick="openAccountAdminModal()"><span class="setting-icon">🔐</span><div><b>การจัดการบัญชีผู้ใช้</b><small id="setAccountSummary">บัญชีเข้าสู่ระบบ รายชื่อผู้ใช้งาน และการเพิ่มผู้ใช้</small></div><strong>›</strong></button>
         <button class="setting-action-card v68-employee-card" onclick="openEmployeeSettingModal()"><span class="setting-icon">🪪</span><div><b>พนักงานที่เกี่ยวข้อง</b><small id="setEmployeeSummary">รายชื่อผู้ประสานงานและพนักงาน Service</small></div><strong>›</strong></button>
         <button class="setting-action-card" onclick="openSlaSettingModal()"><span class="setting-icon">⏱</span><div><b>SLA และขั้นตอนงาน</b><small id="setSlaSummary">เวลาตอบรับ แก้ไข และยกระดับงาน</small></div><strong>›</strong></button>
         <button class="setting-action-card" onclick="openMasterHubModal()"><span class="setting-icon">🧩</span><div><b>ข้อมูลหลักของระบบ</b><small id="setMasterSummary">ประเภทงาน สถานะ และความสำคัญ</small></div><strong>›</strong></button>
@@ -765,6 +766,19 @@
      Loads last on purpose: its openModal / goPage / renderFieldService wrappers have to
      sit outside the ones in js/26 and js/29. -->
 <script src="./js/32-v70FieldWorkspaceScript.js"></script>
+
+<!-- Beta: account administration moves to Settings and the login popup becomes a
+     switcher. Must load after js/09 and js/17 so the chain it wraps is complete. -->
+<script src="./js/33-v70AccountAdminScript.js"></script>
+
+<!-- Beta: the customer Home page gains a quotation module. Parses before
+     DOMContentLoaded so js/08 can wrap showPortalQuotations() like the other
+     portal detail views. -->
+<script src="./js/34-v70CustomerQuoteScript.js"></script>
+
+<!-- Beta: type-to-filter dropdowns. Loads last so its openMachineModal wrapper is the
+     outermost one and the form is already in the DOM when it upgrades the select. -->
+<script src="./js/35-v70ComboBoxScript.js"></script>
 
 </body>
 </html>

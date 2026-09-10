@@ -180,23 +180,83 @@
   return {name:name,count:on};
  }
 
- function buildRoleTabs(host,roleList){
+ /* ---------- role groups ----------
+    Eight roles in one flat strip read as eight near-identical tiles — the five technician
+    variants especially, which differ by one word and a permission count. They are sorted
+    into three groups and only the selected group's roles are shown, so the strip is three
+    tiles wide instead of eight and the variants sit together where they can be compared.
+
+    Classification is by name, not by index, so a role an admin adds later lands somewhere
+    sensible on its own. Order matters: "Technical Lead" and "R&D Lead" both contain a
+    technician word as well as a lead word, so lead is tested first. Anything unrecognised
+    falls into the first group, which is why that one is the catch-all. */
+ var ROLE_GROUPS=[
+  {id:'office',th:'ผู้ดูแลและสำนักงาน',en:'Admin & office'},
+  {id:'tech',  th:'ช่างเทคนิค',        en:'Technicians'},
+  {id:'lead',  th:'หัวหน้าทีมช่าง',     en:'Team leads'}
+ ];
+ function roleGroupId(name){
+  var n=String(name||'').toLowerCase();
+  if(/lead|หัวหน้า/.test(n))return 'lead';
+  if(/technician|ช่าง/.test(n))return 'tech';
+  return 'office';
+ }
+
+ function buildRoleTabs(host,roleList,preferred){
   var cards=[].slice.call(roleList.querySelectorAll('.role-card:not(.user-permission-card)'));
+  if(!cards.length){host.innerHTML='';return cards}
+  /* The visible card is the state. Deriving it here rather than keeping a variable is what
+     lets this function be re-run on every tick and every rename without losing the admin's
+     place. `preferred` is the one case that cannot be derived — see the observer below. */
   var active=Math.max(0,cards.indexOf(cards.filter(function(c){return c.style.display!=='none'})[0]));
+  if(typeof preferred==='number'&&preferred>=0&&preferred<cards.length)active=preferred;
+  var info=cards.map(function(card,i){return roleLabel(card,i)});
+  var groupOf=info.map(function(x){return roleGroupId(x.name)});
+  var groups=ROLE_GROUPS.filter(function(g){return groupOf.indexOf(g.id)>=0});
+  var activeGroup=groupOf[active];
+
   host.innerHTML='';
-  cards.forEach(function(card,i){
-   var info=roleLabel(card,i);
+  var groupRow=document.createElement('div');
+  groupRow.className='permx-groups';
+  var tabRow=document.createElement('div');
+  tabRow.className='permx-tabrow';
+  host.appendChild(groupRow);
+  host.appendChild(tabRow);
+
+  function paintTabs(){
+   tabRow.innerHTML='';
+   cards.forEach(function(card,i){
+    if(groupOf[i]!==activeGroup)return;
+    var b=document.createElement('button');
+    b.type='button';
+    b.className='permx-tab';
+    b.setAttribute('aria-pressed',String(i===active));
+    b.innerHTML='<b>'+esc2(info[i].name)+'</b><small>'+info[i].count+' '+esc2(tl('สิทธิ์','perms'))+'</small>';
+    b.onclick=function(){active=i;show(cards,i);paintTabs()};
+    tabRow.appendChild(b);
+   });
+  }
+  groups.forEach(function(g){
+   var n=groupOf.filter(function(x){return x===g.id}).length;
    var b=document.createElement('button');
    b.type='button';
-   b.className='permx-tab';
-   b.setAttribute('aria-pressed',String(i===active));
-   b.innerHTML='<b>'+esc2(info.name)+'</b><small>'+info.count+' '+esc2(tl('สิทธิ์','perms'))+'</small>';
+   b.className='permx-group';
+   b.setAttribute('aria-pressed',String(g.id===activeGroup));
+   b.innerHTML='<b>'+esc2(tl(g.th,g.en))+'</b><small>'+n+' '+esc2(tl('บทบาท','roles'))+'</small>';
    b.onclick=function(){
-    show(cards,i);
-    [].slice.call(host.children).forEach(function(x,j){x.setAttribute('aria-pressed',String(j===i))});
+    activeGroup=g.id;
+    /* Selecting a group selects its first role, so a card is always visible — an empty
+       body would read as a broken screen. */
+    var first=groupOf.indexOf(g.id);
+    if(first>=0){active=first;show(cards,first)}
+    [].slice.call(groupRow.children).forEach(function(x,j){
+     x.setAttribute('aria-pressed',String(groups[j].id===activeGroup));
+    });
+    paintTabs();
    };
-   host.appendChild(b);
+   groupRow.appendChild(b);
   });
+  paintTabs();
   show(cards,active);
   return cards;
  }
@@ -219,12 +279,20 @@
    var o=document.createElement('option');
    o.value=String(i);
    o.textContent=userOptionLabel(card);
+   /* The card's key is 'UAT-<username>' for a real login account, so this is what makes
+      typing "technician_test1" find the row labelled "สมชาย ใจดี". */
+   o.dataset.search=card.dataset.userKey||'';
    sel.appendChild(o);
   });
   sel.onchange=function(){show(cards,Number(sel.value)||0)};
   host.appendChild(sel);
   show(cards,0);
   sel.value='0';
+  /* js/35 turns this into a type-to-filter combobox. It keeps the <select> and fires a
+     real change event, so the onchange above is still what switches the card. */
+  try{if(typeof window.imodeCombo==='function')window.imodeCombo(sel,{
+   placeholder:tl('พิมพ์ชื่อผู้ใช้งานเพื่อค้นหา','Type a name to search')
+  })}catch(e){}
   list.addEventListener('change',function(e){
    var card=e.target&&e.target.closest&&e.target.closest('.user-permission-card');
    if(!card)return;
@@ -263,10 +331,18 @@
    if(e.target&&e.target.matches('[data-perm]'))buildRoleTabs(tabs,roleList);
   });
   /* Add Role inserts a card and the inline Delete button removes one; watching the list
-     covers both without wrapping either. */
+     covers both without wrapping either.
+
+     A new card must also be *selected*. Without grouping it merely appeared at the end of
+     one flat strip, but a new role is named by the admin afterwards, so roleGroupId() puts
+     it in the catch-all group — and an admin who was looking at the technician group would
+     add a role and see nothing happen. Selecting it moves the group with it. */
   try{
-   new MutationObserver(function(){buildRoleTabs(tabs,roleList)})
-    .observe(roleList,{childList:true});
+   new MutationObserver(function(recs){
+    var added=recs.some(function(r){return r.addedNodes&&r.addedNodes.length});
+    var cards=roleList.querySelectorAll('.role-card:not(.user-permission-card)');
+    buildRoleTabs(tabs,roleList,added?cards.length-1:undefined);
+   }).observe(roleList,{childList:true});
   }catch(e){}
 
   /* individual permissions */
@@ -333,7 +409,16 @@
  st.id='v69PermissionEditorStyle';
  st.textContent=''
  +'.permx-hint{margin:10px 0 8px;padding:9px 12px;border-radius:12px;background:#f2f7ff;border:1px solid #dae7fa;color:#3d557f;font-size:12px;line-height:1.5}'
- +'.permx-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}'
+ +'.permx-tabs{margin:0 0 12px}'
+ +'.permx-groups{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}'
+ +'.permx-tabrow{display:flex;flex-wrap:wrap;gap:8px;padding:10px;border:1px solid #e2ecfb;border-radius:14px;background:#f7fbff}'
+ +'.permx-group{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:140px;padding:9px 14px;border:1px solid #d7e3f5;border-radius:999px;background:#fff;cursor:pointer;text-align:left;transition:border-color .14s ease,background .14s ease}'
+ +'.permx-group b{font-size:12.5px;color:#3d557f;font-weight:700}'
+ +'.permx-group small{font-size:10.5px;color:#8496b5}'
+ +'.permx-group:hover{border-color:#a9cdf7;background:#f3f8ff}'
+ +'.permx-group[aria-pressed="true"]{border-color:#0b63e5;background:#0b63e5}'
+ +'.permx-group[aria-pressed="true"] b,.permx-group[aria-pressed="true"] small{color:#fff}'
+ +'.permx-group:focus-visible,.permx-tab:focus-visible{outline:2px solid #0b63e5;outline-offset:2px}'
  +'.permx-tab{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:132px;padding:9px 13px;border:1px solid #d7e3f5;border-radius:12px;background:linear-gradient(180deg,#fff,#f3f7ff);cursor:pointer;text-align:left;box-shadow:0 3px 0 #e4ecf9;transition:transform .14s ease,box-shadow .14s ease,border-color .14s ease}'
  +'.permx-tab b{font-size:13px;color:#0c225e;font-weight:700}'
  +'.permx-tab small{font-size:10.5px;color:#6f81a3}'
@@ -346,6 +431,6 @@
  +'.permx-userpick{width:100%;max-width:420px;padding:10px 12px;border:1px solid #d3e0f4;border-radius:12px;font-size:13px;background:#fff}'
  +'.permx-savebar{position:sticky;bottom:0;z-index:5;margin:14px -4px -4px;padding:12px 4px;background:linear-gradient(180deg,rgba(255,255,255,.72),#fff 42%);border-top:1px solid #e2ecfb}'
  +'.permx-savebar .button-row{margin:0}'
- +'@media (max-width:640px){.permx-tab{min-width:calc(50% - 4px);flex:1 1 calc(50% - 4px)}.permx-userpick{max-width:100%}}';
+ +'@media (max-width:640px){.permx-tab{min-width:calc(50% - 4px);flex:1 1 calc(50% - 4px)}.permx-group{min-width:calc(50% - 4px);flex:1 1 calc(50% - 4px);border-radius:14px}.permx-userpick{max-width:100%}}';
  document.head.appendChild(st);
 })();

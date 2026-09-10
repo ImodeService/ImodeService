@@ -193,6 +193,10 @@
     wrapDetail('openPortalWarrantyRequest','ซื้อ / ต่อ Warranty','Purchase / Extend Warranty');
     wrapDetail('showPortalHistory','ประวัติ Service','Service History');
     wrapDetail('showPortalDocuments','คู่มือเครื่อง','Machine Documents');
+    /* js/34 defines this at parse time, so it is already on window when install()
+       runs at DOMContentLoaded and it gets the same back arrow, machine strip and
+       detail-mode class as every other portal detail view. */
+    wrapDetail('showPortalQuotations','ใบเสนอราคาของฉัน','My Quotations');
 
     state.originals.contactServiceFromPortal=window.contactServiceFromPortal;
     window.contactServiceFromPortal=renderContactPage;

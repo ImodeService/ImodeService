@@ -250,7 +250,26 @@
 .chome-grid > button:nth-child(5) i::before{background:#7a5af0}
 .chome-grid > button:nth-child(6) i::before{background:#0f9d6b}
 .chome-grid > button:nth-child(7) i::before{background:#07b154}
-.chome-grid > button:nth-child(8) i::before{background:#f2911c}
+.chome-grid > button:nth-child(8) i::before{background:#4b5fd6}
+.chome-grid > button:nth-child(9) i::before{background:#f2911c}
+/* THE CHEVRON GUTTER.
+
+   css/20 line 334 is
+
+     body.customer-portal-mode .portal-action-grid > button{...;padding:12px!important}
+
+   which is (0,2,2) with !important and therefore beats the (0,1,1) padding above, so in
+   portal mode on a phone the right gutter that keeps the title clear of the ::after
+   chevron disappeared and long titles ran underneath it — measured at 390px:
+   "ประวัติ Service" 21px under, "ติดต่อ Service" 16px. Pre-existing; it showed on the
+   reported screenshot too.
+
+   Clearing it with a right gutter on the whole card works, but it narrows the text column
+   on every row and the small-caps English label starts ellipsising ("SERVICE C..."). The
+   chevron is only 34px tall — title height, not label height — so the clearance is put on
+   the title alone and the label keeps the full column width. */
+body.customer-portal-mode .chome-grid > button b{padding-right:26px}
+
 /* The chevron the design puts in the top right corner. */
 .chome-grid > button::after{
   content:"›";
@@ -402,6 +421,7 @@
     min-height:112px !important;
     padding:13px 38px 12px 13px !important;
   }
+
   .chome-grid > button > span:first-child{width:44px !important;height:44px !important;font-size:22px}
   .chome-headline em{display:none}
 }

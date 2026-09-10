@@ -81,17 +81,23 @@
  function inLineInApp(){
   try{return /\bLine\//i.test(navigator.userAgent||'')&&!inLineClient()}catch(e){return false}
  }
- function externalBrowserUrl(){
+ function externalBrowserUrl(opts){
+  var wantScan=!!(opts&&opts.scan===true);
   try{
    var u=new URL(location.href);
    u.searchParams.set('openExternalBrowser','1');
+   if(wantScan)u.searchParams.set('scan','1');
    return u.href;
   }catch(e){
-   return location.href+(location.href.indexOf('?')>=0?'&':'?')+'openExternalBrowser=1';
+   return location.href+(location.href.indexOf('?')>=0?'&':'?')
+    +'openExternalBrowser=1'+(wantScan?'&scan=1':'');
   }
  }
- window.imodeOpenInExternalBrowser=function(){
-  var url=externalBrowserUrl();
+ /* Called both from a click handler and from scanInExternalBrowser(). A click passes the
+    Event as the first argument, which has no `scan` property, so the strict ===true test
+    is what keeps a plain "open in a browser" tap from silently arming the camera. */
+ window.imodeOpenInExternalBrowser=function(opts){
+  var url=externalBrowserUrl(opts);
   try{
    if(typeof liff!=='undefined'&&liff&&typeof liff.openWindow==='function'&&inLineClient()){
     liff.openWindow({url:url,external:true});
@@ -100,6 +106,29 @@
   }catch(e){}
   location.href=url;
  };
+ /* THE CAMERA IN ONE TAP FROM THE LINE RICH MENU.
+
+    A rich-menu link that is a plain https URL lands in LINE's in-app browser, where
+    getUserMedia is refused outright with NotAllowedError and no prompt is ever shown.
+    The scan button therefore does not attempt a camera it cannot have: it hands the page
+    to Chrome / Safari with scan=1, and the entry page there opens the camera by itself.
+    One tap instead of tap -> error -> tap.
+
+    Two ways this stops being needed, both of them configuration rather than code:
+      - the rich menu URL itself carries openExternalBrowser=1, so LINE never opens the
+        in-app browser in the first place; or
+      - a LIFF ID is configured, and then inLineClient() is true and startScan() uses
+        liff.scanCodeV2() — LINE's own scanner, in place, no browser switch. */
+ function scanInExternalBrowser(){
+  window.imodeOpenInExternalBrowser({scan:true});
+ }
+ var autoScanRan=false;
+ function wantsAutoScan(){
+  try{
+   if(new URLSearchParams(location.search).get('scan')==='1')return true;
+   return String(location.hash||'').indexOf('scan=1')>=0;
+  }catch(e){return false}
+ }
  function canScan(){
   /* Inside LINE the LIFF scanner is used. In a browser a camera scan needs a secure
      context — https, localhost, or a file:// page, all three of which Chrome treats as
@@ -140,6 +169,12 @@
  function renderEntry(){
   var host=document.getElementById('page-customer-entry');
   if(!host)return;
+  /* The render below replaces the whole card, video element included. Without this the
+     MediaStream survives its own <video> — the camera light stays on and the decode loop
+     keeps drawing a detached element. It was reachable before (goPage('customer-entry')
+     while scanning) and is more so now that arriving with scan=1 starts a camera at
+     render time. stopScan() is a no-op when nothing is running. */
+  stopScan();
   var brand=customerBrand();
   host.innerHTML=brand+
    '<div class="rhome-body rhome-login-body"><div class="rhome-login-card centry-card">'
@@ -147,10 +182,12 @@
    +'<p>'+esc2(tl('ระบุเครื่องของคุณเพื่อเข้าใช้บริการ','Tell us which machine you have'))+'</p>'
    +(canScan()?'<button type="button" class="centry-scan" id="centryScan">📷 '+esc2(tl('สแกน QR ที่ตัวเครื่อง','Scan the QR on the machine'))+'</button>'
               :'<div class="centry-scan-off">'+esc2(noScanReason())+'</div>')
-   /* Inside LINE the camera is refused before any prompt appears, so the way out is
-      offered up front instead of only after the failure. */
-   +(inLineInApp()?'<button type="button" class="centry-external" id="centryExternal">🌐 '
-     +esc2(tl('เปิดกล้องไม่ได้ใน LINE — เปิดด้วยเบราว์เซอร์','Camera blocked in LINE — open in a browser'))+'</button>':'')
+   /* Inside LINE the scan button opens the camera through the phone's browser, so the
+      separate "open in a browser" button that used to sit here is what that tap already
+      does. A line of text in its place, so the browser switch is not a surprise. */
+   +(inLineInApp()?'<div class="centry-scan-note">'
+     +esc2(tl('การสแกนจะเปิดกล้องผ่านเบราว์เซอร์ของเครื่อง (LINE ไม่อนุญาตให้ใช้กล้องในแอป)',
+              'Scanning opens the camera in your phone browser — LINE does not allow it in the app'))+'</div>':'')
    +'<div class="rhome-login-or">'+esc2(tl('หรือ','or'))+'</div>'
    +'<form id="centryForm" autocomplete="off">'
    +'<div class="rhome-field"><span aria-hidden="true">🔎</span><input id="centrySerial" placeholder="'+esc2(tl('หมายเลขเครื่อง (S/N)','Machine serial number'))+'" aria-label="'+esc2(tl('หมายเลขเครื่อง','Machine serial number'))+'"></div>'
@@ -164,11 +201,19 @@
   var form=document.getElementById('centryForm');
   if(form)form.onsubmit=submitSerial;
   var scan=document.getElementById('centryScan');
-  if(scan)scan.onclick=startScan;
+  if(scan)scan.onclick=inLineInApp()?scanInExternalBrowser:startScan;
   var stop=document.getElementById('centryStop');
   if(stop)stop.onclick=stopScan;
   var ext=document.getElementById('centryExternal');
-  if(ext)ext.onclick=window.imodeOpenInExternalBrowser;
+  if(ext)ext.onclick=function(){window.imodeOpenInExternalBrowser()};
+  /* Arriving from that hand-off. One attempt only: renderEntry() runs again on every
+     goPage('customer-entry'), and a browser that wants a user gesture for getUserMedia
+     would otherwise re-throw the same error on each of them. When it does refuse, the
+     existing error path still offers the button, so nobody is stranded. */
+  if(!autoScanRan&&wantsAutoScan()&&!inLineInApp()&&canScan()){
+   autoScanRan=true;
+   setTimeout(startScan,60);
+  }
  }
  window.imodeRenderCustomerEntry=renderEntry;
 
@@ -187,7 +232,7 @@
    +'<button type="button" class="centry-external" id="centryExternalFix">🌐 '
    +esc2(tl('เปิดด้วยเบราว์เซอร์ (Chrome / Safari)','Open in a browser (Chrome / Safari)'))+'</button>';
   var b=document.getElementById('centryExternalFix');
-  if(b)b.onclick=window.imodeOpenInExternalBrowser;
+  if(b)b.onclick=function(){window.imodeOpenInExternalBrowser({scan:true})};
  }
  function submitSerial(e){
   if(e&&e.preventDefault)e.preventDefault();
@@ -483,6 +528,7 @@
  +'.centry-choice button:hover{border-color:#0b63e5}'
  +'.centry-choice b{display:block;font-size:13px;color:#0c225e}'
  +'.centry-choice small{display:block;font-size:11px;color:#68789a;margin-top:2px}'
+ +'.centry-scan-note{margin-top:8px;padding:9px 11px;border-radius:10px;background:#eef4ff;border:1px solid #d5e4fb;color:#2b5fae;font-size:11.5px;line-height:1.5;text-align:center}'
  +'.centry-scan-off{padding:11px;border-radius:12px;background:#fff7ec;border:1px solid #f6dcb8;color:#8a5a17;font-size:12px;line-height:1.5}'
  +'.centry-external{display:block;width:100%;margin-top:9px;border:1px solid #cfe0fa;border-radius:12px;padding:11px;'
  +'font-size:12.5px;font-weight:700;color:#0b3f9e;background:#f2f7ff;cursor:pointer;line-height:1.4}'

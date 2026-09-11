@@ -442,12 +442,22 @@ var CaseDetailData=(function(){
       return Promise.resolve(all().reports.filter(function(r){return r.caseId===caseId}));
     },
     loadAttachments:function(c){
-      /* The application keeps case evidence on the field status log and on the service
-         report, not on the case itself; both are read here so the card shows what really
-         exists rather than a placeholder count. */
+      /* Case evidence lives in three places, and all three are read so the card shows what
+         really exists rather than a placeholder count: what the CUSTOMER attached when they
+         reported the problem (c.media — this one was missed, which is why a reported photo
+         never appeared here), then the field status log, then the service report. */
       var out=[];
+      (c&&c.media||[]).forEach(function(m){
+        out.push({type:/^video\//i.test(String(m.type||''))?'video':'image',
+          name:m.name||'',data:m.data||'',at:c.createdAt,from:'customer'});
+      });
       (c&&c.fieldStatusLog||[]).forEach(function(entry){
-        (entry.media||[]).forEach(function(m){out.push({type:m.type,name:m.name||'',data:m.data||'',at:entry.createdAt})});
+        /* The log stores a MIME type ("image/jpeg"); every reader on this page compares
+           against the bare word, so these were being counted as neither photo nor video
+           and drawn as nothing. Normalised on the way in, like the two blocks around it. */
+        (entry.media||[]).forEach(function(m){out.push({
+          type:/^video\//i.test(String(m.type||''))?'video':'image',
+          name:m.name||'',data:m.data||'',at:entry.createdAt})});
       });
       return this.loadReports(c&&c.id).then(function(reports){
         reports.forEach(function(r){

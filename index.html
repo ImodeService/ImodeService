@@ -813,5 +813,30 @@
      supabase/05-v70-operational-tables.sql run once; until then it stays quiet. -->
 <script src="./js/41-v70OpsSyncScript.js"></script>
 
+<!-- Beta: the photos a customer attaches to แจ้งปัญหา reach the coordinator and the
+     technician. Must load after js/32 (the หน้างาน workspace it draws into) and after
+     js/38 (whose cloudUpsertCase wrapper it wraps in turn). Needs
+     supabase/06-v70-case-media.sql run once for the attachments to cross devices; until
+     then it probes once, warns in the console and leaves case sync exactly as it was. -->
+<script src="./js/42-v70CaseMediaScript.js"></script>
+
+<!-- Beta: ดูใบเสนอราคา for the coordinator, and the ส่งให้ลูกค้า step that was missing —
+     a quotation left at ร่าง is invisible on the customer home page by design. Reuses the
+     existing quotation.view key, so it registers nothing in PERMISSION_CATALOG. -->
+<script src="./js/43-v70QuoteViewScript.js"></script>
+
+<!-- Beta: what happens when a technician finishes. Loads after js/32 and js/16 so its
+     wrappers sit outside the หน้างาน workspace and งานของฉัน. -->
+<script src="./js/44-v70TechFlowScript.js"></script>
+
+<!-- Beta: งานที่สำเร็จแล้ว — where js/44 sends closed work. After js/36 so it can place
+     itself in the sidebar groups, and after js/38 for the multi-technician crew. -->
+<script src="./js/45-v70DoneJobsScript.js"></script>
+
+<!-- Beta: a password on every load and on every account switch. Loads last so its
+     DOMContentLoaded listener runs after js/11's bootRoute and its imodeQuickSwitch
+     replaces js/33's. -->
+<script src="./js/46-v70LoginGateScript.js"></script>
+
 </body>
 </html>

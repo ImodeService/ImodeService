@@ -191,11 +191,14 @@
  function actionsHTML(c){
   var mapReady=true;
   try{mapReady=!!(settings.mapConfig&&settings.mapConfig.enabled)}catch(e){}
+  /* เตือนลูกค้า was removed from this row on request. sendCustomerReminder() only writes a
+     local notification addressed to nobody — it sends the customer nothing — so on the
+     technician's own screen it read as an action that had happened when none had. The
+     function is untouched and still reachable from the coordinator's case list. */
   var b=[
    ['📍',tl('Check-in','Check-in'),'fieldCheckIn(\''+esc2(c.id)+'\')',''],
    ['🗺',tl('นำทาง','Navigate'),'openMapForCase(\''+esc2(c.id)+'\')',mapReady?'':' muted-btn'],
    ['📞',tl('โทรลูกค้า','Call'),'callCaseCustomer(\''+esc2(c.id)+'\')',''],
-   ['🔔',tl('เตือนลูกค้า','Remind'),'sendCustomerReminder(\''+esc2(c.id)+'\')',''],
    ['📅',tl('ปฏิทินงาน','Calendar'),'goPage(\'calendar\')','']
   ];
   return '<div class="fw-actions">'+b.map(function(x){
@@ -257,6 +260,16 @@
     var host=capture;
     capture=null;
     host.innerHTML=String(body==null?'':body);
+    /* caseContextLinks() opens the sheet with Service Case / ลูกค้า / เครื่องจักร /
+       Google Maps / Warranty / เอกสาร. In a popup those make sense. Here they are wrong
+       twice over: the page above already shows the machine card, the customer address and
+       the case, and every one of those buttons runs closeModal() — a no-op on a page — and
+       then navigates away, so a technician who taps one mid-inspection loses everything
+       typed into the sheet. Removed from the page copy only; the two popups keep theirs. */
+    try{
+     var bar=host.querySelector('.context-link-bar');
+     if(bar)bar.remove();
+    }catch(e){}
     return;
    }
    return baseOpenModal.apply(this,arguments);

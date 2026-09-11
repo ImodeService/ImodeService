@@ -682,6 +682,13 @@ Those four are **`{id, data jsonb, updated_at}` with the whole record in `data`*
 every table above them. That is deliberate — see part 17 §3 — so do not "normalise" them
 into columns without reading it first.
 
+Added 2026-09-11 by `supabase/06-v70-case-media.sql` — **NOT YET RUN**:
+
+`service_cases.media jsonb` and `line_customer_requests.media jsonb`, holding the photos and
+clips a customer attaches to แจ้งปัญหา. `js/42` probes for the column once per session and
+degrades to the old behaviour without it, so the application is unaffected until it is run —
+the attachments simply stay on the device that reported the problem. Safe to re-run.
+
 `notifications` is downloaded but never uploaded; there is no `cloudUpsertNotification`.
 Addressed notices are derived from the case instead.
 
@@ -3167,3 +3174,197 @@ Two testing notes worth keeping:
 5. A team lead still assigns only within their own team. Only an admin can build a
    cross-team crew.
 6. `settings.portalNews` and `settings.slaResponse` still have no editor in the UI.
+
+---
+
+## Session Change Log — 2026-09-11 (part 18): customer photos, the quotation that never left, the technician's end of the job
+
+Ten reported items. Five new JS files, one new SQL file, and small edits to four existing
+files. No storage key renamed, no Supabase setting touched, version untouched.
+
+| File | What |
+|---|---|
+| `supabase/06-v70-case-media.sql` | **new — MUST BE RUN ONCE** for item 1 to cross devices |
+| `js/42-v70CaseMediaScript.js` | **new** — the customer's attachments are drawn, and travel |
+| `js/43-v70QuoteViewScript.js` | **new** — ดูใบเสนอราคา + the missing ส่งให้ลูกค้า step |
+| `js/44-v70TechFlowScript.js` | **new** — what happens when a technician finishes |
+| `js/45-v70DoneJobsScript.js` | **new** — งานที่สำเร็จแล้ว |
+| `js/46-v70LoginGateScript.js` | **new** — a password on every load and every switch |
+| `js/01`, `js/32`, `index.html`, `service-case-detail.html` | the boot splash, three buttons, script tags, the attachment collector |
+
+### 1. The customer's photos — two faults, either one enough to lose them
+
+`submitPortalIssue()` has always put the attachments on the case as `c.media`
+(`{name,type,size,data}`, `data` a data URL, max 4, shrunk by `js/30` to ~420 KB a photo).
+
+- **Nothing ever drew them.** Not the หน้างาน workspace, not `openCaseDetail()`, not
+  `service-case-detail.html` — its `loadAttachments()` walks `fieldStatusLog` and the service
+  report and never the case itself. So even on the phone that reported the problem the photos
+  were stored and invisible.
+- **They never left the phone.** `cloudUpsertCase()` writes an explicit column whitelist and
+  `media` is not in it. Probed against the live project:
+  `column service_cases.media does not exist`.
+
+`js/42` adds the column to the wire in both directions and draws the block on the หน้างาน
+machine card and in the case popup, with a lightbox. **It probes for the column once per
+session and only when a case actually carries media**; if the column is missing it warns in
+the console and sends the case exactly as before, so not running the SQL does not break case
+sync — it just leaves the photos device-local.
+
+Found and fixed in the same area: `service-case-detail.html` stored a MIME type
+(`"image/jpeg"`) on log attachments while every reader on that page compares against the bare
+word `'image'`, so field-log evidence counted as neither photo nor video and drew as nothing.
+
+### 2. Three buttons off the technician's screens
+
+- **เตือนลูกค้า** off the หน้างาน action row. `sendCustomerReminder()` only writes a local
+  notification addressed to nobody — it sends the customer nothing — so on the technician's
+  own screen it read as an action that had happened. The function is untouched.
+- **The `.context-link-bar`** (Service Case / ลูกค้า / เครื่องจักร / Google Maps / ประกัน /
+  เอกสาร) off the *page* copy of the inspection sheet. Every one of those runs `closeModal()`
+  — a no-op on a page — then navigates away, so a technician who tapped one mid-inspection
+  lost everything typed in. The two popup copies keep theirs.
+- **หน้างานช่าง** hidden from a technician's sidebar. The way in is งานของฉัน → tap the job;
+  from the sidebar there is no job, so `autoPick()` silently chooses one. **Hidden for
+  accounts with a `technicianId` only** — an admin previewing a queue from ทีมช่าง keeps it.
+  `applyRoleVisibility()` rewrites `style.display` on every `[data-page]` from the permission
+  alone, so this has to re-apply after it or the entry comes straight back.
+
+### 3+5. ดูใบเสนอราคา — new module `quote-view`
+
+Read, print, send, track. Filters: search / status / customer. Row → the real
+`quotationDocHTML()` paper in a popup with พิมพ์ / สถานะ / แก้ไข / ส่งให้ลูกค้า. Gated on the
+**existing** `quotation.view` key, so it registers nothing in `PERMISSION_CATALOG` and the
+"must load before js/20" rule does not apply.
+
+### 4. Why a finished quotation never reached the customer
+
+Not a delivery failure. `saveQuotation()` stamps `status: 'ร่าง'` on every new quotation, and
+`js/34` deliberately holds ร่าง back from the customer page so a half-finished calculation
+never reads as an offer. Confirmed against the live database: **both rows in `quotations` are
+`status: "ร่าง"`.** The only way off ร่าง was a status popup gated behind `quotation.approve`
+and buried two clicks into a row.
+
+The fix is the missing step, not a change to the rule: an explicit **ส่งให้ลูกค้า**, offered
+as a prompt the moment `saveQuotation()` finishes and again on every draft row in the new
+module. The rule that a draft stays private is unchanged.
+
+**Two more bugs found by reading the live rows, both fixed in `js/43`:**
+
+- `quotations.warranty` is a **text** column, so the boolean is stored as the string
+  `"false"` — and `fromQuotationDb()` reads it as `!!q.warranty`, which for `"false"` is
+  **true**. Every quotation that came back from the cloud claimed to be under warranty, and
+  `quotationDocHTML()` zeroes every machine line when it is: the document printed 0.00 for
+  the work under a correct Grand Total. The same expression drives the `warrantyMode`
+  fallback. Repaired on the way in, so rows already in the database read correctly.
+- `cloudUpsertQuotation()` has **no column for the derived breakdown** — `serviceFee`,
+  `emergency`, `travel`, `pickup`, `labor`, `partsTotal`, `other`, `discount` are all
+  dropped — so a quotation opened on any device but the one that built it was missing its
+  Travel, Pickup, Labor and Other lines while the total still counted them.
+  `imodeQuoteWithTotals()` recomputes them from the inputs that *are* stored, using js/03's
+  own rate helpers. Nothing is written back and no schema changes.
+
+### 6+7+10. The technician's end of the job
+
+**The status contradicted the toast.** `saveServiceReport()` sets `c.status='รอส่งงาน'` —
+"waiting to be submitted" — at the exact moment of submission, then says "จบงานแล้ว". The
+report *is* the submission, so the case now moves on to **เสร็จสิ้น** and the coordinator
+closes it from there. js/03 is not edited: the status is corrected immediately after the save
+it belongs to, so the timeline entry, the report record and the cloud push all stay in the one
+function that owns them. Only `รอส่งงาน` is touched — a case a coordinator parked at
+รออะไหล่, or one already closed, is left alone.
+
+**งานของฉัน holds only unfinished work.** `renderMyWork()` listed every case ever assigned and
+merely sorted the closed ones to the bottom, so the list only grew. Closed work leaves it; the
+fourth KPI tile becomes สำเร็จแล้ว and a link goes to the archive.
+
+**After a successful submit the technician lands back on งานของฉัน**, which by then no longer
+holds the job.
+
+**`js/45` — งานที่สำเร็จแล้ว.** An account with a `technicianId` sees only cases that
+technician is on (own crew included — `js/38` keeps the whole crew, not only the lead);
+anyone else sees every closed case **plus a ช่าง filter**. Filters: search / ช่าง / ลูกค้า /
+สถานะ / เดือน. Gated on **`field.view`, deliberately an existing key** — every technician role
+and Admin / Coordinator already hold it.
+
+There is no `closedAt` field and adding one would only apply going forward, so `updatedAt`
+— stamped by every path that closes a case — is what the ปิดงาน column shows.
+
+### 8+9. A password every time
+
+- **8 was never a bug.** `bootRoute()` in `js/11` already sent a visitor with no session to
+  the door, and still does. What kept the door open was the cached session: `currentUser` is
+  restored from `imode_v5_current_user` on every load, and part 17 §9 raised
+  `settings.authConfig` to `sessionHours 24 / idleMinutes 1440` for a demo stand left running
+  all day. **That convenience is now withdrawn**: `js/46` clears the session at
+  DOMContentLoaded — after `bootRoute()`, before js/03's `load` handler calls `renderAll()` —
+  and routes to `#page-staff-login`. `js/01` no longer exempts a signed-in device from the
+  boot splash, so the dashboard is never painted on the way past.
+- **9.** `imodeQuickSwitch()` in `js/33` signed in with `password = username`, the documented
+  UAT convention, so switching needed no password at all. `js/46` **replaces** it (there is
+  nothing left of the old one to wrap) with a password prompt that goes through the same
+  `ImodeAuth` call, so lockout, expiry and the audit trail are unchanged.
+
+**What this costs, plainly:** a technician who reloads, or whose phone browser evicts the
+tab mid-job, signs in again. Nothing saved is lost, but it is one more step every time.
+Delete `js/46` and revert the one comment block in `js/01` to undo it.
+
+Every customer URL is exempt before anything else in `js/46` runs — `?machineToken=`,
+`?serial=`, `#/customer-entry`, `#/customer-portal`, `?page=customer-*`. That test is a copy
+of the one in `js/01` and the two must be kept in step.
+
+### Gotchas worth keeping
+
+- **`renderMyWork` is reached three ways and only one goes through `window`.** js/16's own
+  `goPage` wrapper calls its *closure* `renderMyWork()`, not `window.imodeRenderMyWork`, so
+  wrapping the exported name alone misses the main path. Both `js/42` and `js/44` use a
+  **MutationObserver on the element** instead, disconnected around their own writes — a
+  MutationObserver only queues records while it is observing, so our own edits are never
+  recorded, rather than recorded and filtered, which is what spun a nav observer into an
+  infinite loop in part 17 §11.
+- A top-level `function` declaration in a classic script **is** a window property, so
+  replacing `window.saveServiceReport` changes what `serviceReportForm.onsubmit`'s bare
+  identifier resolves to. Asserted by dispatching a real `submit` event rather than calling
+  the function by name.
+- A top-level `let` is **not**, and `currentUser=null` from another script works because
+  assigning to an existing lexical binding is legal in strict mode — only creating an
+  implicit global is not.
+
+### Tests
+
+Six headless runs, **141 assertions, 0 failures, 0 JS errors**, at 1440×1000 and 390×844
+(`Emulation.setDeviceMetricsOverride`, not `--window-size` — part 17 §7):
+
+- **boot (21)** — cold start reaches the door, admin signs in, both new modules register in
+  the right sidebar group, all 19 existing pages still open, both version strings unchanged,
+  a reload lands back on the door with the session cleared.
+- **flow (45, run twice)** — the whole of items 1/2/3/4/5/6/7/9/10 in one browser: the
+  attachment block and its lightbox in the case popup and on หน้างาน, the warranty coercion,
+  the recomputed Travel and Other lines, a draft listed as unseen and then sent, หน้างานช่าง
+  hidden for a technician, the closed case gone from งานของฉัน, เตือนลูกค้า and the context
+  bar gone, submit → เสร็จสิ้น → back on งานของฉัน → present in งานที่สำเร็จแล้ว, a technician
+  getting no ช่าง filter and an admin getting one, a wrong password refused on the switcher
+  and the right one getting in, no horizontal overflow.
+- **customer (12, run twice)** — a draft held back and a sent quotation appearing on the
+  customer page, a machine QR still reaching the portal past the login gate with the splash
+  released, and the media probe answering `false` with no cloud rather than throwing.
+- **submit (6)** — the REAL form submit path, dispatched as an event, and a preview-only call
+  leaving the status alone.
+
+`node --check` passes on every file in `js/`, `auth/` and `pages/`, and on the detail page's
+inline script.
+
+### Open / risk
+
+1. **`supabase/06-v70-case-media.sql` has not been run.** Until the project owner runs it in
+   the SQL Editor, a customer's photos stay on the device that reported the problem. The
+   display fix works everywhere immediately; only the transport waits on the column.
+2. A submitted case now goes straight to **เสร็จสิ้น**, so `รอส่งงาน` is no longer reached by
+   the field path at all. It is still in `settings.statuses` and still selectable by hand.
+3. Requiring a password on every load undoes part 17 §9's all-day stand convenience, on
+   request. `settings.authConfig.sessionHours` still governs a session's life *within* a page
+   view; it no longer survives a reload.
+4. Unchanged from part 11: the customer Home page still shows any machine to anyone who has
+   its serial or QR.
+5. Unchanged from part 15: `04-anon-uat.sql` means anyone on the internet can read and write
+   this database. The new `media` column is covered by the same blanket policy.

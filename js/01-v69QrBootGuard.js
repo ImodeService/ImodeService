@@ -30,11 +30,16 @@
       || /[?&]page=(customer-entry|scan|customer-portal|customer-home)\b/.test(location.search)
       || /#\/(customer-portal|customer-home|customer-entry|scan)/.test(location.hash)
       || /customer-portal/.test(location.hash);
-  var signedIn=false;
-  try{signedIn=!!JSON.parse(localStorage.getItem('imode_v5_current_user')||'null')}catch(e){}
-  /* Hide the shell for a QR visitor, and for anyone arriving without a session — that
-     visitor is routed to the staff login door and must never see the dashboard first. */
-  if(!qr&&signedIn)return;
+  /* Hide the shell for every visitor who is not already on a customer route.
+     Until js/46 there was an exemption here for a device that still held a session, because
+     that device went straight to the dashboard and had nothing to wait for. A password is
+     now required on every load, so that device goes to the staff login door like any other
+     and must not see the dashboard on the way. js/11's install() releases the splash in the
+     same DOMContentLoaded dispatch that routes, so nothing is painted in between.
+     The customer/staff distinction still has to be made, but it is made where the release
+     happens — js/11 for staff, the portal entry for a QR — not here. `qr` is left computed
+     above so the two tests stay side by side and cannot drift apart. */
+  void qr;
   var st=document.createElement('style');
   st.id='v69QrBootGuardStyle';
   st.textContent='html.qr-booting .app-shell{visibility:hidden!important}'

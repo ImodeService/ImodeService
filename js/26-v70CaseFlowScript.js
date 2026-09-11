@@ -42,8 +42,11 @@
  }
  /* Only a case nobody has picked up yet is on the clock. Assigning it stops the clock,
     which is the point: the clock measures the office's response, not the repair. */
+ /* c.respondedAt is stamped by the ตอบกลับแล้ว button in js/48. The clock measures how long the
+    office took to answer, so answering is what settles it — not assigning, which happens
+    later and used to be the only way to stop the count. */
  function onClock(c){
-  return !!c&&!c.assignee&&!isClosed(c)&&c.status==='เคสใหม่'&&!!c.createdAt;
+  return !!c&&!c.assignee&&!c.respondedAt&&!isClosed(c)&&c.status==='เคสใหม่'&&!!c.createdAt;
  }
  function remainingMs(c){
   var cfg=slaCfg();

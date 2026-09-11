@@ -110,6 +110,13 @@ a{color:var(--imode-blue)}
 .scd-sla.is-risk .scd-sla-state{color:var(--warn)} .scd-sla.is-risk .dot{background:var(--warn)}
 .scd-sla.is-over .scd-sla-state{color:var(--danger)} .scd-sla.is-over .dot{background:var(--danger)}
 .scd-sla p{margin:9px 0 0;font-size:13px;color:var(--ink)}
+.scd-sla-done{margin-top:12px;width:100%;min-height:40px;padding:9px 14px;border-radius:10px;
+  border:1px solid var(--imode-blue);background:var(--imode-blue);color:#fff;font:700 13px/1.3 inherit;
+  cursor:pointer;box-shadow:0 4px 0 #0a4bb0;transition:transform .12s,box-shadow .12s}
+.scd-sla-done:hover{transform:translateY(-2px);box-shadow:0 6px 0 #0a4bb0}
+.scd-sla-done:active{transform:translateY(3px);box-shadow:0 1px 0 #0a4bb0}
+@media (prefers-reduced-motion:reduce){.scd-sla-done{transition:none}
+  .scd-sla-done:hover,.scd-sla-done:active{transform:none}}
 
 /* ---------- progress ---------- */
 .scd-progress{margin-top:18px;background:var(--card);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 18px 16px;overflow-x:auto}
@@ -675,14 +682,24 @@ function renderCaseHeader(m){
    the response clock, a scheduled case counts down to its appointment, anything else has
    no target and says so rather than inventing "On Time". */
 function renderSla(m){
-  var c=m.case,cls='',state='On Time',line='';
+  var c=m.case,cls='',state='On Time',line='',act='';
   if(['เสร็จสิ้น','ปิดเคส'].indexOf(c.status)>=0){
     state='Closed';line='ปิดงานแล้ว '+esc(fmtDateTime(c.updatedAt));
+  }else if(!m.assignment.technician&&respondedStamp(c)){
+    /* Answered but not yet assigned. The clock is settled; the case is not. */
+    var rs=respondedStamp(c);
+    state='Responded';line='ตอบกลับลูกค้าแล้ว '+esc(fmtDateTime(rs.at))
+      +(rs.by?' · '+esc(rs.by):'');
   }else if(!m.assignment.technician&&c.status==='เคสใหม่'){
     var mins=30,left=new Date(c.createdAt).getTime()+mins*60000-Date.now();
     if(left<0){cls='is-over';state='Overdue';line='เกินเวลาตอบกลับ '+fmtLeft(-left);}
     else{cls=left<=10*60000?'is-risk':'';state=left<=10*60000?'At Risk':'On Time';
          line='ต้องตอบกลับภายใน '+fmtLeft(left);}
+    /* This page never writes — it reads localStorage and hands every edit back to the
+       application, which is also the only place that can push the stamp to Supabase. So
+       the button is a hand-off: js/28 picks the intent up and calls imodeMarkResponded(). */
+    act='<button type="button" class="scd-sla-done" data-action="mark-responded">'
+       +'⏱ บันทึกว่าตอบกลับแล้ว</button>';
   }else if(c.status==='รออะไหล่'){
     cls='is-risk';state='On Hold';line='รออะไหล่ · นาฬิกางานหยุดชั่วคราว';
   }else if(m.appointment.date){
@@ -695,7 +712,7 @@ function renderSla(m){
   }
   return '<aside class="scd-sla '+cls+'"><h3>SLA</h3>'
     +'<div class="scd-sla-state"><span class="dot"></span>'+esc(state)+'</div>'
-    +'<p>'+esc(line)+'</p></aside>';
+    +'<p>'+esc(line)+'</p>'+act+'</aside>';
 }
 function fmtLeft(ms){
   var mins=Math.floor(ms/60000),h=Math.floor(mins/60),m2=mins%60;
@@ -870,6 +887,40 @@ function scheduleService(){goApp('cases','&caseId='+encodeURIComponent(caseDetai
 function openQuotation(){goApp('quotation','&caseId='+encodeURIComponent(caseDetailModel.case.id))}
 function openFieldService(){goApp('field-service')}
 function changeCaseStatus(){goApp('cases','&caseId='+encodeURIComponent(caseDetailModel.case.id)+'&intent=status')}
+/* This page still writes no business data. Stopping the response clock leaves one entry in
+   imode_v70_case_responded — the device-local mirror js/48 owns — and the application
+   applies it to the case and pushes it to Supabase on its next load. Handing the visitor
+   back instead does not work: js/46 requires a password on every load, so an intent in the
+   URL is spent at the login door and lost. */
+var RESPONSE_MIRROR='imode_v70_case_responded';
+function responseMirror(){
+  try{var o=JSON.parse(localStorage.getItem(RESPONSE_MIRROR)||'{}');return (o&&typeof o==='object')?o:{}}
+  catch(e){return {}}
+}
+/* The case's own field when the application has already applied it, this device's mirror
+   while it has not, so the card reads the same either way. */
+function respondedStamp(c){
+  if(c&&c.respondedAt)return {at:c.respondedAt,by:c.respondedBy||''};
+  var e=responseMirror()[c&&c.id];
+  return e?{at:e.at,by:e.by||''}:null;
+}
+function markResponded(){
+  var c=caseDetailModel&&caseDetailModel.case;
+  if(!c){toast('ไม่พบเคส');return}
+  if(respondedStamp(c)){toast('บันทึกการตอบกลับไว้แล้ว');return}
+  try{
+    var o=responseMirror();
+    o[c.id]={at:new Date().toISOString(),by:''};
+    localStorage.setItem(RESPONSE_MIRROR,JSON.stringify(o));
+  }catch(e){toast('บันทึกไม่สำเร็จบนอุปกรณ์นี้');return}
+  var host=document.querySelector('.scd-sla');
+  if(host&&host.parentNode){
+    var wrap=document.createElement('div');
+    wrap.innerHTML=renderSla(caseDetailModel);
+    host.parentNode.replaceChild(wrap.firstChild,host);
+  }
+  toast('บันทึกว่าตอบกลับลูกค้าแล้ว · นาฬิกาตอบกลับหยุดแล้ว');
+}
 function openMachineHistory(){panel('ประวัติการบริการเครื่องนี้',historyHTML())}
 function openCustomerDetail(){panel('ข้อมูลลูกค้า',customerHTML())}
 function openAssignmentDetail(){panel('ผู้รับผิดชอบและนัดหมาย',assignmentHTML())}
@@ -986,6 +1037,7 @@ var HANDLERS={
   'open-quotation':openQuotation,
   'open-field-service':openFieldService,
   'change-status':changeCaseStatus,
+  'mark-responded':markResponded,
   'open-machine-history':openMachineHistory,
   'open-customer-detail':openCustomerDetail,
   'open-assignment-detail':openAssignmentDetail,

@@ -838,5 +838,23 @@
      replaces js/33's. -->
 <script src="./js/46-v70LoginGateScript.js"></script>
 
+<!-- Beta 1.0: a role that has lost permissions is repaired on EVERY load, not once. The
+     three earlier repairs (js/12, js/16, js/20) are gated on a version number or on this
+     device's own pre-boot snapshot, so a role that drifted at the current version was never
+     healed again — which is why an Admin account was answered "คุณไม่มีสิทธิ์" on
+     ทำใบเสนอราคา. Loads after js/20 and js/29 so it sees the result of every earlier repair
+     and its syncCloud wrapper is the outermost one. -->
+<script src="./js/47-v70RolePresetGuardScript.js"></script>
+
+<!-- Beta 1.0: ตอบกลับแล้ว — stops the 30-minute response clock on a new case. Loads after
+     js/26 (which owns the clock) and after js/42 (so the cloudUpsertCase wrappers stack). -->
+<script src="./js/48-v70CaseResponseScript.js"></script>
+
+<!-- Beta 1.0: คำขอจากลูกค้า as a page of its own, first in the งานบริการ sidebar group with
+     a live count of new requests. A new surface over the lineRequests array that already
+     exists; keyed to the existing line.view, so no PERMISSION_CATALOG key is added and the
+     "must load before js/20" rule does not apply. -->
+<script src="./js/49-v70RequestsPageScript.js"></script>
+
 </body>
 </html>

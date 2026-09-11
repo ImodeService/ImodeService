@@ -625,6 +625,9 @@ Added later, same rules apply:
                            will not auto-connect this device to Supabase
 `imode_v69_home_usage`     per-account tally that orders the Home quick board
 `imode_v70_trash_blob`     recycle-bin payloads too large to travel inside `settings`
+`imode_v70_case_responded` the ตอบกลับแล้ว stamps recorded on this device, re-applied after a sync
+                           that did not carry them, and the only way service-case-detail.html
+                           (which never writes) can record one
 
 Clearing `imode_v69_session` signs the user out; clearing `imode_v69_local_pw` restores
 the built-in UAT passwords; clearing `imode_v70_trash_blob` makes the large entries in the
@@ -3368,3 +3371,181 @@ inline script.
    its serial or QR.
 5. Unchanged from part 15: `04-anon-uat.sql` means anyone on the internet can read and write
    this database. The new `media` column is covered by the same blanket policy.
+
+---
+
+## Session Change Log — 2026-09-11 (part 19): the admin permission that never came back, ตอบกลับแล้ว, and a requests page
+
+Three reported items. Three new JS files, one new SQL file, and small edits to four existing
+files. No storage key renamed, no Supabase setting touched, version untouched.
+
+| File | What |
+|---|---|
+| `js/47-v70RolePresetGuardScript.js` | **new** — a drifted role is repaired on EVERY load, not once |
+| `js/48-v70CaseResponseScript.js` | **new** — ตอบกลับแล้ว stops the response clock |
+| `js/49-v70RequestsPageScript.js` | **new** — คำขอจากลูกค้า as a page of its own |
+| `supabase/07-v70-case-response.sql` | **new — NOT YET RUN** — `service_cases.responded_at` |
+| `js/26`, `js/28`, `index.html`, `service-case-detail.html` | one condition, one dead branch removed, script tags, the SLA card |
+
+### 1. THE ADMIN PERMISSION BUG: every repair in the project refuses to run
+
+Reported: signed in as Admin / Coordinator, pressing ทำใบเสนอราคา answers
+"คุณไม่มีสิทธิ์ใช้งานฟังก์ชันนี้" — and the sidebar entry is gone too.
+
+Measured in a browser: on a **fresh profile the role is correct** (33 permissions,
+`quotation.view` and `quotation.create` present, `canPermission` true), and a **no-op save
+through Settings → ผู้ใช้งานและสิทธิ์ preserves all 33** — so neither the role preset nor
+`saveRoles()` is at fault. The fault is a saved settings object that has lost keys, the same
+shape as part 14, part 16 and its follow-up. What is new is **why it never heals**:
+
+| Repair | Why it declined |
+|---|---|
+| `js/12` `migrate()` | returns immediately when `settings.v69RoleScope === SCOPE_VERSION` |
+| `js/16` `migrate()` | the same, on `settings.v69Work` |
+| `js/20` `repair()` | restores only from `window.imodeSettingsSnapshot`, this device's own pre-boot copy — already stripped once the bad copy has been saved or synced down |
+
+Reproduced exactly: strip `quotation.*` from the Admin role with `v69RoleScope` already at 4,
+then reload three times — **31 permissions, `canPermission('quotation.create')` false and the
+sidebar entry hidden, every time.** The version flag that was protecting a deliberate untick
+was also making real drift permanent.
+
+**`js/47` records the intent instead of gating on a version.** `saveRoles()` is the only way a
+permission is ever turned off on purpose, so its wrapper writes down, at the moment of that
+save, which preset keys the admin left unticked — **`settings.rolePresetOptOut`**. The repair
+then runs on **every load and after every cloud sync**, adding back only preset keys that are
+missing and not in that list. It is add-only and convergent: once a load has repaired the
+roles the next one writes nothing, and the corrected copy is pushed back so the shared
+`system_settings` row stops being wrong for every other device.
+
+Things worth knowing about it:
+
+- **Roles the application defines no preset for are skipped entirely.** `Technical Lead` and
+  `R&D Lead` are seeded by js/13, and `permissionPresetForRoleName` falls through to its
+  `['dashboard.view']` default for both — applying that to a hand-built role would be wrong.
+  `hasPreset()` lists the names the preset function actually recognises. Asserted: both stay
+  at 19.
+- **A permission unticked *before* this shipped has no opt-out record, so it comes back once.**
+  That is the deliberate trade — the reported state is indistinguishable from a deliberate
+  untick until the first save records one.
+- Consequence of applying the preset honestly: **`Service Manager` went 42 → 43**, gaining
+  `mywork.view`. Its preset is "every key", and `allPermissionKeys()` grew after js/16
+  registered that one.
+- It registers nothing in `PERMISSION_CATALOG`, so the "must load before js/20" rule does not
+  apply; it loads **after** js/20 and js/29 on purpose, so it sees the result of every earlier
+  repair and its `syncCloud` wrapper is the outermost one.
+
+**The ungated button, left as it is:** the `฿ ทำใบเสนอราคา` in `openCaseDetail()` is rendered
+unconditionally (unlike `caseQuotationButton()`, which checks both keys), which is why the
+symptom was a toast rather than a missing button. Telling someone they lack the permission is
+better than silently hiding it, so it was not changed.
+
+### 2. ตอบกลับแล้ว — the response clock had no off switch
+
+`onClock()` in js/26 is true while a case is open, unassigned and still at `เคสใหม่`, so the
+only ways off the clock were to assign the case or move its status. Neither is what happens
+first: the coordinator rings the customer back inside the thirty minutes and the case stays
+unassigned for hours while a technician and a date are found. So it counted down, went red,
+and then counted up past เกินกำหนด for ever.
+
+`js/48` adds the missing step rather than changing the rule. **js/26's edit is one condition**
+(`&&!c.respondedAt`); everything else is new. The button appears inside the countdown chip on
+the cases table, the mobile cards and มอบหมายงาน, in the case popup, and on the SLA card of
+`service-case-detail.html`. Pressing it stamps `respondedAt` / `respondedBy`, stops the clock
+and leaves a green `✓ ตอบกลับแล้ว <time>` chip. **The case is still unassigned, still เคสใหม่,
+still on มอบหมายงาน — only the clock is settled.** Gated on `case.assign`, so no technician
+sees it.
+
+**Two things a plain field on the case could not survive, both found by testing:**
+
+- `syncCloud()` does `cases = a.data.map(fromCaseDb)` — it replaces the array **wholesale** —
+  so until the SQL is run a stamp made here is wiped by the next sync, which is worse than not
+  travelling at all.
+- `service-case-detail.html` reads and never writes, and **handing the visitor back to the
+  application does not work any more**: js/46 requires a password on every load, so
+  `?page=cases&intent=respond` is spent at the login door and lost. (That is true of the
+  page's other hand-offs too — assignTechnician, scheduleService, changeCaseStatus,
+  openQuotation all now cost a re-login. Not addressed here.) The `intent=respond` branch that
+  was written for js/28 was deleted again once this was measured.
+
+Both are answered by one small device-local key, **`imode_v70_case_responded`**
+(`{caseId:{at,by}}`): the detail page writes an entry and updates its own card in place, the
+application applies it to the case at boot and again after every sync, and it pushes only what
+it really changed and only once the column exists. Deleting the key forgets which clocks were
+stopped on this device; no business data is in it.
+
+**`supabase/07-v70-case-response.sql` adds `responded_at timestamptz` and has NOT been run.**
+Same degradation as js/42's media column: probed once per session, and the case is sent exactly
+as before when it is missing, so case sync is unaffected — the stamp just stays on the device
+that made it.
+
+### 3. คำขอจากลูกค้า — a page of its own
+
+Everything a customer sends already landed in `lineRequests` (แจ้งปัญหา, ขอราคา Service,
+ขอราคา Warranty, เช็คประกัน) and already travelled through `line_customer_requests`. The only
+list was **the last panel at the bottom of the Customers page**, under the customer table and
+its pager, where nobody sees it. `js/49` is a new surface over data that already exists — no
+storage key, no table, no new field.
+
+- New page `requests`, **first in the งานบริการ sidebar group**, with KPI tiles
+  (ใหม่ / กำลังดำเนินการ / เสร็จสิ้น / ทั้งหมด), search, type and status filters, a row per
+  request with its photos counted, and a popup with the full detail plus the attachments
+  through `imodeCaseMediaHTML()`.
+- Actions reuse what already exists: เปิดเคส through the `imodeOpenCase` seam,
+  `prepareServiceQuoteFromRequest`, `prepareWarrantyQuoteFromRequest`, `setLineRequestStatus`.
+- **The nav entry carries a live count of คำขอใหม่**, because "ให้ขึ้นในนี้" is only true if
+  the sidebar says so without being opened first.
+- Keyed to **`line.view`, deliberately an existing key** — Admin / Coordinator and Service
+  Manager hold it, no technician role does. A file that pushes a new key into
+  `PERMISSION_CATALOG` must load before js/20, and this one loads after it.
+
+### Gotchas worth keeping
+
+- **js/26's `renderAll` / `renderCases` wrappers call its CLOSURE `decorate()`, not the
+  exported `window.imodeDecorateSla`**, so wrapping the exported name alone never fires on the
+  real path — the same trap `renderMyWork` set in part 18. js/48 wraps `renderAll`,
+  `renderCases` and `goPage` as well, and keeps a 1s cadence as a backstop.
+- **`imodeQuickSwitch` changes who is signed in without reloading the document**, and an open
+  popup is not redrawn at all, so a button the new account may not use has to be **removed**,
+  not merely not added. Caught by an assertion, not by reading the code.
+- **Headless Chrome with no network stalls the parser on `index.html` for ever** — the Google
+  Fonts `<link>` never resolves and the document stops parsing after `js/01`, with
+  `readyState` stuck at `loading` and no error anywhere. Block `fonts.googleapis.com` and
+  `fonts.gstatic.com` alongside the CDNs, or every suite times out looking like a boot failure.
+
+### Tests
+
+Three suites, five runs, **75 assertions, 0 failures, 0 JS errors**, at 1440×1000 and 390×844
+(`Emulation.setDeviceMetricsOverride`, not `--window-size` — part 17 §7):
+
+- **permissions (10)** — the fresh baseline; `quotation.*` stripped at the current version and
+  healed on the next load with the sidebar entry back; a deliberate untick through the editor
+  recorded in `rolePresetOptOut` and surviving a reload while the role's other preset keys
+  stay; re-ticking clearing the opt-out and restoring the key; the two Lead roles untouched.
+- **flow (24, run at 1440 and at 390)** — the countdown chip and its button, the stamp, the
+  clock stopping, status and assignee untouched, the green chip, the clock staying stopped
+  across a reload; the requests nav item, its badge, the page, its KPI counts, the row popup
+  and the status filter; a technician seeing neither; all 21 pages still reachable, both
+  version strings unchanged, no horizontal overflow.
+- **detail page (17)** — the SLA card on the clock, the button, the card flipping to Responded
+  **in place without leaving the page**, the mirror entry, the page still reading Responded on
+  reload, the application applying the mirror on its next load, the mirror re-applying after a
+  wholesale replace of `cases`, the popup path, and a technician getting no button anywhere.
+
+`node --check` passes on every file in `js/`, `auth/` and `pages/`, and on the detail page's
+inline script.
+
+### Open / risk
+
+1. **`supabase/07-v70-case-response.sql` has not been run.** Until it is, ตอบกลับแล้ว stays on
+   the device that pressed it — correct and durable there, thanks to the mirror, but another
+   device keeps showing the countdown.
+2. `settings.rolePresetOptOut` only records what is unticked **from now on**. A permission an
+   admin removed before this shipped is restored once on the next load.
+3. Unaddressed, and now documented: **every hand-off from `service-case-detail.html` back into
+   the application costs a re-login** because js/46 clears the session on every load, and js/28
+   spends `?page=&caseId=&intent=` before the visitor reaches the door — so those intents are
+   lost. Only ตอบกลับแล้ว was given a way around it.
+4. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its
+   serial or QR.
+5. Unchanged from part 15: `04-anon-uat.sql` means anyone on the internet can read and write
+   this database. The new `responded_at` column is covered by the same blanket policy.

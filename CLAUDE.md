@@ -625,6 +625,12 @@ Added later, same rules apply:
                            will not auto-connect this device to Supabase
 `imode_v69_home_usage`     per-account tally that orders the Home quick board
 `imode_v70_trash_blob`     recycle-bin payloads too large to travel inside `settings`
+`imode_v70_tab_authed`     **sessionStorage, not localStorage** — this browser TAB has been through
+                           the staff door. js/50 restores the session js/46 clears when it is
+                           set, so the password is asked for when the link is opened rather
+                           than on every page load. Gone when the tab closes.
+`imode_v70_pending_route`  **sessionStorage** — the page the visitor was heading for, kept
+                           across the login door because js/28 spends the URL params first
 `imode_v70_case_responded` the ตอบกลับแล้ว stamps recorded on this device, re-applied after a sync
                            that did not carry them, and the only way service-case-detail.html
                            (which never writes) can record one
@@ -3549,3 +3555,76 @@ inline script.
    serial or QR.
 5. Unchanged from part 15: `04-anon-uat.sql` means anyone on the internet can read and write
    this database. The new `responded_at` column is covered by the same blanket policy.
+
+### Follow-up (same day): the password belongs to the tab, not to every page load
+
+Reported: "เวลากดปุ่มในหน้าเคสมันต้องล็อคใหม่ตลอด และพอล็อคอินมันก็กลับแดชบอร์ด ทำให้ทำงานไม่ได้",
+with a screenshot of the six action buttons on `service-case-detail.html`.
+
+**Measured, not guessed.** Nine exits driven in a browser, one at a time, from a signed-in
+session:
+
+| exit | landed on | session |
+|---|---|---|
+| มอบหมายงาน, นัดหมายบริการ, ทำใบเสนอราคา, เริ่มงานหน้างาน, เปลี่ยนสถานะ | `page-staff-login` | gone |
+| the ‹ back arrow, the logo, the notification bell | `page-staff-login` | gone |
+| ติดต่อลูกค้า, ตอบกลับแล้ว | stayed on the page | — |
+
+**8 of 9.** The search box and the two `← กลับไปหน้ารายการ` links in the error states make it
+10 of 11 exits. The two that survived are the only two that do not leave the document.
+
+**Two causes, stacked.**
+
+1. `service-case-detail.html` is a **separate document**, so every one of those buttons is a
+   full page load — and js/46 clears the session on every page load. That was requested in
+   part 18 and was harmless then, because nothing made a person walk back and forth between
+   the application's two documents. Opening a case does exactly that.
+2. js/28's `spendUrl()` deletes `?page=` / `?caseId=` / `?intent=` at `load` + 380 ms —
+   **before the visitor can type a password** — so the destination no longer existed by the
+   time they were through the door, and `submitStaffLogin()` fell back to the Home board.
+   Measured: the query string is already empty while the login page is on screen. (This is
+   also why the `intent=respond` branch added earlier in this session was deleted again.)
+
+**The fix, to the owner's instruction — "ล็อคอินแค่ตอนเปิดหน้าเว็บครั้งแรก ก็คือตอนเปิดลิงค์ใหม่":**
+`js/50-v70SessionScopeScript.js` makes the door **per browser tab** instead of per page load.
+
+`sessionStorage` is that scope by definition, which is why the marker lives there and not in
+`settings` or a cookie: it is created when a tab opens, survives reloads and same-tab
+navigation between `index.html` and `service-case-detail.html`, and is gone when the tab
+closes. Opening the GitHub Pages link — a new tab, a bookmark, coming back tomorrow — still
+asks for a password; moving around inside the application no longer does.
+
+- **`imode_v70_tab_authed`** (sessionStorage) is written by a wrapper on `imodeSignIn`, and
+  only when a real session comes back — `{ok:false}` and a thrown error both leave it unset,
+  so a failed attempt cannot open the tab. `imodeSignOut` and `uatLogout` clear it.
+- **`imode_v70_pending_route`** (sessionStorage) holds the destination across the door. The
+  stash runs on `DOMContentLoaded`, which is how it gets ahead of js/28's `load` + 380 ms
+  `spendUrl()`; the wrapper on `imodeRoleHomeAfterLogin` — the one funnel every staff door
+  uses — consumes it instead of going Home.
+- **js/46 is not edited.** Its `DOMContentLoaded` gate cannot be unregistered, so js/50
+  registers a later listener that puts the session back when the tab has already been through
+  the door. All `DOMContentLoaded` listeners run in one task, so no paint happens in between
+  and the login page never flashes. Delete js/50 and the part-18 behaviour returns exactly.
+
+**What this gives up, plainly:** within one tab the session now survives a reload (F5), which
+part 18 deliberately did not allow. **Known limitation:** opening the link in a second tab
+while the first is in use signs the first one out too, because the gate clears the shared
+localStorage session; recovering is one sign-in. Keeping the stored session alive instead
+would leave a signed-in record for every other entry point to find, which is the thing part 18
+removed.
+
+**Tests.** Re-ran the same nine-exit audit: **0 exits force a re-login**, every one lands on
+its real destination (`page-assign`, `page-cases`, `page-quotation`, `page-field-service`,
+`page-notifications`, `page-dashboard`), and a deep link through the door now finishes on
+`page-quotation` rather than Home. New suite t4, **18 assertions, 0 failures, 0 JS errors**: a
+fresh tab meets the door with no session; the marker is written on sign-in; index → detail →
+back keeps the session and lands on the case list; a reload in the same tab stays signed in; a
+sign-out clears the marker and the next load is the door again; clearing `sessionStorage` —
+exactly what a new tab looks like — puts the door back even with a stored session; a wrong
+password does not mark the tab; and `?serial=` still opens a customer surface without ever
+meeting the staff door.
+
+**Harness note worth keeping:** a native `confirm()` freezes the page *and every
+`Runtime.evaluate` with it*, so a suite hangs with no error and no output — it looks exactly
+like a boot failure. `prepareQuotation()` can raise one. Auto-accept
+`Page.javascriptDialogOpening` in every driver.

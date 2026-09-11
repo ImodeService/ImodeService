@@ -856,5 +856,11 @@
      "must load before js/20" rule does not apply. -->
 <script src="./js/49-v70RequestsPageScript.js"></script>
 
+<!-- Beta 1.0: the password belongs to the browser TAB, not to every page load. Opening the
+     link asks for it; moving between index.html and service-case-detail.html no longer does,
+     and the page the visitor was heading for survives the door. Loads after js/46, whose
+     unconditional gate it neutralises, and after js/28, whose spendUrl it gets ahead of. -->
+<script src="./js/50-v70SessionScopeScript.js"></script>
+
 </body>
 </html>

@@ -3881,3 +3881,41 @@ returning to the list from both the in-page button and the header arrow, a secon
 to the portal home, the case unchanged, and no horizontal overflow. Boot smoke test: 29 pages,
 0 page errors, both version strings unchanged. `node --check` passes on every file in `js/`,
 `auth/` and `pages/`.
+
+---
+
+## Session Change Log — 2026-09-12 (part 20): pushed, and a customer form sends once
+
+Everything above since `d52bfab` was committed and pushed as **`460fa4a`**, and GitHub Pages
+was confirmed serving the fixed js/42 and the new js/53.
+
+Measured before the push, worth keeping: **all 17 rows in `service_cases` and all 18 in
+`line_customer_requests` held `media: []`.** No customer attachment had ever reached the
+database, because the live site was still running the js/42 without the payload fix. Photos
+from cases reported before `460fa4a` are not recoverable from any device but the one that
+reported them.
+
+### `js/54-v70SubmitOnceScript.js` — rapid taps made duplicate cases
+
+Reported: "เวลาลูกค้ากดปุ่มส่งเคสรัวๆ เคสมันจะส่งรัวๆ แทนที่มันจะมา 1 เคสแต่มันมา 2".
+
+The three customer forms that create a record — `submitPortalIssue`,
+`submitPortalServiceQuoteRequest`, `submitPortalWarrantyRequest` — are async in js/03 and
+unshift the record and `saveLocal()` **before** awaiting up to three network round trips. For
+that whole wait the form stays on screen with a live button, so each tap was a new record with
+a new id and ticket. Reproduced with the network slowed to 1.5 s: **3 taps → 3 cases / 3
+requests on each of the three forms.**
+
+js/54 wraps all three (loaded last, so outside js/19's wrapper; all three forms resolve the
+window property when they bind or fire). The first submit marks **the form element**
+`data-imode-sending`, disables its submit button and relabels it `⏳ กำลังส่ง…`; a further
+submit of the same element is swallowed with `preventDefault` (without it the browser falls
+back to a native submit and reloads). A reopened form is a new element, so a deliberate second
+report still goes through; a `submit` event only fires after the required-field check, so an
+incomplete form is never locked; and if the form is somehow still on screen when the submit
+settles, it is released rather than left dead. js/03 is not edited.
+
+Suite once, at 390×844 and 1440×1000: 3 taps → exactly 1 record on each form, the button
+disabled and reading กำลังส่ง while sending, the success screen replacing the form, a reopened
+form still submitting, an empty required field not locking the form, no overflow, 0 page
+errors — **46 assertions, 0 failures**, plus the 8-assertion reproduction with js/54 blocked.

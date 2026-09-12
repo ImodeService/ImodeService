@@ -119,6 +119,30 @@
     }catch(e){return false}
    }
   },
+  quotation:{
+   th:'ใบเสนอราคา', en:'Quotations', icon:'💶', table:'quotations',
+   restore:function(p){
+    try{
+     if(!Array.isArray(quotations))return false;
+     if(quotations.some(function(q){return q.id===p.id}))return true;
+     quotations.unshift(p);
+     if(typeof cloudUpsertQuotation==='function'){try{cloudUpsertQuotation(p)}catch(e){}}
+     return true;
+    }catch(e){return false}
+   }
+  },
+  machine:{
+   th:'เครื่องจักร', en:'Machines', icon:'⚙', table:'machines',
+   restore:function(p){
+    try{
+     if(!Array.isArray(machines))return false;
+     if(machines.some(function(m){return m.id===p.id}))return true;
+     machines.unshift(p);
+     if(typeof cloudUpsertMachine==='function'){try{cloudUpsertMachine(p)}catch(e){}}
+     return true;
+    }catch(e){return false}
+   }
+  },
   document:{
    th:'เอกสารเครื่องจักร', en:'Machine documents', icon:'📁', table:'machine_documents',
    restore:function(p){
@@ -428,7 +452,7 @@
   var host=document.getElementById('page-trash');
   if(!host)return;
   var list=window.imodeTrashList(),counts=window.imodeTrashCounts(),days=retentionDays();
-  var order=['case','document','account','employee'];
+  var order=['case','quotation','machine','document','account','employee'];
   var known={};order.forEach(function(k){known[k]=1});
   Object.keys(counts).forEach(function(k){if(!known[k]){order.push(k);known[k]=1}});
 

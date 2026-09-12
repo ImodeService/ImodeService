@@ -625,12 +625,10 @@ Added later, same rules apply:
                            will not auto-connect this device to Supabase
 `imode_v69_home_usage`     per-account tally that orders the Home quick board
 `imode_v70_trash_blob`     recycle-bin payloads too large to travel inside `settings`
-`imode_v70_tab_authed`     **sessionStorage, not localStorage** — this browser TAB has been through
-                           the staff door. js/50 restores the session js/46 clears when it is
-                           set, so the password is asked for when the link is opened rather
-                           than on every page load. Gone when the tab closes.
 `imode_v70_pending_route`  **sessionStorage** — the page the visitor was heading for, kept
-                           across the login door because js/28 spends the URL params first
+                           across the login door because js/28 spends the URL params first.
+                           (`imode_v70_tab_authed` existed for one build on 2026-09-11 and was
+                           removed again when the door became first-visit-only.)
 `imode_v70_case_responded` the ตอบกลับแล้ว stamps recorded on this device, re-applied after a sync
                            that did not carry them, and the only way service-case-detail.html
                            (which never writes) can record one
@@ -3628,3 +3626,258 @@ meeting the staff door.
 `Runtime.evaluate` with it*, so a suite hangs with no error and no output — it looks exactly
 like a boot failure. `prepareQuotation()` can raise one. Auto-accept
 `Page.javascriptDialogOpening` in every driver.
+
+### Follow-up (same day): six items after the owner tested the build
+
+| File | What |
+|---|---|
+| `js/51-v70Time24Script.js` | **new** — every time picker is 24-hour |
+| `js/52-v70RecordActionsScript.js` | **new** — delete to the bin, and an explicit แก้ไข on a quotation |
+| `js/46`, `js/50` | the front door is withdrawn; only the destination-keeping is left |
+| `js/29` | `closeModal()` closes synchronously again — **30 buttons were dead** |
+| `js/40` | two new bin types: `quotation`, `machine` |
+| `service-case-detail.html` | the customer's photos fall back to the LINE request |
+
+#### 1. "ล็อคอินแค่รอบเดียว ตอนเปลี่ยน Account หรือตอนเข้าเว็บครั้งแรก"
+
+Part 18's gate cleared the session on **every page load**, which stopped being cheap the
+moment a case became its own document. It is withdrawn at the source: `gate()` in js/46 no
+longer runs, and a visitor with no session at all is sent to the door by js/11's
+`bootRoute()`, which has always done that. The session's life is `settings.authConfig`
+(sessionHours / idleMinutes) again. **js/46 part 2 is untouched** — switching account still
+asks for the password every time, which is the half that was still wanted.
+
+js/50 was written for the per-tab door and is now only the second half of that report: the
+destination survives the door. `imode_v70_tab_authed` is gone; `imode_v70_pending_route`
+stays.
+
+#### 2. The customer's photos in the case detail
+
+The display code was already right — asserted end to end, the popup and the page both draw
+`c.media`. What the owner saw (`รูปภาพ 0 ไฟล์`) was a case reported **before
+`06-v70-case-media.sql` was run**, so the photos never left the phone that reported them.
+Both SQL files have since been run and verified by a round-trip write.
+
+One real gap was closed while here: `service-case-detail.html` read `c.media` only, while
+js/42 in the application also falls back to the matching `line_customer_requests` row —
+`submitPortalIssue()` writes the attachments to both. So the same case could show photos in
+the popup and none on the page. The page now reads `imode_test_v532_line_requests` and uses
+the same fallback.
+
+#### 3. 24-hour time — Chrome ignores `lang`
+
+Measured side by side in a headless Chrome and screenshotted: the page is `<html lang="th">`,
+and `lang="th"` and `lang="en-GB"` written **directly on the input** both still rendered
+`02:30 PM`. A native `<input type="time">` / `datetime-local` is formatted from the browser's
+UI locale and there is no attribute, no CSS and no setting that changes it.
+
+So the visible control is ours: a native date box plus two selects, hours `00`–`23` and
+minutes in 5-minute steps (a saved `:07` keeps its own option rather than being rounded).
+**The native input stays in the DOM, hidden, keeping its id and its value** — every save path
+reads these by bare identifier (`sDate.value`, `slaStart.value`) — and the control writes
+`YYYY-MM-DDTHH:MM` / `HH:MM` back and dispatches a real `change`. Same shape as
+`window.imodeCombo()`, and the same two traps: `required` is moved off the hidden input
+(Chrome refuses the submit silently otherwise), and a MutationObserver re-scans after
+`openModal()` replaces the body, disconnected around its own writes.
+
+**Bug caught by the suite and worth keeping:** the listener that mirrors an external write
+back into the control also fired on the control's *own* dispatch. Picking a date before an
+hour leaves `input.value` empty, so the mirror read that back and wiped the date — nothing
+could ever be entered. An `__t24Self` flag around the dispatch is the fix.
+
+#### 4+5. Delete to the bin, and an edit on a quotation
+
+`quotation` and `machine` are registered in **js/40's `TYPES`**, which is where that file says
+a new deletable thing belongs — a type registered anywhere else goes into the bin and can
+never come out, because the fallback `typeOf()` returns a restore that answers `false`. The
+cloud row is deleted too, or `syncCloud()` puts the record straight back.
+
+Buttons: 🗑 in the machine popup and the case popup (js/40's case delete in the edit form
+stays), 🗑 in js/43's quotation document, and on each quotation row **✏ แก้ไข + 🗑 ลบ** —
+appended after each render rather than by rewriting js/03's template. Deleting a machine that
+still has cases states the count first; the cases are not deleted with it.
+
+#### 6. THE ADMIN COULD NOT OPEN THE CUSTOMER PAGE — and 30 other buttons were dead too
+
+Reported as "แอดมินควรจะดูหน้าหลักลูกค้าได้แต่ที่เทสมาดูไม่ได้". Measured: the
+`📱 ดูหน้าหลักลูกค้า` button in the machine QR popup left the visitor on `page-machines`.
+
+The cause is not about the portal at all. js/29's `closeModal()` did
+`history.go(-depth); return` — **it returned without closing**, leaving the close to the async
+popstate. Thirty call sites in this application are written `closeModal();goPage('quotation')`,
+and every one of them broke the same way: `goPage` ran while the popup was still open, js/22
+pushed an entry for the new page, and then the pending traversal arrived and js/22 restored
+the page the popup had been opened from.
+
+`closeModal()` now closes synchronously and decides about the history on the next macrotask,
+when the click handler has finished and it is known whether it navigated. If it did, the
+rewind is skipped — undoing the navigation it just asked for is worse than leaving a spent
+modal entry in the history, whose only symptom is one Back press that does nothing before the
+next one works. If it did not, the rewind is exactly as before.
+
+#### Tests
+
+**t5, 31 assertions, run at 1440×1000 and 390×844**, plus every earlier suite:
+
+a first visit meeting the door and a reload *and a new tab* staying signed in while the
+account switcher still demands a password · the attachment in the popup, counted on the page
+and drawn as a thumbnail · a 24-hour control with the native input hidden behind it, hours
+00–23, `required` moved off, and `2026-10-02T18:45` written back · ✏ แก้ไข and 🗑 ลบ on the
+quotation row · a quotation and a machine deleted into the bin, listed there and **restored**
+· the case popup's delete · the QR popup and the Customers-page button both opening the
+customer page with its eight action cards, and the preview exiting cleanly · 21 pages still
+reachable, the version string, no horizontal overflow.
+
+#### Harness notes worth keeping
+
+- A native `confirm()` freezes the page **and every `Runtime.evaluate` with it**, so a suite
+  hangs with no error and no output — indistinguishable from a boot failure.
+  `prepareQuotation()` raises one. Auto-accept `Page.javascriptDialogOpening`.
+- Reading `DevToolsActivePort` can throw `EBUSY` while Chrome is still writing it. Retry
+  rather than failing the launch.
+
+#### Open / risk
+
+1. Requiring a password only on the first visit is the owner's decision, reversing part 18.
+   A device left signed in opens straight into the application until the session expires.
+2. A record deleted into the bin has its cloud row deleted immediately; restoring pushes it
+   back. A machine's cases, warranties, QC and documents are **not** deleted with it and will
+   point at a machine that is gone until it is restored. The count is stated before deleting.
+3. `closeModal()` followed by a navigation leaves one spent modal entry in the history, so the
+   first Back press after such a button does nothing. The alternative was the button not
+   working at all.
+
+### Follow-up (same day): the customer's attachments on the case detail page
+
+Reported from the page in the screenshot: the ปัญหาที่ลูกค้าแจ้ง card showed a grey box and
+`＋ เพิ่มไฟล์`, not the photos the customer sent. `loadAttachments()` was already reading
+`c.media` (and falling back to the matching `line_customer_requests` row) — what was wrong was
+the drawing: three `background-image` tiles, un-clickable, with customer photos, field-log
+evidence and service-report photos all mixed into one anonymous row, and a tile with no `data`
+rendering as an empty grey box.
+
+`service-case-detail.html` only (no other file touched, no storage key, no schema):
+
+- **Two labelled blocks** in the problem card — `📎 ไฟล์ที่ลูกค้าแนบมากับเคส` and
+  `🧰 หลักฐานหน้างาน / ใบตรวจ` — split by the `from:'customer'` flag `loadAttachments()`
+  already sets. When the customer attached nothing the first block says so explicitly instead
+  of leaving an ambiguous empty row.
+- **Real `<img>` tiles, and every tile opens a lightbox** (Escape, backdrop click, a focused
+  close button), the same treatment js/42 gives the application. This page is a separate
+  document and does not load `css/*`, so the `.cmp-*` styles are restated in its own `<style>`
+  rather than shared.
+- A tile carries `data-media="<index into caseDetailModel.attachments>"`, handled in the
+  existing delegated click listener next to `data-contact`. A data URL is tens of thousands of
+  characters and never goes into an attribute.
+- `attachmentsHTML()` — the `📍 ดูทั้งหมด` panel — reuses the same blocks, so those tiles are
+  clickable too. The `📷 / 🎬` counts and `＋ เพิ่มไฟล์` are unchanged.
+
+**Layout, to the owner's follow-up** (`เอารูปที่ลูกค้าแนบมาไว้บริเวณกรอบสีแดง และรายละเอียดปัญหาไว้ในกรอบสีเขียว`):
+the two swapped places. `📝 รายละเอียดปัญหา` is now a panel of its own directly under the card
+head, holding the issue text that used to be a bare `<h3>`; the attachments took the row below,
+where `＋ เพิ่มไฟล์` used to sit alone — the button moved to the end of that same row, which is
+where the original design had it. `mediaTiles()` returns bare tiles and the caller owns the
+`.cmp-grid`, so the button can share the grid with them.
+
+Suite: 22 assertions in headless Chrome over http at 1440×1000 and 390×844 — the block, its
+label, one tile per attachment, the `<img>` actually decoding (`naturalWidth>0`), the video
+tile marked, the field-evidence block kept separate, the counts unchanged, the lightbox opening
+on a real image and closing, the panel tiles, a case with no attachments saying so, the
+`line_customer_requests` fallback still drawing, and no horizontal overflow. `node --check`
+passes on the page's extracted inline script.
+
+### Follow-up (same day): js/42's transport half had never worked — `media` was dropped at the payload
+
+Reported: the case page still said `ลูกค้าไม่ได้แนบรูปหรือวิดีโอมากับเคสนี้`. Measured against
+the live project rather than guessed: `service_cases.media` **exists** (06 was run) and the
+reported case really holds `media: []`, on both the case row and its `line_customer_requests`
+row. So the display was telling the truth — the photos had never arrived.
+
+Driven end to end in a browser (the portal form, a real file put on `#piMediaInput` with
+`DOM.setFileInputFiles`, a real `submit` event): localStorage held **2** attachments on the case
+and on the request, and the row that reached Supabase held **0**.
+
+**`cloudUpsertCase()` (js/03:1630) does not forward the object it is handed.** It builds an
+explicit snake_case payload column by column, and `media` is not one of them — the same
+whitelist that part 17 §2 had to route the technician crew around. js/42 was adding `media` to
+a *copy of the case* and handing that to the base function, which then built its payload from
+scratch and dropped it. `cloudUpsertLineRequest()` is written the same way, so both halves were
+silent. Nothing in the console: `cloudUpsert()` succeeded, it just carried one field fewer.
+
+**Fix, in `js/42-v70CaseMediaScript.js` only.** The value is injected into the **payload** at
+`cloudUpsert(table,obj)` — the single funnel every table write passes through — keyed by the
+row id the payload always carries. The two upsert wrappers register `id → media` immediately
+before calling the base function and remove it immediately after; JavaScript is single threaded
+and the base awaits `cloudUpsert` inside that window, so no unrelated write can pick it up. The
+column probe is unchanged, so a project without `06-v70-case-media.sql` still degrades quietly.
+
+Restating js/03's whitelist inside js/42 would have been the obvious alternative and is exactly
+what caused this: **a field added to a case object never reaches `service_cases` unless
+`cloudUpsertCase` names it.** Worth checking before adding any new case field.
+
+Verified against the live project, then the four probe rows were deleted: before the fix a
+portal report wrote `media: []`; after it, `media` carries both files on the case **and** the
+request; and a **fresh browser profile — a second device — downloads the case with both
+attachments and the detail page draws them** (`naturalWidth>0`). The 22-assertion detail-page
+suite still passes, and `node --check` passes on every file in `js/`, `auth/` and `pages/`.
+
+Note for existing data: cases reported **before** this fix have no photos in the database at
+all. They cannot be recovered from another device — they are still on the phone that reported
+them, and only there.
+
+### Follow-up (same day): the customer can open a case from ประวัติ Service — read only
+
+Requested: `หน้านี้คือประวัติการแจ้งเซอร์วิสของลูกค้า อยากให้เปิดดูประวัติ รายละเอียดของแต่ละเคส
+แต่ไม่สามารถแก้ไขได้ ดูได้อย่างเดียว`.
+
+`showPortalHistory()` (js/03) printed one flat `.portal-history-item` per case — ticket, date,
+status, issue line — and nothing opened. Everything a customer would want next was already
+stored and had no surface here: the case's `fieldStatusLog`, and its service report's
+diagnosis, work performed, recommendation, parts and next PM.
+
+| File | What |
+|---|---|
+| `js/53-v70PortalCaseViewScript.js` | **new** — the history rows open a read-only case view |
+| `index.html` | one `<script src>` after js/52 |
+
+- `window.showPortalHistory` is replaced **at parse time**, so js/08's `install()` — which runs
+  at DOMContentLoaded — wraps *this* version and the view keeps the portal's detail-mode
+  header, machine-context strip and back arrow for free. js/03 is not edited.
+- The rows are real `<button>`s (`data-pcv-case`), opened through one delegated listener so a
+  row rendered by any later patch still works.
+- The case view shows: วันที่แจ้ง / สถานะ / ประเภทงาน / ความเร่งด่วน / ช่องทาง / นัดหมาย,
+  ปัญหาที่แจ้ง, **the files the customer themself attached** through `imodeCaseMediaHTML()` —
+  js/42 owns that block and its lightbox, one implementation for both audiences — a
+  ความคืบหน้างาน timeline from `fieldStatusLog`, and ผลการให้บริการ from the service report.
+  A section with nothing in it is omitted rather than printed empty.
+- **Read only is a property of the code, not a promise.** The file renders and nothing else:
+  no form, no input, no save call, and it never assigns to `cases`, `serviceReports`,
+  localStorage or Supabase. Asserted both ways — zero `form/input/select/textarea` in the view,
+  and the case JSON byte-identical before and after opening it.
+- While a case is open the header's back arrow returns to the **list**, not to the portal home.
+  Derived from the DOM (`[data-pcv-back]` present) rather than from a flag, so it cannot go
+  stale, and registered in a DOMContentLoaded listener after js/08's and js/22's so it ends up
+  outermost.
+- Styles are appended as a `<style>` at runtime, the way js/10 and js/16 do: `css/21` and
+  `css/23` have to stay the last two `<link>`s and a new stylesheet would have to follow them.
+
+**The `const` trap, again.** The first version printed raw ISO strings — `fmt` and `fmtDay`
+(js/03:254) are `const` arrow functions, so `window.fmt` is `undefined` and the
+`window.fmt ? … : raw` fallback silently took the raw branch. Read by bare identifier. The list
+of lexical globals in part 17 §5 covers `settings`/`cases`/`currentUser`…; **`fmt`, `fmtDay`
+and every other `const` helper in js/03 belong to it too.**
+
+**Harness note worth keeping:** setting `imode_v69_cloud_optout` on a *fresh* profile is too
+late — js/23 ships a cloud config with the app, so the first boot connects and writes
+`imode_v5_cloud`, after which the opt-out is never consulted again. A suite that seeds cases
+must clear **both**, or `syncCloud()` replaces `cases` wholesale a second later and the seeded
+rows vanish mid-test. That cost a round of false failures here.
+
+Suite pcv, **22 assertions, run at 1440×1000 and 390×844**, 0 failures: the rows are buttons
+with a status chip, the case opens with its facts, the progress timeline, the report, the parts
+and the next PM, the view-only line, no editable control anywhere, only the back button (and
+the attachment tiles) clickable, the customer's own attachment drawn and decoding, back
+returning to the list from both the in-page button and the header arrow, a second back leaving
+to the portal home, the case unchanged, and no horizontal overflow. Boot smoke test: 29 pages,
+0 page errors, both version strings unchanged. `node --check` passes on every file in `js/`,
+`auth/` and `pages/`.

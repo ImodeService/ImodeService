@@ -79,22 +79,53 @@
  }
  window.imodeCaseMediaColumnReady=mediaColumnReady;
 
+ /* ATTACHING media TO THE CASE OBJECT IS NOT ENOUGH, and the first version of this file
+    did exactly that and silently sent nothing for weeks. cloudUpsertCase() (js/03:1630)
+    does not forward the object it is handed — it builds an explicit snake_case payload,
+    column by column, and `media` is not one of them, so a field added to its argument is
+    dropped on the floor. Measured: a portal report with two attachments wrote media:[] to
+    service_cases while localStorage held both files.
+
+    So the value is injected into the PAYLOAD instead, at cloudUpsert() — the single funnel
+    every table write goes through — keyed by the row id that the payload always carries.
+    The id is registered immediately before the base call and removed immediately after;
+    JavaScript is single threaded and cloudUpsertCase awaits cloudUpsert inside that window,
+    so the entry cannot be read by an unrelated write.
+
+    The alternative, restating js/03's whitelist here, is the thing that caused this bug in
+    the first place. */
+ var pendingMedia=Object.create(null);
+ var MEDIA_TABLES={service_cases:1,line_customer_requests:1};
+ var baseCloudUpsert=window.cloudUpsert;
+ if(typeof baseCloudUpsert==='function'){
+  window.cloudUpsert=function(table,obj){
+   try{
+    if(MEDIA_TABLES[table]&&obj&&obj.id&&pendingMedia[obj.id])obj.media=pendingMedia[obj.id];
+   }catch(e){}
+   return baseCloudUpsert.apply(this,arguments);
+  };
+ }
+ function withMedia(id,list,run){
+  pendingMedia[id]=list;
+  var done=function(){delete pendingMedia[id]};
+  try{
+   return Promise.resolve(run()).then(function(v){done();return v},function(e){done();throw e});
+  }catch(e){done();throw e}
+ }
+
  /* js/38 already wraps cloudUpsertCase to fold a multi-technician crew into the assignee
-    column. This wraps that, so both survive: the attachments are added to a copy here and
-    js/38 then carries that copy forward untouched. Never the live case object — a screen
-    that has just been taught to read the array must not suddenly see a wire value. */
+    column. This wraps that, so both survive: js/38's copy travels on untouched and the
+    attachments join the payload further down. Never the live case object — a screen that
+    has just been taught to read the array must not suddenly see a wire value. */
  var baseUpsertCase=window.cloudUpsertCase;
  if(typeof baseUpsertCase==='function'){
   window.cloudUpsertCase=function(c){
    var self=this,args=arguments;
    var list=Array.isArray(c&&c.media)?c.media:[];
-   if(!list.length)return baseUpsertCase.apply(self,args);
+   if(!list.length||!c.id)return baseUpsertCase.apply(self,args);
    return mediaColumnReady().then(function(ok){
     if(!ok)return baseUpsertCase.apply(self,args);
-    var wire={},k;
-    for(k in c)if(Object.prototype.hasOwnProperty.call(c,k))wire[k]=c[k];
-    wire.media=list;
-    return baseUpsertCase.call(self,wire);
+    return withMedia(c.id,list,function(){return baseUpsertCase.apply(self,args)});
    });
   };
  }
@@ -106,18 +137,16 @@
    return c;
   };
  }
+ /* cloudUpsertLineRequest() whitelists its columns the same way, so the same route. */
  var baseUpsertReq=window.cloudUpsertLineRequest;
  if(typeof baseUpsertReq==='function'){
   window.cloudUpsertLineRequest=function(r){
    var self=this,args=arguments;
    var list=Array.isArray(r&&r.media)?r.media:[];
-   if(!list.length)return baseUpsertReq.apply(self,args);
+   if(!list.length||!r.id)return baseUpsertReq.apply(self,args);
    return mediaColumnReady().then(function(ok){
     if(!ok)return baseUpsertReq.apply(self,args);
-    var wire={},k;
-    for(k in r)if(Object.prototype.hasOwnProperty.call(r,k))wire[k]=r[k];
-    wire.media=list;
-    return baseUpsertReq.call(self,wire);
+    return withMedia(r.id,list,function(){return baseUpsertReq.apply(self,args)});
    });
   };
  }

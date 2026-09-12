@@ -149,14 +149,33 @@
  }
 
  var baseClose=window.closeModal;
+ function activePageId(){var p=document.querySelector('.page.active');return p?String(p.id||''):''}
  /* × means "done with all of this": rewind every entry this popup stack added, so one
-    Back press afterwards leaves the page rather than re-opening what was just closed. */
+    Back press afterwards leaves the page rather than re-opening what was just closed.
+
+    THE CLOSE MUST HAPPEN SYNCHRONOUSLY, and the rewind must not. The first version did
+    `history.go(-depth); return` — it returned WITHOUT closing and let the async popstate do
+    it. Thirty call sites in this application are written `closeModal();goPage('quotation')`,
+    and every one of them broke: goPage ran while the popup was still open, js/22 pushed an
+    entry for the new page, and then the pending traversal arrived and js/22 restored the
+    page the popup had been opened from. Measured on the machine QR popup — 📱 ดูหน้าหลักลูกค้า
+    switched to the portal and was pulled straight back to เครื่องจักร.
+
+    So: close now, and decide about the history on the next macrotask, when the click handler
+    has finished and it is known whether it navigated. If it did, the traversal is skipped —
+    undoing the navigation it just asked for would be worse than leaving a spent modal entry
+    in the history, whose only symptom is one Back press that does nothing before the next one
+    works. If it did not, the rewind happens exactly as before. */
  if(typeof baseClose==='function'){
   window.closeModal=function(){
-   if(!restoring&&depth>0&&isOpen()){
-    try{history.go(-depth);return}catch(e){}
-   }
-   return baseClose.apply(this,arguments);
+   if(restoring||depth<=0||!isOpen())return baseClose.apply(this,arguments);
+   var d=depth,page=activePageId();
+   var r=baseClose.apply(this,arguments);
+   depth=0;stack.length=0;wasOpen=false;
+   setTimeout(function(){
+    try{if(activePageId()===page)history.go(-d)}catch(e){}
+   },0);
+   return r;
   };
  }
  /* ‹ means "one step back": to the popup underneath if there is one, else close. */

@@ -54,21 +54,24 @@
   try{localStorage.removeItem('imode_v69_session')}catch(e){}
  }
 
- /* Runs at DOMContentLoaded, and therefore AFTER js/11's bootRoute() — this file registers
-    its listener later — and before the window `load` handler in js/03 that calls renderAll()
-    and initCloud(). So the dashboard is never rendered, let alone painted, on the way past. */
- function gate(){
-  if(customerRoute())return;
-  var had=false;
-  try{had=!!currentUser}catch(e){}
-  if(!had)return;                 /* bootRoute already sent them to the door */
-  clearSession();
-  try{
-   if(typeof window.goPage==='function')window.goPage('staff-login');
-  }catch(e){}
- }
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',gate,{once:true});
- else gate();
+ /* WITHDRAWN 2026-09-11, on the owner's instruction: "การที่ต้องล็อคอินบ่อยๆ มันทำให้เสียเวลา
+    ไปเยอะมาก อยากให้แก้เป็นล็อคอินแค่รอบเดียว ตอนเปลี่ยน Account หรือตอนเข้าเว็บครั้งแรก".
+
+    gate() used to run at DOMContentLoaded and clear the session on EVERY page load, which is
+    what item 8 above asked for. It stopped being a small cost the moment a case became its
+    own document: service-case-detail.html means มอบหมายงาน, นัดหมายบริการ, ทำใบเสนอราคา,
+    เริ่มงานหน้างาน, เปลี่ยนสถานะ, the ‹ arrow, the logo and the bell are each a full page
+    load — measured, 8 of 9 exits landed back on the login door.
+
+    The door is now the one place it was always meant to be: a visitor with no session at all.
+    js/11's bootRoute() has always done that and still does, so nothing has to run here. The
+    session's life is governed by settings.authConfig (sessionHours / idleMinutes) and by
+    signing out, exactly as auth-core.js intends.
+
+    Part 2 below is UNCHANGED and is the half the owner still wants: switching account asks
+    for the password every time. clearSession() is kept because that is the switch's own
+    business, not the front door's. */
+ void clearSession;   /* still used by nothing here; kept for part 2's sake and for reverting */
 
  /* ------------------------------------------------- 2. switching needs a password ---- */
  var pending='';

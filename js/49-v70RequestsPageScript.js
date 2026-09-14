@@ -144,6 +144,28 @@
  /* Written once into the row and then updated in place by one 1-second tick — the list is
     never re-rendered for the clock, the same way the 30-minute response clock works, so a
     half-typed search box and the scroll position survive. */
+ /* THREE AGE BANDS on a request nobody has picked up yet.
+    The stored status is business data and is NOT rewritten — a row is only ever labelled by
+    how long it has been sitting, and only while it is still ใหม่. A request that somebody
+    has started or finished keeps its real status, as it should.
+      under a day   ใหม่          green
+      into day one  1 วัน         orange
+      past that     เกิน 1 วัน     red */
+ var DAY=86400000;
+ function ageBand(iso){
+  var t=new Date(iso||0).getTime();
+  if(!t||isNaN(t))return 'new';
+  var ms=Date.now()-t;
+  if(ms<DAY)return 'new';
+  if(ms<2*DAY)return 'day1';
+  return 'over';
+ }
+ function bandLabel(b){
+  return b==='over'?tl('เกิน 1 วัน','Over a day')
+       : b==='day1'?tl('1 วัน','1 day')
+       : tl('ใหม่','New');
+ }
+
  function ageText(iso){
   var t=new Date(iso||0).getTime();
   if(!t||isNaN(t))return '-';
@@ -159,6 +181,19 @@
   if(!host||host.classList.contains('active')===false)return;
   host.querySelectorAll('[data-req-since]').forEach(function(el){
    el.textContent=ageText(el.getAttribute('data-req-since'));
+  });
+  /* A page left open across midnight would otherwise keep yesterday's colour. Swapping two
+     class names and one label is cheap enough to do on the same tick as the clock. */
+  host.querySelectorAll('[data-band-since]').forEach(function(row){
+   var band=ageBand(row.getAttribute('data-band-since'));
+   if(row.dataset.band===band)return;
+   row.dataset.band=band;
+   ['new','day1','over'].forEach(function(b){row.classList.toggle('is-age-'+b,b===band)});
+   row.querySelectorAll('.req-status.is-age,.req-age').forEach(function(el){
+    ['new','day1','over'].forEach(function(b){el.classList.toggle('is-age-'+b,b===band)});
+   });
+   var chip=row.querySelector('.req-status.is-age');
+   if(chip)chip.textContent=bandLabel(band);
   });
  }
  setInterval(function(){try{tickAges()}catch(e){}},1000);
@@ -188,19 +223,22 @@
  function rowHTML(r){
   var cu=customerOf(r),m=machineOf(r);
   var media=Array.isArray(r.media)?r.media.length:0;
-  return '<div class="req-row'+(isNew(r)?' is-new':'')+(isDone(r)?' is-done':'')+'" data-req="'+esc2(r.id)+'"'
+  var band=isNew(r)?ageBand(r.createdAt):'';
+  return '<div class="req-row'+(isNew(r)?' is-new is-age-'+band:'')+(isDone(r)?' is-done':'')+'"'
+   +' data-req="'+esc2(r.id)+'"'+(isNew(r)?' data-band-since="'+esc2(r.createdAt||'')+'"':'')
    +' role="button" tabindex="0" aria-label="'+esc2(tl('เปิดคำขอ','Open request'))+'">'
    +'<div class="req-row-main">'
    +'<div class="req-row-top">'
    +'<span class="req-type req-type-'+esc2(r.type||'other')+'">'+esc2(typeLabel(r.type))+'</span>'
-   +'<span class="req-status'+(isNew(r)?' is-new':isDone(r)?' is-done':'')+'">'+esc2(r.status||'-')+'</span>'
+   +'<span class="req-status'+(isNew(r)?' is-age is-age-'+band:isDone(r)?' is-done':'')+'">'
+   +esc2(isNew(r)?bandLabel(band):(r.status||'-'))+'</span>'
    +(media?'<span class="req-media">📷 '+media+'</span>':'')
    +'</div>'
    +'<b>'+esc2((cu&&cu.name)||r.contact||tl('ไม่ระบุลูกค้า','Unknown customer'))+'</b>'
    +'<small>'+esc2(m?((m.name||'-')+(m.serial?' · S/N '+m.serial:'')):tl('ไม่ระบุเครื่อง','No machine'))+'</small>'
    +'<p>'+esc2(String(r.message||'-').slice(0,180))+'</p>'
    +'<div class="req-foot">'
-   +'<span class="req-age'+(isNew(r)?' is-waiting':'')+'">'+esc2(tl('รอมาแล้ว','Waiting'))
+   +'<span class="req-age'+(isNew(r)?' is-age-'+band:'')+'">'+esc2(tl('รอมาแล้ว','Waiting'))
    +' <b data-req-since="'+esc2(r.createdAt||'')+'">'+esc2(ageText(r.createdAt))+'</b></span>'
    +'<small>'+esc2(fmtAny(r.createdAt))
    +(r.contact?' · '+esc2(r.contact):'')+(r.phone?' · '+esc2(r.phone):'')+'</small>'
@@ -400,7 +438,10 @@
  +'transition:transform .12s ease,border-color .12s ease,box-shadow .12s ease}'
  +'.req-row:hover{border-color:#0b63e5;transform:translateY(-1px);box-shadow:0 6px 16px rgba(11,99,229,.12)}'
  +'.req-row:focus-visible{outline:2px solid #0b63e5;outline-offset:2px}'
- +'.req-row.is-new{border-color:#f3d3b2;background:#fffaf4}'
+ /* the three age bands — green while it is fresh, orange on day one, red past that */
+ +'.req-row.is-new.is-age-new{border-color:#b6e6c9;background:#f5fdf8}'
+ +'.req-row.is-new.is-age-day1{border-color:#f3d3b2;background:#fffaf4}'
+ +'.req-row.is-new.is-age-over{border-color:#f0b4b4;background:#fff7f7}'
  +'.req-row.is-done{opacity:.72}'
  +'.req-row-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}'
  /* 9. the row text was too small to scan — every size here went up a step and the
@@ -415,8 +456,12 @@
  +'background:#f5f9ff;border-radius:999px;padding:2px 11px;white-space:nowrap}'
  +'.req-age b{font-family:ui-monospace,Consolas,monospace;font-size:13px;color:#0c225e;'
  +'font-variant-numeric:tabular-nums}'
- +'.req-age.is-waiting{border-color:#f3d3b2;background:#fff6ec;color:#9a6516}'
- +'.req-age.is-waiting b{color:#b4600a}'
+ +'.req-age.is-age-new{border-color:#b6e6c9;background:#f2fbf6;color:#0a6b3d}'
+ +'.req-age.is-age-new b{color:#07603a}'
+ +'.req-age.is-age-day1{border-color:#f3d3b2;background:#fff6ec;color:#9a6516}'
+ +'.req-age.is-age-day1 b{color:#b4600a}'
+ +'.req-age.is-age-over{border-color:#f0b4b4;background:#fff4f4;color:#a3241f}'
+ +'.req-age.is-age-over b{color:#b3261e}'
  /* 4. how many to show, and where the picked-up ones went */
  +'.req-limit{flex:0 1 150px!important}'
  +'.req-moved{margin:0 14px 10px;padding:9px 13px;border-radius:11px;background:#f2f7ff;'
@@ -431,7 +476,9 @@
  +'.req-type-service_quote{background:#fff3e2;border-color:#f3ddbd;color:#9a6516}'
  +'.req-status{font-size:10.5px;font-weight:800;border-radius:999px;padding:2px 9px;'
  +'background:#f2f6fc;border:1px solid #dde7f6;color:#5b6b88}'
- +'.req-status.is-new{background:#fdeee0;border-color:#f3d3b2;color:#b4600a}'
+ +'.req-status.is-age-new{background:#e9f8ef;border-color:#b6e6c9;color:#0a6b3d}'
+ +'.req-status.is-age-day1{background:#fdeee0;border-color:#f3d3b2;color:#b4600a}'
+ +'.req-status.is-age-over{background:#fdecec;border-color:#f0b4b4;color:#b3261e}'
  +'.req-status.is-done{background:#e9f8ef;border-color:#b6e6c9;color:#0a6b3d}'
  +'.req-media{font-size:10.5px;font-weight:800;color:#0b3f9e}'
  +'.req-row-side{flex:none;display:flex;flex-direction:column;gap:7px;align-items:stretch}'

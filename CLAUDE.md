@@ -3919,3 +3919,191 @@ Suite once, at 390×844 and 1440×1000: 3 taps → exactly 1 record on each form
 disabled and reading กำลังส่ง while sending, the success screen replacing the form, a reopened
 form still submitting, an empty required field not locking the form, no overflow, 0 page
 errors — **46 assertions, 0 failures**, plus the 8-assertion reproduction with js/54 blocked.
+
+---
+
+## Session Change Log — 2026-09-14 (part 21): the case page can write, and twenty other things
+
+Three commits — `f27b5d2`, `ffd271c`, `bc2ff04` — all pushed and confirmed live on GitHub
+Pages. Six new JS files, edits to nine existing ones, and one change that invalidates
+something this file has said since part 16.
+
+### ⚠ CORRECTION TO EARLIER ENTRIES IN THIS FILE
+
+**`service-case-detail.html` is no longer read-only.** Part 16 §1 says "It never writes",
+part 19 says "reads and never writes", and the part-19 follow-up repeats it. As of this
+session the page **writes the case status** — locally and to Supabase. The owner was asked
+and chose this over handing every click back to the application.
+
+What it actually does now, and the rules that keep it safe:
+
+- `CaseWrite.patch()` rewrites the one case inside `imode_test_v532_cases`, then sends only
+  the columns that changed with **`update()`, never `upsert()`** — an upsert whose payload
+  does not name every column blanks the rest of the row, and `cloudUpsertCase`'s whitelist
+  is not available here.
+- The connection is read from `imode_v5_cloud`, which js/23 writes on this device the first
+  time the application boots. A `<script src="…supabase-js@2">` tag was added to the page.
+- With no cloud config the local write still happens and the toast says **the change has not
+  left this device** rather than claiming success.
+- Nothing else on the page writes. The `ตอบกลับแล้ว` mirror from part 19 is untouched.
+
+**A trap this exposed, worth keeping:** the page's data adapter (`all()` in section 2) reads
+storage **once and keeps it**. That is right for a page that only reads and wrong the moment
+it writes — the first version saved correctly and then re-rendered from the cached copy, so
+the screen never changed. `CaseDetailData.refresh()` clears it and every write calls it.
+
+### 1. Deletes, permissions, the customer's quotation (`f27b5d2`)
+
+- **ปุ่มลบเคสในหน้าเคสเต็มหน้า** — in the footer, not in the six-button action bar. It hands
+  the case to the application with `intent=delete`; js/28 and js/50 call the existing
+  `imodeDeleteCase()`, which confirms and checks `case.edit`, so a URL carrying that intent
+  can neither delete silently nor delete without the permission.
+- **สิทธิ์รายบุคคล actually did nothing** — `js/55` (new). Measured: the ROLE side was correct
+  all along. Every checkbox on an individual card started **unticked whatever the account
+  really held** (js/20's clone ticks `settings.userPermissions[key].permissions`, which is
+  empty until somebody saves one), and the card is consulted only when its toggle is on. So
+  unticking changed nothing, twice over. Cards are now seeded from the role, any edit switches
+  individual mode on with a line saying so, and a seeded-but-untouched card is put back to
+  empty just before `saveRoles()` collects it — nothing new is persisted for accounts nobody
+  edited. It also refreshes `window.imodeSettingsSnapshot` after a save, closing the path
+  where unticking and then pressing ซิงก์ Cloud brought the permission back from the pre-boot
+  copy.
+- **ลบลูกค้า** — `customer` registered in js/40's `TYPES` (the only place a deletable thing may
+  be registered), delete button in the customer popup gated on `customer.edit`. It states how
+  many machines / cases / quotations are attached first, deletes the cloud row, and refuses
+  บริษัท ไอโมด พลัส จำกัด because `ensureInternalCustomer()` re-creates it.
+- **ลูกค้าเปิดดูใบเสนอราคาได้** — `js/56` (new). The rows on ใบเสนอราคาของฉัน become buttons
+  that open the real `quotationDocHTML()` paper inside the portal, through js/43's
+  `imodeQuoteWithTotals()` so a cloud-loaded quotation keeps its Travel / Pickup / Labor lines
+  and is not zeroed by the `warranty:"false"` string. Printing is the existing
+  `printQuotation()` — the paper carries `#quotePreviewDoc`, so Save-as-PDF works with no new
+  code. Scope is **re-checked on open**, not trusted: the quotation must belong to the scanned
+  machine's customer and must not be ร่าง. js/34 gained one attribute and nothing else.
+
+### 2. The quotation carries its case number (`ffd271c`)
+
+Two faults that looked identical on screen. Measured on every route in, reading the `<select>`
+and the visible combo box separately:
+
+| route | select | visible box |
+|---|---|---|
+| `prepareQuotation(caseId)` | CASE-Q1 | **empty** |
+| `?page=quotation&caseId=` | CASE-Q1 | **empty** |
+| `prepareServiceQuoteFromRequest` (แจ้งปัญหา) | **empty** | empty |
+| `prepareServiceQuoteFromRequest` (ขอราคา) | empty | empty |
+
+1. **js/35 — the combo never followed a programmatic `.value`.** Assigning it fires no event,
+   and `prepareQuotation()`, `loadCaseIntoQuote()`, `resetQuote()` and `renderQuotations()` all
+   set these selects directly. Rather than refresh at a dozen call sites in js/03 and miss the
+   next one, **`value` is shadowed on the element itself**, delegating to the prototype
+   accessor and resyncing the input afterwards. Reads are unchanged and every combo in the
+   project is covered — `qCase`, `qCustomer`, `maCustomer`, the Settings user picker, the
+   onsite machine picker. `selectedIndex` is not shadowed; nothing here assigns it.
+2. **js/57 (new)** — `prepareServiceQuoteFromRequest` / `prepareWarrantyQuoteFromRequest` never
+   touched `qCase`, though `submitPortalIssue()` records the case it opened as `req.caseId`.
+   Only the reference is applied; `loadCaseIntoQuote()` is deliberately not re-run, because the
+   request has already filled the form with what the customer asked for.
+
+A ขอราคา / ขอต่อ Warranty request still leaves the field empty, because those write a
+`lineRequests` row and **no case at all**. ไม่อ้างอิงเคส is the true answer there.
+
+### 3. Twelve requested changes (`bc2ff04`)
+
+| # | where | what |
+|---|---|---|
+| 1+2 | `js/36` | a **รายงาน** group holding รายงาน + สต๊อกอะไหล่; **ราคาและค่าใช้จ่าย** moved to sit directly after งานบริการ |
+| 3+4+9+11 | `js/49` | the requests inbox |
+| 5 | `js/40` | the bin's category buttons and a page size |
+| 6 | `js/58` (new) | the same for ศูนย์แจ้งเตือน |
+| 7+8+12 | `service-case-detail.html` | clickable status circles, split status/edit buttons, case age |
+| 10 | `js/16` | the whole bar on มอบหมายงาน opens the picker |
+
+**The group ids in js/36 are an API.** js/43, js/45 and js/49 insert their own page by id
+(`'service'`, `'money'`), so a group may be re-ordered and renamed but never renumbered away.
+Removing สต๊อกอะไหล่ left คลังและทีมงาน with only ทีมช่าง in it, so it is named **ทีมงาน** now.
+
+**The requests inbox (js/49).** A live `รอมาแล้ว d hh:mm:ss` chip on every row, updated by one
+1-second tick that touches only those spans — the list is never re-rendered for the clock, so a
+half-typed search and the scroll position survive. A show-how-many control beside the type and
+status filters. Every text size went up a step. The **สถานะ** button is gone.
+
+**"เคสไหนเปิดแล้วให้เอาออกจากหน้าคำขอ" could not be taken literally** and the owner was asked.
+`submitPortalIssue()` opens a case the moment the customer sends the form, so every แจ้งปัญหา
+carries a `caseId` from birth — hiding on that test would have emptied the page of problem
+reports entirely and left only quote requests. The test is whether the case has **moved off
+`เคสใหม่`**, i.e. whether anybody has acted on it. A line at the top says how many moved and
+links to the Service Cases page. A request whose case was deleted stays, because it still needs
+attention.
+
+**The bin and the notification centre** share one shape: category cards with the icon, the name
+and the count on three separate lines (the old label was an icon and a name crushed into one
+11px `<small>`), plus a page size. Both are **scoped** — `.trash-kpi` / `.ntf-kpi` — so the
+cases and QC pages keep the compact `.module-kpi-card` they were designed with. js/58 reads the
+category off the key each notice already carries (`auto_visit_`, `auto_urgent_`, `auto_part_`,
+`auto_submit_`, `auto_warranty_`, `auto_assigned_`, `auto_intake_`, `n_`) and stores nothing;
+the base function still owns the badges and they still count everything, not the filtered view.
+
+**The status circles (item 8).** Every step is a button:
+
+- **behind or on** the current step → opens a drawer describing what happened there;
+- **exactly one ahead** → moves the case forward;
+- **further ahead** → `disabled`; stages cannot be skipped.
+
+Step 4 draws the technician's own **nine-status track underneath**, read from `fieldStatusLog`,
+and the case cannot pass it until the technician reaches `จบงาน` or files a report. Clicking the
+blocked step **opens that track and says why** instead of refusing silently. Step 5 links to the
+documents and the report; step 6 closes the case.
+
+**The ViewModel does not carry the field track.** `buildModel()` builds a page shape with only
+what the layout needs, so `fieldStatusLog` is absent and the first version marked nothing done
+and never opened the gate. `m.raw` now holds the record as stored, read-only, beside the
+ViewModel.
+
+**เปลี่ยนสถานะ used to open the case EDIT form**, which is a different job. It now changes the
+status on the page; **แก้ไขเคส** is its own button (item 7). The action bar became
+`auto-fit, minmax(168px,1fr)` to hold seven.
+
+**Item 10** sets the row attributes in `renderAssign()`, not in `caseRow()` — that function is
+shared with งานของฉัน and งานที่สำเร็จแล้ว, where a row means "open the job", not "assign it".
+
+### Documentation published this session
+
+Three artifacts on claude.ai (private to the owner's account, not in the repo): the business
+flow, a complete button-by-button reference with a "สิ่งที่ยังใช้ไม่ได้" section, and six arrow
+diagrams. `docs/imode-flow-map.png` (4000×6188) is the six diagrams on one sheet —
+**untracked, deliberately, pending the owner's decision on whether it belongs in the repo.**
+
+The reference was produced by crawling the running application in a browser, admin and
+technician, every page and every popup. **No button in the project calls a function that does
+not exist.** What "ใช้ไม่ได้" means here is measured and worth keeping:
+
+- **`🔔 เตือนลูกค้า`** on หน้างานช่าง writes a local notification and sends the customer
+  nothing. Hidden from technicians in part 18; **an admin still sees it.**
+- **`settings.sla` — `urgentResponseMin`, `resolutionHours`, `autoEscalateMin`, `workStart`,
+  `workEnd` are read by NOTHING** except the summary line under the menu. Only
+  `repairWarrantyDays` is really used. The SLA screen saves values that drive nothing, and it
+  is a different object from `settings.slaResponse`, which drives the 30-minute clock.
+- Gated on missing config: LIFF ID (`''` → LINE scan and auto-login inert), Messaging API token
+  (no outgoing LINE), Maps API key (**distance must be typed by hand on every quotation**),
+  `backendEndpoint`, and there is no email path at all.
+
+### Tests
+
+`node` is still not installed; syntax is checked by loading each file through `new Function` in
+a headless browser. **64 files clean.** Suites this session, each run at 1440×1000 and 390×844:
+44 (deletes, permissions, customer delete) · 28 (portal quotation) · 16 (combo boxes) · 28
+(sidebar, requests, bin, notifications, assign) · 30 (the case page) · 15 regression.
+**0 failures, 0 page errors.**
+
+### Open / risk
+
+1. **The case page now writes.** A status change made there with no cloud config stays on that
+   device, and `syncCloud()` replaces `cases` wholesale — so it would be lost. The toast says
+   so; the fix is to make sure the device is connected.
+2. `เตือนลูกค้า` should be hidden from the admin too, or wired to something real. One line.
+3. The SLA settings screen should grey out the four fields that do nothing, or they should be
+   implemented. As it stands it reads like the system is timing something.
+4. Unchanged from part 15: `04-anon-uat.sql` means anyone on the internet can read and write
+   this database. The case page's new `update()` goes through the same open door.
+5. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its
+   serial or QR.

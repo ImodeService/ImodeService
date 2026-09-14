@@ -3,6 +3,11 @@
 # Browser / tooling noise
 debug.log
 *.log
+# Headless-test debris that has landed in the repo root before: a Chrome profile from a
+# test run, and a literal "%SystemDrive%" folder from a Windows variable that was never
+# expanded. Neither belongs to the application.
+tmp/
+%SystemDrive%/
 
 # Data exports — these contain real customer records, never publish them
 I-MODE_Service_Backup_*.json

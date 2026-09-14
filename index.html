@@ -915,5 +915,16 @@
      this one keeps every request and is the only place one can be deleted. -->
 <script src="./js/61-v70RequestLogScript.js"></script>
 
+<!-- Beta 1.0: a quote request closes itself. A แจ้งปัญหา has left the inbox since part 21 as
+     soon as its case was picked up; ขอราคา Service / ขอราคา Warranty had no way out at all,
+     because nothing linked a quotation back to the request it was built from. -->
+<script src="./js/62-v70RequestQuoteCloseScript.js"></script>
+
+<!-- Beta 1.0: the technician's sheet drops the Checklist block (form, stored record and the
+     printed ใบตรวจ together, so nothing prints eleven unchecked "ปกติ" rows), and จบงาน asks
+     for confirmation and then really finishes the case so the job leaves งานของฉัน.
+     Must stay after js/32 — its openModal wrapper has to see the sheet markup first. -->
+<script src="./js/63-v70FieldSheetScript.js"></script>
+
 </body>
 </html>

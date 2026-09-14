@@ -48,12 +48,47 @@
   var c=caseById(jobId);
   return c||null;
  }
+ /* THE JOB THE TECHNICIAN LOOKED AT LAST (2026-09-15).
+
+    Reported: "โมดุลหน้างานอะ อยากให้เวลากดแล้วจะเป็นเคสหน้างานของช่างที่ช่างเปิดดูล่าสุด".
+    Opening หน้างาน from the module card, the bottom bar or a Home shortcut used to re-pick
+    by next appointment, so a technician who was halfway through a job could be handed a
+    different one. The last job opened is remembered per technician and wins, as long as it
+    is still theirs and still open — a job that has been closed, reassigned or deleted falls
+    through to the appointment order below rather than showing something stale.
+
+    Its own key, not `settings`: it is a per-device convenience about where somebody was
+    looking, it must not travel to other devices, and losing it costs nothing. */
+ var LAST_KEY='imode_v70_field_last_job';
+ function lastMap(){
+  try{return JSON.parse(localStorage.getItem(LAST_KEY)||'{}')||{}}catch(e){return {}}
+ }
+ function rememberJob(id){
+  var tid=myTechId();
+  if(!tid||!id)return;
+  try{
+   var m=lastMap();
+   if(m[tid]===id)return;
+   m[tid]=id;
+   localStorage.setItem(LAST_KEY,JSON.stringify(m));
+  }catch(e){}
+ }
  /* Entering หน้างาน without picking a job — from the sidebar, the bottom bar or a Home
-    card — still has to show one job, so the technician's most current one is chosen.
+    card — still has to show one job, so the one the technician was last on is chosen, and
+    failing that their most current one.
     Anyone who is not a technician (an admin previewing a queue) gets the original list. */
  function autoPick(){
   var tid=myTechId();
   if(!tid)return '';
+  var last=lastMap()[tid]||'';
+  if(last){
+   var lc=caseById(last);
+   if(lc&&!isClosed(lc)){
+    var still=(typeof window.imodeIsAssignedTo==='function')
+     ? window.imodeIsAssignedTo(lc,tid) : lc.assignee===tid;
+    if(still)return last;
+   }
+  }
   /* Any technician on the job, not only its lead — js/38 keeps c.assignees beside the
      lead and this is the screen a second technician actually works from. */
   var onIt=(typeof window.imodeIsAssignedTo==='function')
@@ -72,6 +107,7 @@
   var c=caseById(id);
   if(!c)return;
   jobId=id;
+  rememberJob(id);
   if(typeof window.goPage==='function')window.goPage('field-service');
   if(typeof window.renderFieldService==='function')window.renderFieldService();
  };

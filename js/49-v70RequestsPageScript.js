@@ -120,7 +120,12 @@
   try{return (Array.isArray(cases)?cases:[]).filter(function(c){return c.id===r.caseId})[0]||null}
   catch(e){return null}
  }
+ /* 2026-09-15: a request that is finished leaves too — "เวลาทำเสร็จแล้วคำขอนั้นจะหายไปจาก
+    หน้าคำขอ". For a quote request that moment is the ส่งให้ลูกค้า press, which js/62 turns into
+    status เสร็จสิ้น on this row; for anything else it is somebody marking it done by hand.
+    Nothing is lost: ประวัติคำขอ (js/61) keeps every request ever received. */
  function pickedUp(r){
+  if(isDone(r))return true;
   var c=caseOf(r);
   return !!(c&&String(c.status||'')!=='เคสใหม่');
  }
@@ -278,7 +283,7 @@
    +'<div class="req-kpi-box'+(newCount()?' is-new':'')+'"><small>'+esc2(tl('ใหม่ · รอรับเรื่อง','New'))+'</small><b>'+all.filter(isNew).length+'</b></div>'
    +'<div class="req-kpi-box"><small>'+esc2(tl('กำลังดำเนินการ','In progress'))+'</small><b>'
    +all.filter(function(r){return !isNew(r)&&!isDone(r)}).length+'</b></div>'
-   +'<div class="req-kpi-box"><small>'+esc2(tl('เสร็จสิ้น','Done'))+'</small><b>'+all.filter(isDone).length+'</b></div>'
+   +'<div class="req-kpi-box"><small>'+esc2(tl('ปิดเรื่องแล้ว','Closed'))+'</small><b>'+everything.filter(isDone).length+'</b></div>'
    +'<div class="req-kpi-box"><small>'+esc2(tl('ทั้งหมด','Total'))+'</small><b>'+all.length+'</b></div>'
    +'</div>'
    +'<div class="req-filters">'
@@ -302,10 +307,13 @@
        +esc2(tl('แสดง ','Show ')+o[1])+'</option>';
      }).join('')+'</select>'
    +'</div>'
-   +(moved?'<p class="req-moved">'+esc2(tl('มีคนรับเรื่องแล้ว ','Picked up: ')+moved
-      +tl(' คำขอ — ย้ายไปติดตามที่หน้าเคสงานบริการแล้ว',' request(s) — now tracked on the Service Cases page'))
+   +(moved?'<p class="req-moved">'+esc2(tl('รับเรื่อง / ปิดเรื่องแล้ว ','Handled: ')+moved
+      +tl(' คำขอ — ออกจากกล่องคำขอแล้ว ดูต่อได้ที่หน้าเคสงานบริการหรือประวัติคำขอ',
+          ' request(s) — out of the inbox; follow them on the Service Cases page or in the request history'))
       +' <button type="button" class="req-link" onclick="goPage(&quot;cases&quot;)">'
-      +esc2(tl('ไปที่หน้าเคส','Go to cases'))+' ›</button></p>':'')
+      +esc2(tl('ไปที่หน้าเคส','Go to cases'))+' ›</button>'
+      +' <button type="button" class="req-link" onclick="goPage(&quot;request-log&quot;)">'
+      +esc2(tl('ประวัติคำขอทั้งหมด','Full request history'))+' ›</button></p>':'')
    +'<div class="req-list">'+(shown.length?shown.map(rowHTML).join('')
       :'<div class="empty">'+esc2(all.length?tl('ไม่พบคำขอตามเงื่อนไขนี้','No request matches this filter')
                                             :tl('ยังไม่มีคำขอจากลูกค้า','No customer requests yet'))+'</div>')+'</div>'

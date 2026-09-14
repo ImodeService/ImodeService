@@ -167,6 +167,16 @@ a{color:var(--imode-blue)}
 .sd-ok{margin:10px 0 0;font-size:13px;font-weight:700;color:var(--ok)}
 .sd-wait{margin:10px 0 0;font-size:13px;font-weight:700;color:#9a6516}
 .sd-acts{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}
+.sd-team{margin-top:12px}
+.sd-team>b{display:block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:7px}
+.sd-members{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+.sd-member{display:flex;align-items:center;gap:9px;border:1px solid var(--line-2);border-radius:11px;
+  padding:9px 11px;background:#fff;cursor:pointer;font-size:13px}
+.sd-member.is-on{border-color:var(--imode-blue);background:#f3f8ff}
+.sd-member span{font-weight:700;color:var(--imode-navy)}
+.sd-member small{margin-left:auto;color:var(--muted);font-size:11.5px}
+.sd-member input{width:17px;height:17px;flex:0 0 auto}
 .sd-go{border:1px solid var(--line-2);background:#fff;border-radius:11px;padding:9px 14px;
   font:inherit;font-size:12.5px;font-weight:700;color:var(--imode-navy);cursor:pointer}
 .sd-go:hover{border-color:var(--imode-blue);color:var(--imode-blue)}
@@ -591,6 +601,9 @@ var CaseDetailData=(function(){
     loadMachine:function(machineId){return Promise.resolve(byId(all().machines,machineId))},
     loadCustomer:function(customerId){return Promise.resolve(byId(all().customers,customerId))},
     loadTechnician:function(techId){return Promise.resolve(byId(all().technicians,techId))},
+    allTechnicians:function(){return all().technicians.slice()},
+    currentUser:function(){return all().user},
+    roles:function(){return (all().settings.roles)||[]},
     loadMachineHistory:function(machineId){
       return Promise.resolve(all().cases.filter(function(c){return c.machineId===machineId}));
     },
@@ -876,6 +889,13 @@ var CaseWrite=(function(){
     if(!sb)return Promise.resolve({ok:true,cloud:false});
     var row={updated_at:hit.updatedAt};
     if('status' in changes)row.status=changes.status;
+    /* service_cases has one `assignee` column and no `assignees`. js/38 puts the whole crew
+       in it as a comma list, lead first, and splits it apart again on the way in — so this
+       page has to write the same shape or a two-technician job would come back as one. */
+    if('assignees' in changes||'assignee' in changes){
+      var crew=changes.assignees||(changes.assignee?[changes.assignee]:[]);
+      row.assignee=crew.length?crew.join(','):null;
+    }
     try{
       return Promise.resolve(sb.from('service_cases').update(row).eq('id',caseId))
         .then(function(r){
@@ -884,7 +904,27 @@ var CaseWrite=(function(){
         },function(e){console.warn('[scd] cloud update threw',e);return {ok:true,cloud:false,error:e}});
     }catch(e){return Promise.resolve({ok:true,cloud:false,error:e})}
   }
-  return {setStatus:function(id,status){return patch(id,{status:status})},configured:function(){return !!cfg()}};
+  return {
+    setStatus:function(id,status){return patch(id,{status:status})},
+    /* Assigning is the one other thing this page may change. The lead is always ids[0], the
+       same rule js/38 enforces, so `assignee` and `assignees` can never disagree. A case
+       still sitting at เคสใหม่ moves on to มอบหมายแล้ว in the same write, exactly as
+       js/16's imodeAssignCase() does it — and the technician's own device derives the
+       "you have been given a job" notice from the case itself (part 16 §5), so nothing
+       else has to be sent. */
+    setAssignees:function(id,ids,caseStatus){
+      var crew=[],seen={};
+      (ids||[]).forEach(function(v){
+        var t=String(v||'').trim();
+        if(!t||seen[t])return;
+        seen[t]=1;crew.push(t);
+      });
+      var changes={assignees:crew,assignee:crew[0]||''};
+      if(crew.length&&caseStatus==='เคสใหม่')changes.status='มอบหมายแล้ว';
+      return patch(id,changes);
+    },
+    configured:function(){return !!cfg()}
+  };
 })();
 
 /* ---------- what the technician has done, read from the case ---------- */
@@ -1069,7 +1109,7 @@ function stepDrawerHTML(m,i){
       +(t?'<dl class="sd-kv"><dt>ช่างผู้รับผิดชอบ</dt><dd>'+esc(t.name||'-')+'</dd>'
           +'<dt>มอบหมายเมื่อ</dt><dd>'+esc(fmtDateTime(m.assignment.assignedAt))+'</dd></dl>'
         :'<p class="sd-empty">ยังไม่ได้มอบหมายช่าง</p>')
-      +'<div class="sd-acts"><button type="button" class="sd-go" data-action="assign-technician">ไปหน้ามอบหมายงาน ›</button></div>';
+      +'<div class="sd-acts"><button type="button" class="sd-go" data-action="assign-technician">เลือกช่าง / มอบหมายงาน ›</button></div>';
   }
   if(i===2){
     return head('3. นัดหมายบริการ','วันเวลาที่นัดลูกค้าไว้')
@@ -1297,7 +1337,109 @@ function appLink(page,extra){
 }
 function goApp(page,extra){window.location.href=appLink(page,extra)}
 
-function assignTechnician(){goApp('assign','&caseId='+encodeURIComponent(caseDetailModel.case.id))}
+/* มอบหมายงาน — ON THIS PAGE (2026-09-15).
+
+   Reported: "ปุ่มมอบหมายงานในหน้ารายละเอียดเคสอยากให้กดแล้วสามารถมอบหมายได้เลย ไม่จำเป็นต้อง
+   เข้าไปหน้ามอบหมาย ที่มีหลายๆเคสเพราะมันจะงง". It used to send the visitor to the มอบหมายงาน
+   page, which is a list of every case waiting — so after a full page load they had to find
+   again the case they were already looking at. And since the same day that page only lists
+   cases with NO technician, it could not have been used to change one either.
+
+   Same rules as js/16's picker, so the two cannot disagree: the first technician ticked is
+   the lead, a team lead may only pick inside their own team, and an admin (teamScope null)
+   sees everybody. */
+function teamScope(){
+  var u=CaseDetailData.currentUser();
+  if(!u)return null;
+  var rec=null,list=CaseDetailData.allTechnicians();
+  if(u.technicianId)rec=list.filter(function(t){return t.id===u.technicianId})[0]||null;
+  if(rec&&rec.team)return rec.team;
+  var role=CaseDetailData.roles().filter(function(r){return r.name===(u.permissionRole||u.role)})[0];
+  if(role&&role.teamScope)return role.teamScope;
+  if(u.accountType==='technician')return u.team||'Technical';
+  return null;
+}
+function caseCrew(){
+  var raw=caseDetailModel.raw||{};
+  var out=[];
+  if(Array.isArray(raw.assignees))out=raw.assignees.slice();
+  if(!out.length&&raw.assignee)out=String(raw.assignee).split(',');
+  return out.map(function(v){return String(v||'').trim()}).filter(Boolean);
+}
+/* Selection order decides the lead, so it is kept as an array rather than read back off the
+   check boxes in DOM order. */
+var assignPick=[];
+function assignPanelHTML(){
+  var scope=teamScope();
+  var list=CaseDetailData.allTechnicians().filter(function(t){return !scope||(t.team||'Technical')===scope});
+  if(!list.length){
+    return '<p class="sd-hint">ไม่มีช่างในขอบเขตของบัญชีนี้</p>';
+  }
+  var teams=[];
+  list.forEach(function(t){var k=t.team||'Technical';if(teams.indexOf(k)<0)teams.push(k)});
+  var body=teams.map(function(team){
+    return '<div class="sd-team"><b>ทีม '+esc(team)+'</b><div class="sd-members">'
+      +list.filter(function(t){return (t.team||'Technical')===team}).map(function(t){
+        var on=assignPick.indexOf(t.id)>=0;
+        return '<label class="sd-member'+(on?' is-on':'')+'">'
+          +'<input type="checkbox" data-assign-tech="'+esc(t.id)+'"'+(on?' checked':'')+'>'
+          +'<span>'+esc(t.name||t.id)+'</span>'
+          +'<small>'+esc(t.status||'พร้อมรับงาน')+'</small></label>';
+      }).join('')+'</div></div>';
+  }).join('');
+  var names=assignPick.map(function(id){
+    var t=list.filter(function(x){return x.id===id})[0];
+    return (t&&t.name)||id;
+  });
+  return body
+    +'<p class="sd-hint" id="scdAssignPicked">'
+    +(names.length?'เลือกไว้: <b>'+esc(names.join(', '))+'</b> · หัวหน้างานคือคนแรกที่เลือก'
+                 :'ยังไม่ได้เลือกช่าง')+'</p>'
+    +'<div class="sd-acts"><button type="button" class="sd-go" data-action="do-assign">'
+    +(caseCrew().length?'บันทึกการเปลี่ยนช่าง':'มอบหมายงาน')+' ›</button></div>';
+}
+function assignTechnician(){
+  if(!can('case.assign')){toast('บัญชีนี้ไม่มีสิทธิ์มอบหมายงาน');return}
+  assignPick=caseCrew();
+  panel('มอบหมายงานให้ช่าง',assignPanelHTML());
+}
+function refreshAssignPanel(){
+  var host=el('scdPanel');
+  if(!host||!host.querySelector('[data-assign-tech]'))return;
+  var card=host.querySelector('.card');
+  if(!card)return;
+  /* Only the part below the check boxes is rewritten — redrawing the list would drop the
+     focus the person is using to tick the next name. */
+  var tip=el('scdAssignPicked');
+  var names=assignPick.map(function(id){
+    var t=CaseDetailData.allTechnicians().filter(function(x){return x.id===id})[0];
+    return (t&&t.name)||id;
+  });
+  if(tip)tip.innerHTML=names.length
+    ? 'เลือกไว้: <b>'+esc(names.join(', '))+'</b> · หัวหน้างานคือคนแรกที่เลือก'
+    : 'ยังไม่ได้เลือกช่าง';
+}
+function doAssign(){
+  var c=caseDetailModel.case;
+  if(!c||!c.id)return;
+  if(!can('case.assign')){toast('บัญชีนี้ไม่มีสิทธิ์มอบหมายงาน');return}
+  if(!assignPick.length){toast('กรุณาเลือกช่างอย่างน้อย 1 คน');return}
+  toast('กำลังบันทึก…');
+  CaseWrite.setAssignees(c.id,assignPick,c.status).then(function(r){
+    if(!r||!r.ok){toast('บันทึกไม่สำเร็จ — ลองทำจากระบบหลัก');return}
+    openStep=null;
+    try{CaseDetailData.refresh()}catch(e){}
+    load().then(function(res){
+      if(res&&!res.error)renderPage(res);
+      var names=assignPick.map(function(id){
+        var t=CaseDetailData.allTechnicians().filter(function(x){return x.id===id})[0];
+        return (t&&t.name)||id;
+      });
+      toast(r.cloud?('มอบหมายให้ '+names.join(', ')+' แล้ว')
+                   :('มอบหมายให้ '+names.join(', ')+' แล้ว · ยังอยู่เฉพาะเครื่องนี้ ยังไม่ได้ส่งขึ้นระบบกลาง'));
+    });
+  });
+}
 function scheduleService(){goApp('cases','&caseId='+encodeURIComponent(caseDetailModel.case.id)+'&intent=schedule')}
 function openQuotation(){goApp('quotation','&caseId='+encodeURIComponent(caseDetailModel.case.id))}
 function openFieldService(){goApp('field-service')}
@@ -1590,6 +1732,7 @@ function feedbackHTML(){
    ======================================================================= */
 var HANDLERS={
   'assign-technician':assignTechnician,
+  'do-assign':doAssign,
   'schedule-service':scheduleService,
   'contact-customer':openContactPicker,
   'open-quotation':openQuotation,
@@ -1643,6 +1786,19 @@ document.addEventListener('click',function(e){
   if(!btn)return;
   var fn=HANDLERS[btn.getAttribute('data-action')];
   if(fn){e.preventDefault();fn()}
+});
+/* The crew check boxes answer `change`, not `click`: a click that lands on the label text
+   never reaches the input through closest(), and the order the boxes are ticked in is what
+   decides the lead. */
+document.addEventListener('change',function(e){
+  var tech=e.target&&e.target.closest&&e.target.closest('[data-assign-tech]');
+  if(!tech)return;
+  var tid=tech.getAttribute('data-assign-tech'),at=assignPick.indexOf(tid);
+  if(tech.checked&&at<0)assignPick.push(tid);
+  else if(!tech.checked&&at>=0)assignPick.splice(at,1);
+  var lab=tech.closest('.sd-member');
+  if(lab)lab.classList.toggle('is-on',!!tech.checked);
+  refreshAssignPanel();
 });
 el('scdSearch').addEventListener('keydown',function(e){
   if(e.key==='Enter'&&this.value.trim())goApp('cases','&q='+encodeURIComponent(this.value.trim()));

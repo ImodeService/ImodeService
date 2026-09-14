@@ -632,6 +632,10 @@ Added later, same rules apply:
 `imode_v70_case_responded` the ตอบกลับแล้ว stamps recorded on this device, re-applied after a sync
                            that did not carry them, and the only way service-case-detail.html
                            (which never writes) can record one
+`imode_v70_field_last_job` `{technicianId: caseId}` — the job each technician had open on หน้างาน
+                           last, so opening the module again reopens it instead of re-picking by
+                           appointment. Per device on purpose; losing it only changes which job
+                           หน้างาน opens with
 
 Clearing `imode_v69_session` signs the user out; clearing `imode_v69_local_pw` restores
 the built-in UAT passwords; clearing `imode_v70_trash_blob` makes the large entries in the
@@ -3937,6 +3941,9 @@ and chose this over handing every click back to the application.
 
 What it actually does now, and the rules that keep it safe:
 
+- **As of 2026-09-15 it also writes the assignee** (part 22 §2) — `CaseWrite.setAssignees()`,
+  which is the มอบหมายงาน button. The crew crosses the wire as js/38's comma list in the one
+  `assignee` column.
 - `CaseWrite.patch()` rewrites the one case inside `imode_test_v532_cases`, then sends only
   the columns that changed with **`update()`, never `upsert()`** — an upsert whose payload
   does not name every column blanks the rest of the row, and `cloudUpsertCase`'s whitelist
@@ -4107,3 +4114,185 @@ a headless browser. **64 files clean.** Suites this session, each run at 1440×1
    this database. The case page's new `update()` goes through the same open door.
 5. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its
    serial or QR.
+---
+
+## Session Change Log — 2026-09-15 (part 22): the queue empties itself
+
+Seven reported items about work leaving a screen once it has been dealt with. Two new JS
+files, small edits to three existing ones and to `service-case-detail.html`. No storage key
+renamed, no Supabase setting touched, no schema change, version untouched.
+
+| File | What |
+|---|---|
+| `js/62-v70RequestQuoteCloseScript.js` | **new** — a quote request closes itself when the quotation is sent |
+| `js/63-v70FieldSheetScript.js` | **new** — the Checklist leaves the system; จบงาน asks, then really finishes |
+| `js/16-v69WorkAssignScript.js` | มอบหมายงาน lists only what is still waiting |
+| `js/49-v70RequestsPageScript.js` | a finished request leaves the inbox too |
+| `js/32-v70FieldWorkspaceScript.js` | หน้างาน reopens the job the technician had open last |
+| `service-case-detail.html` | the มอบหมายงาน button assigns **on the page** |
+
+### What was already true, measured before changing anything
+
+Two of the seven needed no work, and saying so is the point:
+
+- **Item 4 — tapping a row in งานของฉัน already opens หน้างาน for that case.** Driven in a
+  browser: the row click lands on `#page-field-service` with `imodeFieldJobId()` returning
+  that case. js/32 has done it since part 17. What looked like a failure is item 7 — entering
+  หน้างาน from the module card, where the job was re-picked by appointment.
+- **Item 3, first half — a แจ้งปัญหา already leaves the inbox** once its case moves off
+  `เคสใหม่` (js/49's `pickedUp()`, part 21). It was the quote requests that could never leave.
+
+And the owner was right about เช็คประกัน: `showPortalWarranty()` answers the customer on the
+spot and writes **no request at all**. `warranty_check` is a filter label in js/49 and js/61
+that no code path can produce. The thing that does arrive is `warranty_quote` — ขอต่อประกัน.
+
+### 1. มอบหมายงาน is a queue, not a directory
+
+`assignableCases()` listed every open case with the unassigned merely sorted first, so the
+two or three that needed a decision were buried under the ones that had already had it. A
+case now leaves **the moment it has a technician**. The KPI row becomes
+รอมอบหมาย / มอบหมายแล้ว·กำลังทำ / ช่างในระบบ, and a line under it says how many are in flight
+with a link to the Service Cases page.
+
+**Consequence, and the reason item 2 had to ship with it:** changing the technician later
+cannot be done here any more — the case is not on the page. That is what the case-detail
+button is now for.
+
+### 2. The case page assigns, and that is a second thing it writes
+
+`assignTechnician()` used to navigate to `?page=assign`, which after §1 could not have
+reassigned anything either, and which since js/46 costs a full page load. It now opens a panel
+**on the page**: technicians grouped by team, check boxes, first ticked is the lead.
+
+- `CaseWrite.setAssignees(id, ids, status)` writes `assignee` + `assignees` locally and sends
+  **js/38's comma list in the one `assignee` column** — `service_cases` has no `assignees`
+  column, so writing anything else would arrive as one technician. `update()`, never `upsert()`,
+  as before.
+- A case still at `เคสใหม่` moves to `มอบหมายแล้ว` in the same write, exactly as
+  `imodeAssignCase()` does it. **No notification is written**: since part 16 §5 the "you have
+  been given a job" notice is derived from the case, so the assignee field is the whole message
+  and it reaches the technician's device through the case row.
+- Team scope is mirrored from js/13's rule, so a team lead still cannot reach outside their own
+  team and an admin still sees everybody.
+- Gated on `case.assign` at the panel and again at the write.
+
+**The check boxes answer `change`, not `click`.** A click on the label text has the `<span>` as
+its target and `closest('[data-assign-tech]')` never finds the input, so a click listener
+silently loses every tick made by tapping the name — which is how a phone is used.
+
+### 3. A quote request closes when the quotation is sent
+
+Nothing in the project had ever linked a quotation back to the request it was built from, so
+ขอราคา Service and ขอราคา Warranty sat in the inbox for ever however much work was done.
+
+- ทำใบเสนอราคา on a request moves it to `กำลังดำเนินการ` — somebody has it, it is still listed.
+- Saving the quotation records the link.
+- ส่งให้ลูกค้า marks the request `เสร็จสิ้น`, and js/49's `pickedUp()` now treats that as out of
+  the inbox. **Nothing is lost** — ประวัติคำขอ (js/61) keeps every request ever received.
+
+**Where the link lives, and why.** `cloudUpsertQuotation()` writes an explicit whitelist — the
+same one that already drops the derived breakdown (part 18 §4) — so a field on the quotation
+would never leave the device. It is kept in `settings.quoteRequestLink`, because settings travel
+whole. When even that is missing (prepared on one device, sent from another) the send falls back
+to matching on customer + machine + kind, and **refuses to guess between two**: a Warranty
+request is only ever closed by a `WP` quotation and a Service request only by a non-`WP` one.
+The close itself always travels, because `status` is in `cloudUpsertLineRequest()`'s whitelist.
+
+### 5. The Checklist leaves the system
+
+Eleven rows of ปกติ / หมายเหตุ at the top of the technician's sheet. Out of the whole system
+at the owner's instruction, **including the printed ใบตรวจ** — which took three changes
+together, because leaving any one of them would have printed a lie:
+
+| | |
+|---|---|
+| the editor | `window.renderChecklistEditor` returns `''` |
+| the heading and the "Checklist จะเปลี่ยนตามประเภทงาน" hint | removed from the form markup as it passes through `openModal()` |
+| what is stored | `checklistTemplate` is swapped for one returning `[]` **around the call** to `saveServiceReport()` |
+
+`#checklistEditor` itself is **kept, empty and hidden** — `changeReportWorkType()` writes to it
+as an id global and would throw without it, the same reason `#fieldQueue` and
+`#portalLineIdentity` are still in the document.
+
+**The swap is the part worth remembering.** `saveServiceReport()` does `template.map(...)` with
+`document.getElementById('src'+i)?.value||'OK'`, so a hidden editor would have stored a full
+pass on eleven points nobody looked at. An async function runs synchronously up to its first
+`await`, and `const check=template.map(...)` is well before it, so replacing the template for the
+duration of the call is exact and nothing else sees it.
+
+Reports written before this keep their checklist in storage; it simply stops being printed.
+**QC's checklist is a different thing** (`QC_CHECKLIST_MASTER`) and is untouched.
+
+### 6. จบงาน asks, then really finishes
+
+`saveFieldStatus()` maps จบงาน to `รอส่งงาน` (js/03 line 978), which is not a closed status, so
+the job stayed on งานของฉัน looking exactly as unfinished as before. Pressing it now asks first —
+saying whether the ใบตรวจ has been filed, because that is the one thing the technician cannot go
+back for once the job has left their list — and on yes the case lands on `เสร็จสิ้น`, the status
+the submit path has used since part 18. The job leaves งานของฉัน (js/44 drops closed rows) and is
+in งานที่สำเร็จแล้ว (js/45); a technician is taken back to งานของฉัน.
+
+**The hook is `window.saveFieldStatus`, not any one button.** Three screens reach จบงาน through
+it — js/32's step bar on the page, js/26's stepper in the popup and js/03's own status modal.
+Only that one word is intercepted; every other step is untouched, and a case a coordinator had
+parked at `รออะไหล่`, or one already closed, is left alone.
+
+### 7. หน้างาน reopens the job the technician had open last
+
+`autoPick()` re-picked by next appointment, so a technician halfway through a job and coming
+back through the module card, the bottom bar or a Home shortcut could be handed a different one.
+The last job **opened** is remembered per technician in `imode_v70_field_last_job` and wins, as
+long as it is still theirs and still open — closed, reassigned or deleted falls through to the
+appointment order. Its own key rather than `settings`: it is a per-device note about where
+somebody was looking and it must not travel.
+
+### Tests
+
+Four suites in the session scratchpad, run at 1440×1000 and 390×844, **63 + 11 assertions,
+0 failures, 0 page errors**:
+
+- **t1 (15)** — the assign page listing only what waits, its KPI and its in-flight line, a case
+  leaving the instant it is assigned; the quote request marked in progress, the link recorded,
+  still listed before the send, closed by the send, gone from the inbox, the other request
+  untouched, and both still in ประวัติคำขอ.
+- **t2 (21)** — a technician's row opening หน้างาน for that case; no checklist rows and no
+  Checklist heading on the sheet while the sheet, `#checklistEditor` and `changeReportWorkType()`
+  all still work; the module reopening the remembered job; จบงาน asking, the question naming the
+  ใบตรวจ, **cancel changing nothing**, accept finishing the case, the job leaving งานของฉัน and
+  turning up in งานที่สำเร็จแล้ว, and an ordinary step asking nothing and still saving.
+- **t3 (16)** — the printed ใบตรวจ dropping the table of an OLD report that still carries one
+  while keeping everything else; the detail page assigning without leaving the page, writing
+  `assignee` + `assignees` + `มอบหมายแล้ว`, pre-ticking the existing crew on reopen, a crew of two
+  keeping its lead, and the application reading both back through `imodeCaseAssignees()`.
+- **t4 (11 ×2)** — 24 sidebar pages open, both version strings, no horizontal overflow, the
+  machines pager, the cases KPI, the report popup with its parts editor and both signature pads
+  and no checklist, and an unrelated popup still opening.
+
+`node --check` passes on every file in `js/`, `auth/` and `pages/`, and the detail page's inline
+script parses through `new Function`.
+
+Known-benign, unchanged: `goPage('my-work')` bounces for an admin (no `mywork.view`, part 13),
+and the `sw.js` 404.
+
+**Harness note worth keeping:** `/json/list` on the DevTools endpoint returns extension
+background pages too, and its first entry is often one of them — attaching to it gives a session
+that navigates nothing and evaluates in the wrong context, with `readyState` complete, no error
+and an empty document. Filter for `type=='page'`, and pass `--disable-extensions`.
+
+### Open / risk
+
+1. **The มอบหมายงาน page can no longer change a technician**, by design. The way to do it is the
+   case page's own button. Anyone used to the old page will look there first.
+2. The quotation → request link lives in `settings.quoteRequestLink` and grows by one short
+   string per quotation built from a request. Nothing prunes it.
+3. A report saved from now on stores `checklist:[]`. Nothing reads that field except the printed
+   sheet, which no longer prints it, but an export written against it would come back empty.
+4. จบงาน now closes the case, so a technician who files the ใบตรวจ afterwards has to reach the
+   job through งานที่สำเร็จแล้ว. The confirmation says so.
+5. Unchanged from part 21: the case page writes, and a write made with no cloud config stays on
+   that device — `syncCloud()` replaces `cases` wholesale. The toast says so.
+6. Unchanged from part 15: `04-anon-uat.sql` means anyone on the internet can read and write this
+   database.
+7. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its
+   serial or QR.
+

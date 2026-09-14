@@ -189,12 +189,25 @@
  };
 
  /* ---------- 4. มอบหมายงาน ---------- */
+ /* THE PAGE IS A QUEUE, NOT A DIRECTORY (2026-09-15).
+
+    Reported: "หลังจากที่มอบหมายงานแล้วอยากให้เคสนั้นหายไปจากหน้ามอบหมายงานเลย". It used to list
+    every open case with the unassigned ones merely sorted first, so the list only grew and the
+    two or three cases that actually needed a decision were buried under the ones that had
+    already had it. A case leaves the moment it has a technician.
+
+    Changing the technician later is therefore NOT done here any more — it is done on the case
+    itself, where the whole case is in front of you: service-case-detail.html's มอบหมายงาน
+    button assigns and reassigns in place. */
  function assignableCases(){
-  return caseList().filter(function(c){return !isClosed(c)}).sort(function(a,b){
-   var aa=a.assignee?1:0,bb=b.assignee?1:0;
-   if(aa!==bb)return aa-bb;                    /* unassigned first */
+  return caseList().filter(function(c){return !isClosed(c)&&!idsOf(c).length}).sort(function(a,b){
    return new Date(b.createdAt||0)-new Date(a.createdAt||0);
   });
+ }
+ /* Open work that already has a technician — not listed, only counted, so the page still says
+    how much is in flight without asking anybody to act on it. */
+ function assignedOpen(){
+  return caseList().filter(function(c){return !isClosed(c)&&idsOf(c).length}).length;
  }
  /* Who this account may hand work to. A team lead stays inside their own team — that is
     the existing teamScope rule and this change does not loosen it. An admin resolves to
@@ -277,20 +290,27 @@
   var host=document.getElementById('page-assign');
   if(!host)return;
   var list=assignableCases();
-  var waiting=list.filter(function(c){return !c.assignee}).length;
+  var waiting=list.length;
+  var running=assignedOpen();
   host.innerHTML='<div class="panel">'
    +'<div class="panel-head toolbar-head"><div><h3>'+esc2(tl('มอบหมายงานให้ช่าง','Assign work to a technician'))+'</h3>'
    +'<p class="subtext">'+esc2(tl('เลือกช่างแล้วกดมอบหมาย ระบบจะแจ้งเตือนช่างและงานจะไปอยู่ใน "งานของฉัน" ของช่างคนนั้น',
                                   'Pick a technician and assign; they are notified and the case appears in their My Work'))+'</p></div>'
    +'<button class="soft-btn" onclick="goPage(\'cases\')">'+esc2(tl('ไปหน้าเคสงานบริการ','Open service cases'))+'</button></div>'
    +'<div class="work-kpi">'
-   +'<div class="work-kpi-box"><small>'+esc2(tl('ยังไม่มีช่าง','Unassigned'))+'</small><b>'+waiting+'</b></div>'
-   +'<div class="work-kpi-box"><small>'+esc2(tl('เคสที่ยังไม่จบ','Open cases'))+'</small><b>'+list.length+'</b></div>'
+   +'<div class="work-kpi-box"><small>'+esc2(tl('รอมอบหมาย','Waiting'))+'</small><b>'+waiting+'</b></div>'
+   +'<div class="work-kpi-box"><small>'+esc2(tl('มอบหมายแล้ว · กำลังทำ','Assigned · running'))+'</small><b>'+running+'</b></div>'
    +'<div class="work-kpi-box"><small>'+esc2(tl('ช่างในระบบ','Technicians'))+'</small><b>'+techList().length+'</b></div>'
    +'</div>'
+   +(running?'<p class="assign-moved">'+esc2(tl('มอบหมายไปแล้ว ','Assigned: ')+running
+      +tl(' เคส — ติดตามและเปลี่ยนช่างได้ที่หน้าเคสงานบริการ',
+          ' case(s) — track them and change the technician on the Service Cases page'))
+      +' <button type="button" class="assign-movedlink" onclick="goPage(&quot;cases&quot;)">'
+      +esc2(tl('ไปที่หน้าเคส','Go to cases'))+' ›</button></p>':'')
    +'<div class="work-list">'+(list.length?list.map(function(c){
      return caseRow(c,pickerHTML(c));
-    }).join(''):'<div class="empty">'+esc2(tl('ไม่มีเคสที่ต้องมอบหมาย','No open cases to assign'))+'</div>')+'</div>'
+    }).join(''):'<div class="empty">'+esc2(tl('ไม่มีเคสรอมอบหมาย — มอบหมายครบทุกเคสแล้ว',
+                                              'Nothing waiting — every open case has a technician'))+'</div>')+'</div>'
    +'</div>';
   /* 10. THE BAR IS THE BUTTON. Reaching for the small ปุ่มเลือกช่าง on a long row is fussy,
      so the row itself opens the picker. Attributes are set here rather than in caseRow()
@@ -555,6 +575,9 @@
  style.id='v69WorkStyle';
  style.textContent=''
  +'.work-kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:12px 0}'
+ +'.assign-moved{margin:0 0 10px;padding:9px 12px;border:1px solid #d7e3f6;border-radius:10px;'
+ +'background:#f4f8ff;color:#31507f;font-size:12.5px;line-height:1.6}'
+ +'.assign-movedlink{border:0;background:none;color:#0b63e5;font:inherit;font-weight:700;cursor:pointer;padding:0}'
  +'.work-kpi-box{background:#f4f8ff;border:1px solid #e2ecfb;border-radius:12px;padding:10px 12px}'
  +'.work-kpi-box small{display:block;font-size:11px;color:#7385a5}'
  +'.work-kpi-box b{font-size:20px;color:#0c225e}'

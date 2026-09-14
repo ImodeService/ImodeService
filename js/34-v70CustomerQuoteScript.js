@@ -68,7 +68,9 @@
  function rowHTML(q,mid){
   var mine=mid&&Array.isArray(q.machineIds)&&q.machineIds.indexOf(mid)>=0;
   var count=(q.machineIds||[]).length;
-  return '<div class="pquote-item">'
+  /* The id travels on the row so js/56 can turn it into a button that opens the document.
+     On its own the attribute does nothing — remove js/56 and these rows are inert again. */
+  return '<div class="pquote-item" data-pquote-id="'+esc2(q.id||'')+'">'
    +'<div class="pquote-top">'
    +'<b>'+esc2(q.id||'-')+'</b>'
    +'<span class="pquote-status '+statusTone(q.status)+'">'+esc2(q.status||'-')+'</span>'

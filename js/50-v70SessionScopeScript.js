@@ -86,6 +86,7 @@
    try{
     if(o.intent==='schedule'&&typeof openScheduleModal==='function')openScheduleModal(o.caseId);
     else if(o.intent==='status'&&typeof openCaseModal==='function')openCaseModal(o.caseId);
+    else if(o.intent==='delete'&&typeof window.imodeDeleteCase==='function')window.imodeDeleteCase(o.caseId);
     else if(o.page==='quotation'&&typeof prepareQuotation==='function')prepareQuotation(o.caseId);
    }catch(e){}
   },280);

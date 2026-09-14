@@ -89,6 +89,11 @@
    try{
     if(intent==='schedule'&&typeof openScheduleModal==='function')openScheduleModal(cid);
     else if(intent==='status'&&typeof openCaseModal==='function')openCaseModal(cid);
+    /* ลบเคส from service-case-detail.html. That page reads and never writes, so the delete
+       itself — bin entry, Supabase row, re-render — happens here. imodeDeleteCase() asks
+       for confirmation and checks case.edit, so an URL carrying this intent can neither
+       delete silently nor delete without the permission. */
+    else if(intent==='delete'&&typeof window.imodeDeleteCase==='function')window.imodeDeleteCase(cid);
     else if(page==='quotation'&&typeof prepareQuotation==='function')prepareQuotation(cid);
    }catch(e){}
   },260);

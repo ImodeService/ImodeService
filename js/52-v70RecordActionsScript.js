@@ -122,6 +122,50 @@
   return {ok:true};
  };
 
+ /* ------------------------------------------------------------- customer ---- */
+ /* A customer is the top of the chain — machines, cases, quotations and warranties all point
+    at it — so the counts are stated before anything moves, exactly as the machine delete
+    does, and none of those records is deleted with it. They are orphaned, not wrong, and a
+    bin cannot undo a cascade cleanly.
+
+    บริษัท ไอโมด พลัส จำกัด is refused: ensureInternalCustomer() in js/04 re-creates it on
+    every renderAll(), so deleting it would look like the delete had failed. */
+ window.imodeDeleteCustomer=function(cid){
+  if(!ready())return {ok:false};
+  var cu=null;
+  try{cu=(customers||[]).filter(function(x){return x.id===cid})[0]||null}catch(e){}
+  if(!cu){toast(tl('ไม่พบลูกค้า','Customer not found'));return {ok:false}}
+  if(!can('customer.edit')){
+   if(typeof requirePermission==='function')requirePermission('customer.edit');
+   return {ok:false};
+  }
+  if(String(cu.name||'').trim()==='บริษัท ไอโมด พลัส จำกัด'||cid==='CUST-INTERNAL-IMODE'){
+   toast(tl('ลูกค้าภายในของบริษัทลบไม่ได้ ระบบใช้สำหรับงาน QC และการเบิกอะไหล่',
+            'The internal company record cannot be deleted — QC and parts issue use it'));
+   return {ok:false};
+  }
+  var nm=0,nc=0,nq=0;
+  try{nm=(machines||[]).filter(function(m){return m.customerId===cid}).length}catch(e){}
+  try{nc=(cases||[]).filter(function(c){return c.customerId===cid}).length}catch(e){}
+  try{nq=(quotations||[]).filter(function(q){return q.customerId===cid}).length}catch(e){}
+  if(nm+nc+nq&&!confirm(tl('ลูกค้ารายนี้มี ','This customer has ')
+    +[nm?nm+tl(' เครื่อง',' machine(s)'):'',nc?nc+tl(' เคส',' case(s)'):'',nq?nq+tl(' ใบเสนอราคา',' quotation(s)'):'']
+      .filter(Boolean).join(' · ')
+    +tl(' ผูกอยู่ ข้อมูลเหล่านั้นจะยังอยู่แต่จะไม่มีลูกค้าให้อ้างอิง ต้องการลบต่อหรือไม่?',
+        ' linked. Those records stay but will point at a customer that is gone. Continue?')))return {ok:false};
+  var label=[cu.name,cu.branch].filter(Boolean).join(' · ')||cid;
+  if(!confirmBin(tl('ลูกค้า ','customer ')+label))return {ok:false};
+  window.imodeTrashPut('customer',cu,{title:cu.name||cid,
+   sub:[cu.branch,cu.contact,cu.phone].filter(Boolean).join(' · ')});
+  try{customers=customers.filter(function(x){return x.id!==cid})}catch(e){}
+  cloudDelete('customers',cid);
+  try{if(typeof saveLocal==='function')saveLocal()}catch(e){}
+  try{if(typeof closeModal==='function')closeModal()}catch(e){}
+  try{if(typeof renderAll==='function')renderAll()}catch(e){}
+  toast(tl('ย้ายลูกค้าไปถังขยะแล้ว','Customer moved to the bin'));
+  return {ok:true};
+ };
+
  /* ----------------------------------------------------------- the buttons ---- */
  function binBtn(fn,id,label){
   return '<button type="button" class="soft-btn ra-del" data-ra-del="'+esc2(id)+'"'
@@ -155,6 +199,22 @@
     var row=document.querySelector('#modal .button-row');
     if(!row||row.querySelector('[data-ra-del]'))return r;
     row.insertAdjacentHTML('beforeend',binBtn('imodeDeleteCase',cid,tl('ลบเคส','Delete case')));
+   }catch(e){}
+   return r;
+  };
+ }
+
+ /* The customer popup, which is what a row on the Customers page opens. */
+ var baseCustomerDetail=window.openCustomerDetail;
+ if(typeof baseCustomerDetail==='function'){
+  window.openCustomerDetail=function(cid){
+   var r=baseCustomerDetail.apply(this,arguments);
+   try{
+    if(!cid||!can('customer.edit'))return r;
+    var rows=document.querySelectorAll('#modal .button-row');
+    var row=rows[rows.length-1];
+    if(!row||row.querySelector('[data-ra-del]'))return r;
+    row.insertAdjacentHTML('beforeend',binBtn('imodeDeleteCustomer',cid,tl('ลบลูกค้า','Delete customer')));
    }catch(e){}
    return r;
   };

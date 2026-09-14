@@ -247,6 +247,12 @@ a{color:var(--imode-blue)}
   background:#fff;color:var(--imode-navy);font-weight:700;cursor:pointer;text-decoration:none}
 .scd-back:hover{border-color:#b9d2f4}
 .scd-note-foot{color:var(--muted);font-size:12.5px;max-width:640px}
+/* ลบเคส — destructive, so it never sits in the six-button action bar where a mis-tap
+   costs something. It keeps the footer's shape and states its own danger in colour. */
+.scd-danger{display:inline-flex;align-items:center;gap:9px;padding:13px 20px;border-radius:12px;
+  border:1px solid #e8b4af;background:#fff;color:#b3261e;font-weight:700;cursor:pointer;font-size:14px;font-family:inherit}
+.scd-danger:hover{border-color:#d9534f;background:#fdf3f2;color:#8f1d17}
+.scd-danger:focus-visible{outline:2px solid #b3261e;outline-offset:2px}
 
 /* ---------- states ---------- */
 .scd-state{margin:60px auto;max-width:520px;text-align:center;background:#fff;border:1px solid var(--line-2);border-radius:var(--radius);padding:36px 26px;box-shadow:var(--shadow)}
@@ -358,6 +364,31 @@ function readJSON(key,fallback){
   try{var raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch(e){return fallback}
 }
 function el(id){return document.getElementById(id)}
+/* The same precedence the application's canPermission() uses — an enabled per-user entry
+   wins, otherwise the resolved role's list — read from the same two keys. It is a display
+   gate only: the delete itself is carried out by the application, which checks again with
+   requirePermission(). Enforcement off means everything is allowed, exactly as in the app. */
+function permissionRoleName(u,roles){
+  var raw=String((u&&(u.permissionRole||u.role))||'');
+  var names=(roles||[]).map(function(r){return String(r.name||'')});
+  if(names.indexOf(raw)>=0)return raw;
+  var n=raw.toLowerCase(),find=function(x){return names.indexOf(x)>=0?x:raw};
+  if(n.indexOf('service manager')>=0||n.indexOf('supervisor')>=0)return find('Service Manager');
+  if(n.indexOf('executive secretary')>=0||n.indexOf('admin')>=0||n.indexOf('coordinator')>=0)return find('Admin / Coordinator');
+  if(n.indexOf('technician')>=0||n==='r&d'||n.indexOf('engineer')>=0)return find('Technician');
+  if(n.indexOf('sales')>=0||n.indexOf('marketing')>=0)return find('Sales');
+  return raw;
+}
+function can(key){
+  var s=readJSON(K.settings,{})||{};
+  if(!(s.systemBehavior&&s.systemBehavior.enforceRolePermissions))return true;
+  var u=readJSON(K.user,null);
+  var entry=(s.userPermissions||{})[String((u&&(u.id||u.name))||'').trim()];
+  if(entry&&entry.enabled)return (entry.permissions||[]).indexOf(key)>=0;
+  var roles=Array.isArray(s.roles)?s.roles:[];
+  var r=roles.filter(function(x){return String(x.name||'')===permissionRoleName(u,roles)})[0];
+  return !!(r&&(r.permissions||[]).indexOf(key)>=0);
+}
 function toast(msg){
   var t=el('scdToast');t.textContent=msg;t.classList.add('show');
   clearTimeout(toast._t);toast._t=setTimeout(function(){t.classList.remove('show')},2400);
@@ -932,6 +963,8 @@ function renderPage(m){
     +renderSecondaryActions()
     +'<div class="scd-foot">'
       +'<a class="scd-back" href="'+APP+'?page=cases">← กลับไปหน้ารายการ</a>'
+      +((!m.isMock&&m.case.id&&can('case.edit'))
+        ? '<button type="button" class="scd-danger" data-action="delete-case">🗑 ลบเคสนี้</button>' : '')
       +'<p class="scd-note-foot">'
       +(m.isMock?'ยังไม่พบเคสนี้ในเครื่องนี้ — กำลังแสดงโครงหน้าตัวอย่าง'
                :'หน้านี้อ่านข้อมูลจากระบบเท่านั้น การแก้ไขทั้งหมดยังทำในระบบหลัก')
@@ -964,6 +997,17 @@ function scheduleService(){goApp('cases','&caseId='+encodeURIComponent(caseDetai
 function openQuotation(){goApp('quotation','&caseId='+encodeURIComponent(caseDetailModel.case.id))}
 function openFieldService(){goApp('field-service')}
 function changeCaseStatus(){goApp('cases','&caseId='+encodeURIComponent(caseDetailModel.case.id)+'&intent=status')}
+/* ลบเคส. This page still writes no business data — deleting has to move the record into
+   ถังขยะ, drop the Supabase row and re-render the lists, and only the application can do
+   all three. So the button hands the case over the same way นัดหมาย and เปลี่ยนสถานะ do,
+   with intent=delete, and js/28 calls imodeDeleteCase() there. That function asks for
+   confirmation and checks case.edit itself, which is why this side does not ask twice. */
+function deleteCase(){
+  var id=caseDetailModel&&caseDetailModel.case&&caseDetailModel.case.id;
+  if(!id){toast('ไม่พบเคส');return}
+  toast('กำลังเปิดระบบหลักเพื่อยืนยันการลบเคส…');
+  setTimeout(function(){goApp('cases','&caseId='+encodeURIComponent(id)+'&intent=delete')},450);
+}
 /* This page still writes no business data. Stopping the response clock leaves one entry in
    imode_v70_case_responded — the device-local mirror js/48 owns — and the application
    applies it to the case and pushes it to Supabase on its next load. Handing the visitor
@@ -1143,6 +1187,7 @@ var HANDLERS={
   'open-quotation':openQuotation,
   'open-field-service':openFieldService,
   'change-status':changeCaseStatus,
+  'delete-case':deleteCase,
   'mark-responded':markResponded,
   'open-machine-history':openMachineHistory,
   'open-customer-detail':openCustomerDetail,

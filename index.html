@@ -878,5 +878,17 @@
      second tap made a second case. Loads last so its wrapper sits outside js/19's. -->
 <script src="./js/54-v70SubmitOnceScript.js"></script>
 
+<!-- Beta 1.0: the individual-permission cards in Settings -> ผู้ใช้งานและสิทธิ์ started with
+     every box unticked and were ignored unless a separate toggle was on, so unticking a
+     permission there changed nothing. Must load after js/20 (which clones the cards for the
+     real login accounts) and after js/47 (whose saveRoles wrapper records the opt-outs). -->
+<script src="./js/55-v70UserPermissionFixScript.js"></script>
+
+<!-- Beta 1.0: ใบเสนอราคาของฉัน on the customer page listed a total with nothing behind it.
+     The rows open the real quotationDocHTML() paper, read-only, with the existing print.
+     Loads after js/34 (whose list it wraps) and after js/53 (whose portal back-arrow
+     wrapper it must sit outside of). -->
+<script src="./js/56-v70PortalQuoteViewScript.js"></script>
+
 </body>
 </html>

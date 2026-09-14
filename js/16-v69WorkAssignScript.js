@@ -292,6 +292,15 @@
      return caseRow(c,pickerHTML(c));
     }).join(''):'<div class="empty">'+esc2(tl('ไม่มีเคสที่ต้องมอบหมาย','No open cases to assign'))+'</div>')+'</div>'
    +'</div>';
+  /* 10. THE BAR IS THE BUTTON. Reaching for the small ปุ่มเลือกช่าง on a long row is fussy,
+     so the row itself opens the picker. Attributes are set here rather than in caseRow()
+     because that function is shared with งานของฉัน and งานที่สำเร็จแล้ว, where a row means
+     "open the job", not "assign it". */
+  [].slice.call(host.querySelectorAll('.work-row')).forEach(function(r){
+   r.setAttribute('role','button');
+   r.setAttribute('tabindex','0');
+   r.setAttribute('aria-label',tl('มอบหมายเคส ','Assign case ')+(r.getAttribute('data-case')||''));
+  });
   wireAssign();
  }
  /* Selection order, not DOM order, decides the lead — "คนแรกที่เลือก" has to mean what
@@ -360,6 +369,13 @@
   host=host||document.getElementById('page-assign');
   if(!host||host.__assignWired)return;
   host.__assignWired=true;
+  host.addEventListener('keydown',function(e){
+   if(['Enter',' '].indexOf(e.key)<0)return;
+   var bar=e.target&&e.target.closest&&e.target.closest('.work-row');
+   if(!bar||e.target!==bar)return;
+   e.preventDefault();
+   window.imodeOpenAssignPicker(bar.getAttribute('data-case'));
+  });
   host.addEventListener('click',function(e){
    var t=e.target;
    if(!t||!t.closest)return;
@@ -370,6 +386,13 @@
    }
    var go=t.closest('[data-assign]');
    if(go){window.imodeAssignCase(go.getAttribute('data-assign'));return}
+   /* Anywhere on the bar that is not already a control. The picker lives in the modal, so
+      its own clicks never reach this listener. */
+   var bar=t.closest('.work-row');
+   if(bar&&!t.closest('button,a,input,select,textarea,label')){
+    window.imodeOpenAssignPicker(bar.getAttribute('data-case'));
+    return;
+   }
    var mini=t.closest('.assign-mini');
    if(mini){
     var grp=mini.closest('.assign-team'),box=mini.closest('.assign-panel');
@@ -537,6 +560,10 @@
  +'.work-kpi-box b{font-size:20px;color:#0c225e}'
  +'.work-list{display:flex;flex-direction:column;gap:10px}'
  +'.work-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border:1px solid #e2ecfb;border-radius:14px;background:#fff}'
+ /* Only on มอบหมายงาน does the bar itself do something. */
+ +'#page-assign .work-row{cursor:pointer;transition:border-color .12s ease,box-shadow .12s ease,transform .12s ease}'
+ +'#page-assign .work-row:hover{border-color:#0b63e5;transform:translateY(-1px);box-shadow:0 6px 16px rgba(11,99,229,.12)}'
+ +'#page-assign .work-row:focus-visible{outline:2px solid #0b63e5;outline-offset:2px}'
  +'.work-row-main{display:flex;flex-direction:column;gap:3px;min-width:210px;flex:1}'
  +'.work-row-main b{color:#0c225e;font-size:14px}'
  +'.work-row-main small{color:#5b6b88;font-size:11.5px}'

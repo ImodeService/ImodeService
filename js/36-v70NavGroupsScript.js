@@ -41,19 +41,28 @@
 
  /* Order inside a group is deliberate: the group reads as the sequence of the work.
     งานบริการ is intake -> assign -> the technician's own list -> the site -> the diary. */
+ /* ORDER IS THE READING ORDER OF THE SIDEBAR. ราคาและค่าใช้จ่าย sits directly after
+    งานบริการ because a quotation is part of taking a job in, not a back-office chore.
+    รายงาน is its own group and holds สต๊อกอะไหล่ with it — both are things you go and look
+    up rather than work in. That left คลังและทีมงาน with only ทีมช่าง in it, so it is named
+    ทีมงาน now.
+    THE ids ARE AN API: js/43, js/45 and js/49 insert their own page by group id
+    ('service', 'money'), so an id may be re-ordered and renamed but never renumbered away. */
  var GROUPS=[
   {id:'overview', th:'ภาพรวม',              en:'Overview',
    pages:['dashboard','notifications']},
   {id:'service',  th:'งานบริการ',            en:'Service work',
    pages:['cases','assign','my-work','field-service','calendar']},
-  {id:'assets',   th:'ลูกค้าและเครื่องจักร',   en:'Customers & machines',
-   pages:['customers','machines','qc','warranty','documents']},
   {id:'money',    th:'ราคาและค่าใช้จ่าย',      en:'Pricing & expenses',
    pages:['quotation','onsite','petty-cash']},
-  {id:'stock',    th:'คลังและทีมงาน',         en:'Stock & team',
-   pages:['spare-parts','technicians']},
+  {id:'assets',   th:'ลูกค้าและเครื่องจักร',   en:'Customers & machines',
+   pages:['customers','machines','qc','warranty','documents']},
+  {id:'stock',    th:'ทีมงาน',               en:'Team',
+   pages:['technicians']},
+  {id:'report',   th:'รายงาน',               en:'Reports',
+   pages:['reports','spare-parts']},
   {id:'system',   th:'ระบบ',                 en:'System',
-   pages:['reports','settings','trash']},
+   pages:['settings','trash']},
   {id:'other',    th:'อื่น ๆ',                en:'Other', pages:[]}
  ];
 

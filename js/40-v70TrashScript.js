@@ -458,7 +458,9 @@
   try{return (typeof fmt==='function')?fmt(v):String(v||'')}catch(e){return String(v||'')}
  }
  var filterType='all';
+ var showLimit=25;                       /* 0 = ทั้งหมด */
  window.imodeTrashFilter=function(t){filterType=t||'all';render()};
+ window.imodeTrashLimit=function(v){showLimit=Number(v)||0;render()};
 
  function render(){
   var host=document.getElementById('page-trash');
@@ -471,18 +473,25 @@
   /* The same .module-kpi-card in a .case-kpi-grid that the cases and QC pages use as a
      clickable status filter. The pill row this replaced was the only control of its kind in
      the application and read as a different product. */
-  function card(kind,label,n){
+  /* The label was an icon and a name squeezed into one 11px <small>, which is what made
+     this row unreadable. Icon, name and count are three lines now, each at a size you can
+     read, and the styles are scoped under .trash-kpi so the cases and QC pages keep the
+     compact card they were designed with. */
+  function card(kind,icon,label,n){
    return '<button type="button" class="module-kpi-card" data-kind="'+esc2(kind)+'"'
     +' aria-pressed="'+(filterType===kind)+'" onclick="imodeTrashFilter(\''+esc2(kind)+'\')">'
-    +'<small>'+esc2(label)+'</small><b>'+n+'</b><span>'+esc2(tl('รายการ','items'))+'</span></button>';
+    +'<i class="tk-ico" aria-hidden="true">'+esc2(icon)+'</i>'
+    +'<small class="tk-name">'+esc2(label)+'</small>'
+    +'<b>'+n+'</b><span>'+esc2(tl('รายการ','items'))+'</span></button>';
   }
-  var tabs=card('all',tl('ทั้งหมด','All'),list.length)
+  var tabs=card('all','🗃',tl('ทั้งหมด','All'),list.length)
    +order.map(function(k){
      var t=typeOf(k);
-     return card(k,t.icon+' '+tl(t.th,t.en),counts[k]||0);
+     return card(k,t.icon,tl(t.th,t.en),counts[k]||0);
     }).join('');
 
-  var shown=list.filter(function(e){return filterType==='all'||e.type===filterType});
+  var matching=list.filter(function(e){return filterType==='all'||e.type===filterType});
+  var shown=showLimit?matching.slice(0,showLimit):matching.slice();
   var rows=shown.map(function(e){
    var t=typeOf(e.type),left=daysLeft(e);
    var cls=left<=3?' is-soon':(left<=7?' is-warn':'');
@@ -513,9 +522,21 @@
    +'<div class="panel-head toolbar-head"><div><p class="subtext">'
    +esc2(tl('ข้อมูลที่ลบจะอยู่ที่นี่ '+days+' วัน แล้วระบบจะลบถาวรเอง',
             'Deleted records stay here for '+days+' days, then they are removed for good'))+'</p></div>'
+   +'<div class="trash-headops">'
+   +'<select class="trash-limit" onchange="imodeTrashLimit(this.value)" aria-label="'
+   +esc2(tl('จำนวนที่แสดง','How many to show'))+'">'
+   +[['10','10'],['25','25'],['50','50'],['100','100'],['0',tl('ทั้งหมด','All')]].map(function(o){
+      return '<option value="'+o[0]+'"'+(String(showLimit)===o[0]?' selected':'')+'>'
+       +esc2(tl('แสดง ','Show ')+o[1])+'</option>';
+     }).join('')+'</select>'
    +(list.length?'<button class="soft-btn" data-act="purgeall">'+esc2(tl('ล้างถังขยะทั้งหมด','Empty the bin'))+'</button>':'')
    +'</div>'
+   +'</div>'
    +'<div class="trash-list">'+(shown.length?rows:empty)+'</div>'
+   +(matching.length>shown.length
+     ?'<div class="trash-more"><span>'+esc2(tl('แสดง ','Showing ')+shown.length+tl(' จาก ',' of ')+matching.length)+'</span>'
+      +'<button type="button" class="soft-btn" onclick="imodeTrashLimit(0)">'+esc2(tl('แสดงทั้งหมด','Show all'))+'</button></div>'
+     :'')
    +'</div>';
   wire(host);
  }
@@ -567,7 +588,24 @@
  style.textContent=''
  /* .case-kpi-grid brings the grid, the card look and every breakpoint with it; only the
     margin under the row is this page's own. */
- +'.trash-kpi{display:grid;margin-bottom:14px}'
+ +'.trash-kpi{display:grid;margin-bottom:14px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))!important}'
+ /* Scoped to this page only. The shared card is built for a one-line status count; a bin
+    category needs an icon you can see and a name you can read, so the card grows here and
+    nowhere else. */
+ +'.trash-kpi .module-kpi-card{padding:14px 12px 12px!important;gap:2px;text-align:center;'
+ +'display:flex!important;flex-direction:column;align-items:center;justify-content:flex-start;min-height:118px}'
+ +'.trash-kpi .tk-ico{font-style:normal;font-size:26px;line-height:1.15;display:block}'
+ +'.trash-kpi .tk-name{font-size:13.5px!important;font-weight:700;color:#22355c;'
+ +'line-height:1.35;margin-top:3px;white-space:normal;overflow-wrap:anywhere}'
+ +'.trash-kpi .module-kpi-card b{font-size:23px!important;line-height:1.15;margin-top:4px}'
+ +'.trash-kpi .module-kpi-card span{font-size:11px!important;color:#6f81a3}'
+ +'.trash-kpi .module-kpi-card[aria-pressed="true"] .tk-name{color:#0b3f9e}'
+ +'.trash-headops{display:flex;align-items:center;gap:9px;flex-wrap:wrap}'
+ +'.trash-limit{border:1px solid #d9e6fa;border-radius:11px;padding:8px 11px;background:#fff;'
+ +'color:#0c225e;font-size:12.5px;font-weight:700;font-family:inherit;min-height:36px}'
+ +'.trash-limit:focus{outline:2px solid #0b63e5;outline-offset:1px}'
+ +'.trash-more{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:0 12px 14px;'
+ +'font-size:12.5px;color:#5b6b88}'
  +'.trash-list{padding:12px;display:grid;gap:7px}'
  +'.trash-row{display:grid;grid-template-columns:34px minmax(0,1fr) 62px auto;align-items:center;gap:10px;'
  +'padding:10px 12px;border:1px solid #e2eaf7;border-radius:12px;background:#fff}'

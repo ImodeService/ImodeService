@@ -136,8 +136,71 @@ a{color:var(--imode-blue)}
 .scd-after .mark{width:30px;height:30px;border-radius:50%;background:#eef2f9;color:#c6a02a;display:grid;place-items:center}
 .scd-substates{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 
+/* ---------- 8. the circles are buttons ---------- */
+.scd-steps li{padding:0}
+.scd-step-btn{display:block;width:100%;border:0;background:none;padding:0 6px 4px;font:inherit;
+  text-align:center;cursor:pointer;border-radius:12px;color:inherit}
+.scd-step-btn:disabled{cursor:default}
+.scd-step-btn:not(:disabled):hover .mark{transform:scale(1.08)}
+.scd-step-btn:not(:disabled):hover b{color:var(--imode-blue)}
+.scd-step-btn:focus-visible{outline:2px solid var(--imode-blue);outline-offset:2px}
+.scd-steps .mark{transition:transform .12s ease}
+.scd-steps li.is-open .mark{box-shadow:0 0 0 4px #cfe0fa}
+.scd-step-cue{display:block;margin-top:5px;font-size:11px;font-weight:700;font-style:normal;color:var(--imode-blue)}
+.scd-steps li.is-blocked .scd-step-cue{color:#9a6516}
+.scd-steps li.is-blocked .mark{background:#fdf0e2;color:#9a6516;box-shadow:0 0 0 2px #f3d3b2}
+
+/* ---------- the drawer under a step ---------- */
+.scd-stepdrawer{margin-top:14px;border:1px solid var(--line-2);border-radius:14px;
+  background:#f8fbff;padding:14px 16px}
+.sd-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.sd-head h4{margin:0;font-size:15px;color:var(--imode-navy)}
+.sd-head p{margin:0;flex:1;font-size:12.5px;color:var(--muted)}
+.sd-close{border:1px solid var(--line-2);background:#fff;border-radius:9px;padding:5px 12px;
+  font:inherit;font-size:12px;font-weight:700;color:var(--imode-navy);cursor:pointer}
+.sd-close:hover{border-color:var(--imode-blue);color:var(--imode-blue)}
+.sd-kv{display:grid;grid-template-columns:120px 1fr;gap:5px 12px;margin:0;font-size:13px}
+.sd-kv dt{color:var(--muted)}
+.sd-kv dd{margin:0;font-weight:600;color:var(--imode-navy);overflow-wrap:anywhere}
+.sd-empty{margin:0;font-size:13px;color:var(--muted)}
+.sd-hint{margin:10px 0 0;font-size:12.5px;color:var(--muted)}
+.sd-ok{margin:10px 0 0;font-size:13px;font-weight:700;color:var(--ok)}
+.sd-wait{margin:10px 0 0;font-size:13px;font-weight:700;color:#9a6516}
+.sd-acts{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}
+.sd-go{border:1px solid var(--line-2);background:#fff;border-radius:11px;padding:9px 14px;
+  font:inherit;font-size:12.5px;font-weight:700;color:var(--imode-navy);cursor:pointer}
+.sd-go:hover{border-color:var(--imode-blue);color:var(--imode-blue)}
+.sd-go:focus-visible{outline:2px solid var(--imode-blue);outline-offset:2px}
+
+/* the technician's own nine-status track, under step 4 */
+.sd-field{list-style:none;margin:0;padding:0;display:flex;gap:0;overflow-x:auto;min-width:0}
+.sd-field li{flex:1 0 108px;position:relative;text-align:center;padding:0 4px}
+.sd-field li::before{content:"";position:absolute;top:13px;left:-50%;width:100%;height:3px;background:#e3ecfa}
+.sd-field li:first-child::before{display:none}
+.sd-field li.done::before{background:var(--ok)}
+.sd-field .fdot{position:relative;z-index:1;width:26px;height:26px;margin:0 auto;border-radius:50%;
+  display:grid;place-items:center;background:#eef2f9;color:#8ea2c2;font-size:12px;font-weight:800;
+  border:3px solid #fff;box-shadow:0 0 0 2px #e3ecfa}
+.sd-field li.done .fdot{background:var(--ok);color:#fff;box-shadow:0 0 0 2px var(--ok)}
+.sd-field li.now .fdot{background:var(--imode-blue);color:#fff;box-shadow:0 0 0 3px #cfe0fa}
+.sd-field b{display:block;margin-top:7px;font-size:11.5px;color:var(--imode-navy);line-height:1.35}
+.sd-field li.pending b{color:#93a4c1}
+.sd-field small{display:block;font-size:10.5px;color:var(--muted);margin-top:2px}
+
+/* the status picker the ⇄ button opens */
+.sd-statuses{display:flex;flex-wrap:wrap;gap:9px;margin-top:10px}
+.sd-status{border:1px solid var(--line-2);background:#fff;border-radius:11px;padding:9px 14px;
+  font:inherit;font-size:13px;font-weight:700;color:var(--imode-navy);cursor:pointer}
+.sd-status:hover{border-color:var(--imode-blue);color:var(--imode-blue)}
+.sd-status.is-now{background:var(--imode-blue);border-color:var(--imode-blue);color:#fff;cursor:default}
+.sd-status:focus-visible{outline:2px solid var(--imode-blue);outline-offset:2px}
+
+/* ---------- 12. case age ---------- */
+.scd-age.is-warn{color:#9a6516;font-weight:700}
+.scd-age.is-late{color:#b3261e;font-weight:700}
+
 /* ---------- action bar ---------- */
-.scd-actions{display:grid;grid-template-columns:repeat(6,1fr);gap:13px;margin-top:18px}
+.scd-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:13px;margin-top:18px}
 .scd-act{display:flex;align-items:center;justify-content:center;gap:9px;min-height:58px;padding:12px 14px;border-radius:14px;
   border:1px solid var(--line-2);background:#fff;color:var(--imode-navy);font-size:14.5px;font-weight:700;cursor:pointer;
   box-shadow:0 4px 0 #e6eefb;transition:transform .14s ease,box-shadow .14s ease}
@@ -326,6 +389,10 @@ a{color:var(--imode-blue)}
 
 <div id="scdToast" role="status" aria-live="polite"></div>
 
+<!-- Beta 1.0: this page can now write. The status circles change the case, so it needs the
+     same Supabase client the application uses; the connection details are read from the
+     config the app already stored on this device. Nothing else on the page writes. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (function(){
 'use strict';
@@ -405,6 +472,29 @@ function fmtDay(v){
   return d.toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'});
 }
 function daysBetween(a,b){return Math.round((new Date(a)-new Date(b))/86400000)}
+/* 12. how long this case has been open. It counts to the day it closed, not to today —
+   a case closed last month is 3 days old, not 40. */
+function caseAgeMs(c){
+  var from=new Date(c&&c.createdAt||0).getTime();
+  if(!from||isNaN(from))return 0;
+  var closed=['เสร็จสิ้น','ปิดเคส'].indexOf(c&&c.status)>=0;
+  var to=closed?new Date(c.updatedAt||Date.now()).getTime():Date.now();
+  return Math.max(0,to-from);
+}
+function caseAge(c){
+  var ms=caseAgeMs(c);
+  if(!ms)return '-';
+  var d=Math.floor(ms/86400000),h=Math.floor(ms%86400000/3600000),mi=Math.floor(ms%3600000/60000);
+  var closed=['เสร็จสิ้น','ปิดเคส'].indexOf(c&&c.status)>=0;
+  var txt=d?(d+' วัน '+h+' ชม.'):(h?(h+' ชม. '+mi+' นาที'):(mi+' นาที'));
+  return txt+(closed?' (จนถึงวันปิดงาน)':'');
+}
+/* Only an OPEN case can look old. */
+function ageTone(c){
+  if(['เสร็จสิ้น','ปิดเคส'].indexOf(c&&c.status)>=0)return '';
+  var d=caseAgeMs(c)/86400000;
+  return d>=7?'late':(d>=3?'warn':'');
+}
 
 /* Machine image priority, kept the same as the application's:
    the machine's own photo, then a family reference image, then No Image. A reference
@@ -569,6 +659,10 @@ var CaseDetailData=(function(){
       return Promise.resolve(c&&c.note?[{text:c.note,at:c.updatedAt||c.createdAt,by:''}]:[]);
     },
     currentUser:function(){return all().user},
+    /* all() reads storage once and keeps it — which is right for a page that only reads,
+       and wrong the moment the page writes. Anything that changes a record clears the
+       cache so the next load() sees what was actually saved. */
+    refresh:function(){db=null},
     unreadNotifications:function(){
       return all().notifications.filter(function(n){return !n.read}).length;
     },
@@ -581,6 +675,7 @@ var CaseDetailData=(function(){
    A page-level shape only. It is not the database schema and nothing here implies one.
    ======================================================================= */
 var caseDetailModel={
+  raw:null,      /* the record as stored — the field-status track is read from here */
   case:{id:'',caseNo:'',status:'',subStatus:'',priority:'',issueTitle:'',issueDescription:'',
         customerNote:'',source:'',createdAt:'',updatedAt:''},
   customer:{id:'',name:'',address:'',contactName:'',phone:'',email:'',lineUserId:'',whatsapp:''},
@@ -634,6 +729,10 @@ function buildModel(c){
   m.case={id:c.id,caseNo:c.ticket||c.id,status:c.status||'',subStatus:c.fieldStatus||'',
     priority:c.priority||'',issueTitle:c.issue||'',issueDescription:'',customerNote:c.note||'',
     source:c.channel||'',createdAt:c.createdAt||'',updatedAt:c.updatedAt||''};
+  /* The ViewModel is a page shape and deliberately carries only what the layout needs.
+     The technician's nine-status track lives on the record itself (fieldStatusLog), so the
+     raw case is kept alongside rather than copied field by field. Read only. */
+  m.raw=c;
   m.service.fieldStatus=c.fieldStatus||'';
   m.service.partsStatus=c.status==='รออะไหล่'?'waiting':'none';
   m.isMock=false;
@@ -709,6 +808,92 @@ function load(){
 /* =======================================================================
    6. render — one function per region, no data access
    ======================================================================= */
+/* =======================================================================
+   5b. writing — the only part of this page that changes anything
+   The status circles in section 6 move the case forward, so the page needs a real write.
+   It does two things and no more:
+     1. rewrites this one case inside imode_test_v532_cases, the array the whole
+        application reads;
+     2. UPDATEs the two columns that changed on Supabase — update(), never upsert(), so a
+        payload that does not name every column cannot blank the rest of the row.
+   The connection is read from imode_v5_cloud, which js/23 writes on this device the first
+   time the application boots. With no config the local write still happens and the caller
+   is told the change has not left this device, rather than being told it worked.
+   ======================================================================= */
+var CaseWrite=(function(){
+  var client=null,tried=false;
+  function cfg(){
+    try{var c=JSON.parse(localStorage.getItem('imode_v5_cloud')||'{}');return (c&&c.url&&c.key)?c:null}
+    catch(e){return null}
+  }
+  function db(){
+    if(tried)return client;
+    tried=true;
+    var c=cfg();
+    try{if(c&&window.supabase)client=window.supabase.createClient(c.url,c.key)}catch(e){client=null}
+    return client;
+  }
+  function localCases(){return readJSON(K.cases,[])||[]}
+  /* Returns a promise that resolves {ok, cloud} — cloud:false means it is on this device
+     only, which the caller says out loud. */
+  function patch(caseId,changes){
+    var list=localCases(),hit=null;
+    for(var i=0;i<list.length;i++){
+      if(list[i]&&list[i].id===caseId){hit=list[i];break}
+    }
+    if(!hit)return Promise.resolve({ok:false,reason:'not-found'});
+    for(var k in changes)if(Object.prototype.hasOwnProperty.call(changes,k))hit[k]=changes[k];
+    hit.updatedAt=new Date().toISOString();
+    try{localStorage.setItem(K.cases,JSON.stringify(list))}catch(e){return Promise.resolve({ok:false,reason:'storage'})}
+    /* keep the page's own model in step so the next render shows the new state */
+    try{if(caseDetailModel&&caseDetailModel.case&&caseDetailModel.case.id===caseId){
+      if('status' in changes)caseDetailModel.case.status=changes.status;
+      caseDetailModel.case.updatedAt=hit.updatedAt;
+    }}catch(e){}
+
+    var sb=db();
+    if(!sb)return Promise.resolve({ok:true,cloud:false});
+    var row={updated_at:hit.updatedAt};
+    if('status' in changes)row.status=changes.status;
+    try{
+      return Promise.resolve(sb.from('service_cases').update(row).eq('id',caseId))
+        .then(function(r){
+          if(r&&r.error){console.warn('[scd] cloud update failed',r.error);return {ok:true,cloud:false,error:r.error}}
+          return {ok:true,cloud:true};
+        },function(e){console.warn('[scd] cloud update threw',e);return {ok:true,cloud:false,error:e}});
+    }catch(e){return Promise.resolve({ok:true,cloud:false,error:e})}
+  }
+  return {setStatus:function(id,status){return patch(id,{status:status})},configured:function(){return !!cfg()}};
+})();
+
+/* ---------- what the technician has done, read from the case ---------- */
+/* The nine field statuses are js/03's FIELD_STATUSES, in order. The case carries the
+   current one in fieldStatus and the whole history in fieldStatusLog, so this page can
+   show the technician's progress without asking the application for anything. */
+var FIELD_STEPS=['กำลังเดินทาง','ถึงหน้างาน','เริ่มตรวจเช็ก','กำลัง PM / Maintenance',
+                 'กำลังซ่อม Service','รออะไหล่','ทดสอบเครื่อง','รอลูกค้าตรวจรับ','จบงาน'];
+function fieldLog(m){
+  var log=(m&&m.raw&&m.raw.fieldStatusLog)||[];
+  return Array.isArray(log)?log:[];
+}
+function fieldReached(m){
+  var hit={};
+  fieldLog(m).forEach(function(e){if(e&&e.status)hit[e.status]=e.createdAt||e.timestamp||''});
+  var now=(m&&m.raw&&m.raw.fieldStatus)||(m&&m.case&&m.case.subStatus)||'';
+  if(now&&!Object.prototype.hasOwnProperty.call(hit,now))hit[now]='';
+  return hit;
+}
+/* "the technician has finished" — จบงาน on the field track, or a service report exists.
+   Either one is proof the work is over; a case can reach เสร็จสิ้น through the report path
+   without the field track ever being touched. */
+function fieldDone(m){
+  if(!m||!m.case)return false;
+  var now=(m.raw&&m.raw.fieldStatus)||m.case.subStatus||'';
+  if(String(now)==='จบงาน')return true;
+  if(Object.prototype.hasOwnProperty.call(fieldReached(m),'จบงาน'))return true;
+  return !!(m.closing&&m.closing.serviceReportReady);
+}
+
 var STEPS=[
   {th:'รับแจ้งปัญหา',statuses:['เคสใหม่']},
   {th:'ตรวจสอบ / มอบหมาย',statuses:['มอบหมายแล้ว']},
@@ -743,6 +928,8 @@ function renderCaseHeader(m){
       +'<p class="scd-customer">'+esc(m.customer.name)+'</p>'
       +'<div class="scd-meta">'
         +'<div><i>📅</i><small>รับแจ้ง:</small> '+esc(fmtDateTime(c.createdAt))+'</div>'
+        +'<div class="scd-age'+(ageTone(c)?' is-'+ageTone(c):'')+'"><i>⏳</i><small>อายุเคส:</small> '
+          +esc(caseAge(c))+'</div>'
         +'<div><i>💬</i><small>ช่องทาง:</small> '+esc(c.source||'-')+'</div>'
         +'<div><i>👤</i><small>ผู้ติดต่อ:</small> '+esc(m.customer.contactName||'-')
           +(m.customer.phone?'&nbsp;&nbsp;'+esc(m.customer.phone):'')+'</div>'
@@ -793,26 +980,119 @@ function fmtLeft(ms){
   return h?(h+' ชม. '+m2+' นาที'):(m2+' นาที');
 }
 
+/* Which step is open underneath the track. null = none. */
+var openStep=null;
+
 function renderProgress(m){
   var idx=stepIndex(m.case.status),closed=m.case.status==='ปิดเคส';
   var times=stepTimes(m);
+  var canWork=fieldDone(m);
   var lis=STEPS.map(function(s,i){
     var cls=i<idx?'done':i===idx?'now':'pending';
     var mark=i<idx?'✔':String(i+1);
-    return '<li class="'+cls+'"><span class="mark">'+mark+'</span><b>'+(i+1)+'. '+esc(s.th)+'</b>'
-      +(times[i]?'<small>'+esc(times[i])+'</small>':'')+'</li>';
+    /* WHAT A CIRCLE DOES depends on where it sits.
+         behind or on the current step  → open it and show what happened there
+         exactly one step ahead         → move the case forward to it
+         further ahead                  → nothing; you cannot skip stages
+       The one gate: step 5 cannot be reached while the technician is still working, and
+       clicking it then opens step 4's track instead of refusing silently. */
+    var role = i<=idx ? 'open' : (i===idx+1 ? 'next' : 'far');
+    var blocked = (role==='next' && idx===3 && !canWork);
+    var hint = role==='open' ? 'ดูรายละเอียดขั้นนี้'
+             : blocked ? 'รอช่างอัปเดตให้จบกระบวนการก่อน — กดเพื่อดูความคืบหน้า'
+             : role==='next' ? 'กดเพื่อไปขั้นนี้'
+             : 'ต้องผ่านขั้นก่อนหน้าก่อน';
+    return '<li class="'+cls+(openStep===i?' is-open':'')+(blocked?' is-blocked':'')+'">'
+      +'<button type="button" class="scd-step-btn" data-step="'+i+'" data-role="'+role+'"'
+      +(role==='far'?' disabled':'')
+      +' title="'+esc(hint)+'" aria-expanded="'+(openStep===i)+'"'
+      +' aria-label="'+esc((i+1)+'. '+s.th+' — '+hint)+'">'
+      +'<span class="mark">'+mark+'</span>'
+      +'<b>'+(i+1)+'. '+esc(s.th)+'</b>'
+      +(times[i]?'<small>'+esc(times[i])+'</small>':'')
+      +(role==='next'?'<em class="scd-step-cue">'+(blocked?'🔒 รอช่าง':'กดเพื่อไปต่อ ›')+'</em>':'')
+      +'</button></li>';
   }).join('');
   var subs='';
   if(HOLD_STATES[m.case.status])subs+='<span class="badge badge-sub">'+esc(HOLD_STATES[m.case.status])+'</span>';
   if(m.case.subStatus)subs+='<span class="badge badge-prio">หน้างาน: '+esc(m.case.subStatus)+'</span>';
   return '<section class="scd-progress" aria-label="ความคืบหน้าของเคส">'
     +'<ol class="scd-steps">'+lis+'</ol>'
+    +(openStep==null?'':'<div class="scd-stepdrawer">'+stepDrawerHTML(m,openStep)+'</div>')
     +(subs?'<div class="scd-substates">'+subs+'</div>':'')
     +'<div class="scd-after"><span class="mark">★</span>'
     +(closed?'<button class="scd-mod" style="box-shadow:none;padding:6px 12px" type="button" data-action="open-feedback">ประเมินความพึงพอใจ</button>'
             :'ประเมินความพึงพอใจ (หลังปิดเคส)')
     +'</div></section>';
 }
+/* ---------- the drawer under a step ----------
+   One claim per step: what happened there, and where to go next. Step 4 is the one the
+   sketch asks for — the technician's own nine-status track drawn underneath the six, so an
+   admin can see exactly how far the job has got without leaving the page. */
+function stepDrawerHTML(m,i){
+  var c=m.case;
+  var head=function(t,sub){
+    return '<div class="sd-head"><h4>'+esc(t)+'</h4>'+(sub?'<p>'+esc(sub)+'</p>':'')
+      +'<button type="button" class="sd-close" data-action="close-step">ปิด</button></div>';
+  };
+  if(i===0){
+    return head('1. รับแจ้งปัญหา','เคสนี้เข้ามาอย่างไร')
+      +'<dl class="sd-kv"><dt>รับแจ้ง</dt><dd>'+esc(fmtDateTime(c.createdAt))+'</dd>'
+      +'<dt>ช่องทาง</dt><dd>'+esc(c.source||'-')+'</dd>'
+      +'<dt>ผู้ติดต่อ</dt><dd>'+esc(m.customer.contactName||'-')+(m.customer.phone?' · '+esc(m.customer.phone):'')+'</dd>'
+      +'<dt>อาการที่แจ้ง</dt><dd>'+esc(c.issueDescription||c.issueTitle||'-')+'</dd></dl>';
+  }
+  if(i===1){
+    var t=m.assignment.technician;
+    return head('2. ตรวจสอบ / มอบหมาย','ใครรับผิดชอบงานนี้')
+      +(t?'<dl class="sd-kv"><dt>ช่างผู้รับผิดชอบ</dt><dd>'+esc(t.name||'-')+'</dd>'
+          +'<dt>มอบหมายเมื่อ</dt><dd>'+esc(fmtDateTime(m.assignment.assignedAt))+'</dd></dl>'
+        :'<p class="sd-empty">ยังไม่ได้มอบหมายช่าง</p>')
+      +'<div class="sd-acts"><button type="button" class="sd-go" data-action="assign-technician">ไปหน้ามอบหมายงาน ›</button></div>';
+  }
+  if(i===2){
+    return head('3. นัดหมายบริการ','วันเวลาที่นัดลูกค้าไว้')
+      +(m.appointment.date
+        ?'<dl class="sd-kv"><dt>นัดหมาย</dt><dd>'+esc(fmtDateTime(m.appointment.date))+'</dd>'
+         +'<dt>สถานที่</dt><dd>'+esc(m.appointment.location||m.customer.address||'-')+'</dd></dl>'
+        :'<p class="sd-empty">ยังไม่มีนัดหมาย</p>')
+      +'<div class="sd-acts"><button type="button" class="sd-go" data-action="schedule-service">ตั้ง / แก้นัดหมาย ›</button></div>';
+  }
+  if(i===3){
+    /* the technician's track, drawn under the main one */
+    var hit=fieldReached(m),done=fieldDone(m);
+    var dots=FIELD_STEPS.map(function(fs,k){
+      var on=Object.prototype.hasOwnProperty.call(hit,fs);
+      var isNow=String((m.raw&&m.raw.fieldStatus)||c.subStatus||'')===fs;
+      return '<li class="'+(on?'done':'pending')+(isNow?' now':'')+'">'
+        +'<span class="fdot">'+(on?'✔':String(k+1))+'</span>'
+        +'<b>'+esc(fs)+'</b>'
+        +(hit[fs]?'<small>'+esc(fmtDateTime(hit[fs]))+'</small>':'')+'</li>';
+    }).join('');
+    return head('4. กำลังให้บริการ','ความคืบหน้าที่ช่างอัปเดตจากหน้างาน')
+      +'<ol class="sd-field">'+dots+'</ol>'
+      +'<p class="'+(done?'sd-ok':'sd-wait')+'">'
+      +(done?'✔ ช่างทำงานเสร็จแล้ว — กดวงกลมขั้นที่ 5 เพื่อไปต่อได้'
+            :'⏳ ยังรอช่างอัปเดตให้ถึง “จบงาน” หรือบันทึกใบตรวจ ระหว่างนี้ยังข้ามไปขั้นถัดไปไม่ได้')+'</p>'
+      +'<div class="sd-acts"><button type="button" class="sd-go" data-action="open-field-service">เปิดหน้างานช่าง ›</button></div>';
+  }
+  if(i===4){
+    return head('5. งานเสร็จ / ตรวจรับ','ใบตรวจและเอกสารของงานนี้')
+      +'<dl class="sd-kv"><dt>ใบตรวจ</dt><dd>'
+      +(m.closing.serviceReportReady?'มีใบตรวจแล้ว':'ยังไม่มีใบตรวจ')+'</dd>'
+      +'<dt>เครื่อง</dt><dd>'+esc(m.machine.name||'-')
+      +(m.machine.serialNumber?' · S/N '+esc(m.machine.serialNumber):'')+'</dd></dl>'
+      +'<div class="sd-acts">'
+      +'<button type="button" class="sd-go" data-action="open-case-attachments">เอกสาร &amp; รูปภาพ ›</button>'
+      +'<button type="button" class="sd-go" data-action="open-machine-history">ประวัติ / เอกสารเครื่อง ›</button>'
+      +'</div>'
+      +'<p class="sd-hint">ตรวจรับเรียบร้อยแล้วกดวงกลมขั้นที่ 6 เพื่อปิดเคส หรือใช้ปุ่ม เปลี่ยนสถานะ ก็ได้</p>';
+  }
+  return head('6. ปิดเคส','งานนี้จบแล้ว')
+    +'<dl class="sd-kv"><dt>ปิดเมื่อ</dt><dd>'+esc(fmtDateTime(c.updatedAt))+'</dd></dl>'
+    +'<div class="sd-acts"><button type="button" class="sd-go" data-action="open-feedback">ประเมินความพึงพอใจ ›</button></div>';
+}
+
 /* Only the timestamps the case really has are shown under a step. */
 function stepTimes(m){
   var out=[];
@@ -826,13 +1106,17 @@ function stepTimes(m){
   return out;
 }
 
+/* 7. เปลี่ยนสถานะ used to open the case EDIT form, which is a different job. Now it
+   changes the status here on the page, and แก้ไขเคส is its own button that opens the form
+   in the application. */
 var ACTIONS=[
   {act:'assign-technician',icon:'👥',label:'มอบหมายงาน',cls:'primary'},
   {act:'schedule-service', icon:'📅',label:'นัดหมายบริการ',cls:'green'},
   {act:'contact-customer', icon:'📞',label:'ติดต่อลูกค้า',cls:'green'},
   {act:'open-quotation',   icon:'📄',label:'ทำใบเสนอราคา',cls:''},
   {act:'open-field-service',icon:'🔧',label:'เริ่มงานหน้างาน',cls:''},
-  {act:'change-status',    icon:'⇄',  label:'เปลี่ยนสถานะ',cls:''}
+  {act:'change-status',    icon:'⇄',  label:'เปลี่ยนสถานะ',cls:''},
+  {act:'edit-case',        icon:'✏',  label:'แก้ไขเคส',cls:''}
 ];
 function renderActionBar(){
   return '<div class="scd-actions">'+ACTIONS.map(function(a){
@@ -996,7 +1280,71 @@ function assignTechnician(){goApp('assign','&caseId='+encodeURIComponent(caseDet
 function scheduleService(){goApp('cases','&caseId='+encodeURIComponent(caseDetailModel.case.id)+'&intent=schedule')}
 function openQuotation(){goApp('quotation','&caseId='+encodeURIComponent(caseDetailModel.case.id))}
 function openFieldService(){goApp('field-service')}
-function changeCaseStatus(){goApp('cases','&caseId='+encodeURIComponent(caseDetailModel.case.id)+'&intent=status')}
+/* แก้ไขเคส — the full form still belongs to the application. */
+function editCase(){goApp('cases','&caseId='+encodeURIComponent(caseDetailModel.case.id)+'&intent=status')}
+
+/* เปลี่ยนสถานะ — a picker on this page, because the page can write now. */
+function changeCaseStatus(){
+  var c=caseDetailModel.case;
+  var all=[];
+  try{
+    var st=(readJSON(K.settings,{})||{}).statuses;
+    all=Array.isArray(st)&&st.length?st:[];
+  }catch(e){}
+  if(!all.length)all=['เคสใหม่','มอบหมายแล้ว','นัดหมายแล้ว','กำลังดำเนินการ','รออะไหล่','รอส่งงาน','เสร็จสิ้น','ปิดเคส'];
+  panel('เปลี่ยนสถานะเคส',
+    '<p class="sd-hint">สถานะปัจจุบัน: <b>'+esc(c.status||'-')+'</b></p>'
+    +'<div class="sd-statuses">'+all.map(function(x){
+      return '<button type="button" class="sd-status'+(x===c.status?' is-now':'')+'"'
+        +' data-set-status="'+esc(x)+'">'+esc(x)+'</button>';
+     }).join('')+'</div>');
+}
+
+/* One place where a status really changes, whichever control asked for it. */
+function applyStatus(next,why){
+  var c=caseDetailModel.case;
+  if(!c||!c.id)return;
+  if(next===c.status){toast('เคสอยู่ที่สถานะนี้อยู่แล้ว');return}
+  if(!confirm((why?why+'\n\n':'')+'เปลี่ยนสถานะเคส '+(c.caseNo||c.id)+'\nจาก “'+(c.status||'-')+'” เป็น “'+next+'” ?'))return;
+  toast('กำลังบันทึก…');
+  CaseWrite.setStatus(c.id,next).then(function(r){
+    if(!r||!r.ok){toast('บันทึกไม่สำเร็จ — ลองทำจากระบบหลัก');return}
+    openStep=null;
+    try{CaseDetailData.refresh()}catch(e){}
+    load().then(function(res){
+      if(res&&!res.error)renderPage(res);
+      toast(r.cloud?('เปลี่ยนเป็น “'+next+'” แล้ว')
+                   :('เปลี่ยนเป็น “'+next+'” แล้ว · ยังอยู่เฉพาะเครื่องนี้ ยังไม่ได้ส่งขึ้นระบบกลาง'));
+    });
+  });
+}
+
+/* A circle was pressed. */
+function stepPressed(i,role){
+  var m=caseDetailModel,idx=stepIndex(m.case.status);
+  if(role==='open'||role==='far'){
+    openStep=(openStep===i)?null:i;
+    repaintProgress();
+    return;
+  }
+  /* role === 'next' */
+  if(idx===3&&!fieldDone(m)){
+    openStep=3;                       /* show the technician's track and why it is blocked */
+    repaintProgress();
+    toast('ยังข้ามไปขั้นถัดไปไม่ได้ — รอช่างอัปเดตให้ถึง “จบงาน” หรือบันทึกใบตรวจก่อน');
+    return;
+  }
+  applyStatus(STEPS[i].statuses[0],'ขั้นถัดไปคือ “'+STEPS[i].th+'”');
+}
+
+/* Redraws only the progress block, so the rest of the page keeps its scroll and panels. */
+function repaintProgress(){
+  var host=document.querySelector('.scd-progress');
+  if(!host||!host.parentNode)return;
+  var wrap=document.createElement('div');
+  wrap.innerHTML=renderProgress(caseDetailModel);
+  host.parentNode.replaceChild(wrap.firstChild,host);
+}
 /* ลบเคส. This page still writes no business data — deleting has to move the record into
    ถังขยะ, drop the Supabase row and re-render the lists, and only the application can do
    all three. So the button hands the case over the same way นัดหมาย and เปลี่ยนสถานะ do,
@@ -1187,6 +1535,8 @@ var HANDLERS={
   'open-quotation':openQuotation,
   'open-field-service':openFieldService,
   'change-status':changeCaseStatus,
+  'edit-case':editCase,
+  'close-step':function(){openStep=null;repaintProgress()},
   'delete-case':deleteCase,
   'mark-responded':markResponded,
   'open-machine-history':openMachineHistory,
@@ -1217,6 +1567,14 @@ document.addEventListener('click',function(e){
   if(tile){e.preventDefault();openMediaView(tile.getAttribute('data-media'));return}
   var contact=e.target.closest('[data-contact]');
   if(contact){contactCustomer(contact.getAttribute('data-contact'));return}
+  var step=e.target.closest('[data-step]');
+  if(step&&!step.disabled){
+    e.preventDefault();
+    stepPressed(Number(step.getAttribute('data-step'))||0,step.getAttribute('data-role')||'open');
+    return;
+  }
+  var setst=e.target.closest('[data-set-status]');
+  if(setst){e.preventDefault();applyStatus(setst.getAttribute('data-set-status'),'');return}
   var btn=e.target.closest('[data-action]');
   if(!btn)return;
   var fn=HANDLERS[btn.getAttribute('data-action')];

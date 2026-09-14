@@ -103,14 +103,32 @@
  }
  window.imodePaintRequestBadge=paintBadge;
 
+ /* ------------------------------------------------- picked up = off this page ---- */
+ /* Every แจ้งปัญหา opens a real case the moment the customer sends it, so "has a case" is
+    not the test — every one of them would vanish on arrival. The test is whether anybody
+    has ACTED on that case: as long as it is still เคสใหม่ nobody has, and the request stays
+    here waiting. Assign it, answer it or move its status and the row leaves for the Service
+    Cases page. A request whose case was deleted stays, because it still needs attention. */
+ function caseOf(r){
+  if(!r||!r.caseId)return null;
+  try{return (Array.isArray(cases)?cases:[]).filter(function(c){return c.id===r.caseId})[0]||null}
+  catch(e){return null}
+ }
+ function pickedUp(r){
+  var c=caseOf(r);
+  return !!(c&&String(c.status||'')!=='เคสใหม่');
+ }
+
  /* ------------------------------------------------------------- filters ---- */
+ /* limit 0 = ทั้งหมด */
  var state={q:'',type:'',status:'',limit:25};
  window.imodeRequestsSet=function(k,v){
   state[k]=v;
   if(k!=='limit')state.limit=25;
   render();
  };
- window.imodeRequestsMore=function(){state.limit+=25;render()};
+ window.imodeRequestsMore=function(){state.limit=state.limit?state.limit+25:0;render()};
+ window.imodeRequestsLimit=function(v){state.limit=Number(v)||0;render()};
 
  function matches(r){
   if(state.type&&String(r.type||'')!==state.type)return false;
@@ -122,6 +140,29 @@
           cu&&cu.name,m&&m.name,m&&m.serial,m&&m.model]
    .some(function(v){return String(v||'').toLowerCase().indexOf(s)>=0});
  }
+ /* ---------------------------------------------------- 3. how long it has waited ---- */
+ /* Written once into the row and then updated in place by one 1-second tick — the list is
+    never re-rendered for the clock, the same way the 30-minute response clock works, so a
+    half-typed search box and the scroll position survive. */
+ function ageText(iso){
+  var t=new Date(iso||0).getTime();
+  if(!t||isNaN(t))return '-';
+  var s=Math.max(0,Math.floor((Date.now()-t)/1000));
+  var d=Math.floor(s/86400), h=Math.floor(s%86400/3600),
+      m=Math.floor(s%3600/60), sec=s%60;
+  var p=function(n){return n<10?'0'+n:String(n)};
+  if(d)return d+tl(' วัน ',' d ')+p(h)+':'+p(m)+':'+p(sec);
+  return p(h)+':'+p(m)+':'+p(sec);
+ }
+ function tickAges(){
+  var host=document.getElementById('page-'+PAGE);
+  if(!host||host.classList.contains('active')===false)return;
+  host.querySelectorAll('[data-req-since]').forEach(function(el){
+   el.textContent=ageText(el.getAttribute('data-req-since'));
+  });
+ }
+ setInterval(function(){try{tickAges()}catch(e){}},1000);
+
  function sorted(list){
   return list.slice().sort(function(a,b){
    return new Date(b.createdAt||0)-new Date(a.createdAt||0);
@@ -139,9 +180,9 @@
   if(r.type==='warranty_quote'&&can('quotation.create'))
    out+='<button type="button" class="req-act" onclick="event.stopPropagation();'
     +'prepareWarrantyQuoteFromRequest(&quot;'+esc2(r.id)+'&quot;)">'+esc2(tl('ทำใบเสนอราคา','Quote'))+'</button>';
-  if(can('line.manage'))
-   out+='<button type="button" class="req-act is-primary" onclick="event.stopPropagation();'
-    +'setLineRequestStatus(&quot;'+esc2(r.id)+'&quot;)">'+esc2(tl('สถานะ','Status'))+'</button>';
+  /* The สถานะ button is gone on purpose. A คำขอ is an inbox item, not a second place to
+     track a job: once somebody picks the case up it leaves this page altogether and the
+     Service Cases page is the one record of where the work stands. */
   return out;
  }
  function rowHTML(r){
@@ -158,8 +199,12 @@
    +'<b>'+esc2((cu&&cu.name)||r.contact||tl('ไม่ระบุลูกค้า','Unknown customer'))+'</b>'
    +'<small>'+esc2(m?((m.name||'-')+(m.serial?' · S/N '+m.serial:'')):tl('ไม่ระบุเครื่อง','No machine'))+'</small>'
    +'<p>'+esc2(String(r.message||'-').slice(0,180))+'</p>'
+   +'<div class="req-foot">'
+   +'<span class="req-age'+(isNew(r)?' is-waiting':'')+'">'+esc2(tl('รอมาแล้ว','Waiting'))
+   +' <b data-req-since="'+esc2(r.createdAt||'')+'">'+esc2(ageText(r.createdAt))+'</b></span>'
    +'<small>'+esc2(fmtAny(r.createdAt))
    +(r.contact?' · '+esc2(r.contact):'')+(r.phone?' · '+esc2(r.phone):'')+'</small>'
+   +'</div>'
    +'</div>'
    +'<div class="req-row-side">'+actionsHTML(r)+'</div>'
    +'</div>';
@@ -168,9 +213,11 @@
  function render(){
   var host=document.getElementById('page-'+PAGE);
   if(!host)return;
-  var all=reqList();
+  var everything=reqList();
+  var moved=everything.filter(pickedUp).length;      /* now living on the Service Cases page */
+  var all=everything.filter(function(r){return !pickedUp(r)});
   var list=sorted(all.filter(matches));
-  var shown=list.slice(0,state.limit);
+  var shown=state.limit?list.slice(0,state.limit):list.slice();
 
   var statuses=[];
   all.forEach(function(r){if(r.status&&statuses.indexOf(r.status)<0)statuses.push(r.status)});
@@ -204,13 +251,29 @@
    +statuses.map(function(s){
       return '<option value="'+esc2(s)+'"'+(state.status===s?' selected':'')+'>'+esc2(s)+'</option>';
      }).join('')+'</select>'
+   +'<select class="req-limit" onchange="imodeRequestsLimit(this.value)" aria-label="'
+   +esc2(tl('จำนวนที่แสดง','How many to show'))+'">'
+   +[['10','10'],['25','25'],['50','50'],['100','100'],['0',tl('ทั้งหมด','All')]].map(function(o){
+      return '<option value="'+o[0]+'"'+(String(state.limit)===o[0]?' selected':'')+'>'
+       +esc2(tl('แสดง ','Show ')+o[1])+'</option>';
+     }).join('')+'</select>'
    +'</div>'
+   +(moved?'<p class="req-moved">'+esc2(tl('มีคนรับเรื่องแล้ว ','Picked up: ')+moved
+      +tl(' คำขอ — ย้ายไปติดตามที่หน้าเคสงานบริการแล้ว',' request(s) — now tracked on the Service Cases page'))
+      +' <button type="button" class="req-link" onclick="goPage(&quot;cases&quot;)">'
+      +esc2(tl('ไปที่หน้าเคส','Go to cases'))+' ›</button></p>':'')
    +'<div class="req-list">'+(shown.length?shown.map(rowHTML).join('')
       :'<div class="empty">'+esc2(all.length?tl('ไม่พบคำขอตามเงื่อนไขนี้','No request matches this filter')
                                             :tl('ยังไม่มีคำขอจากลูกค้า','No customer requests yet'))+'</div>')+'</div>'
-   +(list.length>shown.length
-     ?'<div class="req-more"><button type="button" class="soft-btn" onclick="imodeRequestsMore()">'
-      +esc2(tl('แสดงเพิ่ม','Show more'))+' ('+(list.length-shown.length)+')</button></div>':'')
+   +(list.length
+     ?'<div class="req-more"><span class="req-count">'
+      +esc2(list.length>shown.length
+        ?tl('แสดง ','Showing ')+shown.length+tl(' จาก ',' of ')+list.length
+        :tl('แสดงครบ ','Showing all ')+list.length+tl(' รายการ',' items'))+'</span>'
+      +(list.length>shown.length
+        ?'<button type="button" class="soft-btn" onclick="imodeRequestsMore()">'
+         +esc2(tl('แสดงเพิ่ม','Show more'))+' ('+(list.length-shown.length)+')</button>':'')
+      +'</div>':'')
    +'</div>';
 
   host.querySelectorAll('.req-row').forEach(function(row){
@@ -340,10 +403,27 @@
  +'.req-row.is-new{border-color:#f3d3b2;background:#fffaf4}'
  +'.req-row.is-done{opacity:.72}'
  +'.req-row-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}'
- +'.req-row-main b{font-size:14px;color:#0c225e}'
- +'.req-row-main small{font-size:11.5px;color:#5b6b88}'
- +'.req-row-main p{margin:4px 0 2px;font-size:12.5px;color:#2c3f68;line-height:1.5;'
+ /* 9. the row text was too small to scan — every size here went up a step and the
+    customer name now leads the row properly. */
+ +'.req-row-main b{font-size:16.5px;line-height:1.45;color:#0c225e}'
+ +'.req-row-main small{font-size:13px;color:#5b6b88}'
+ +'.req-row-main p{margin:5px 0 3px;font-size:14.5px;color:#22355c;line-height:1.6;'
  +'overflow-wrap:anywhere}'
+ /* 3. how long the request has been waiting */
+ +'.req-foot{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin-top:4px}'
+ +'.req-age{font-size:12.5px;font-weight:700;color:#5b6b88;border:1px solid #dde7f6;'
+ +'background:#f5f9ff;border-radius:999px;padding:2px 11px;white-space:nowrap}'
+ +'.req-age b{font-family:ui-monospace,Consolas,monospace;font-size:13px;color:#0c225e;'
+ +'font-variant-numeric:tabular-nums}'
+ +'.req-age.is-waiting{border-color:#f3d3b2;background:#fff6ec;color:#9a6516}'
+ +'.req-age.is-waiting b{color:#b4600a}'
+ /* 4. how many to show, and where the picked-up ones went */
+ +'.req-limit{flex:0 1 150px!important}'
+ +'.req-moved{margin:0 14px 10px;padding:9px 13px;border-radius:11px;background:#f2f7ff;'
+ +'border:1px solid #cfe0fa;color:#0b3f9e;font-size:12.8px;line-height:1.55}'
+ +'.req-link{border:0;background:none;padding:0;font:inherit;font-weight:800;color:#0b3f9e;'
+ +'cursor:pointer;text-decoration:underline}'
+ +'.req-count{font-size:12.5px;color:#5b6b88}'
  +'.req-row-top{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:2px}'
  +'.req-type{font-size:10.5px;font-weight:800;border-radius:999px;padding:2px 9px;'
  +'background:#eef4ff;border:1px solid #cfe0fa;color:#0b3f9e}'
@@ -361,7 +441,7 @@
  +'.req-act.is-primary{background:#0b63e5;border-color:#0b63e5;color:#fff}'
  +'.req-act.is-primary:hover{background:#0a54c4;color:#fff}'
  +'.req-act:focus-visible{outline:2px solid #0b63e5;outline-offset:2px}'
- +'.req-more{padding:0 14px 16px}'
+ +'.req-more{padding:0 14px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}'
  +'@media (max-width:640px){'
  +'.req-row{flex-direction:column;align-items:stretch}'
  +'.req-row-side{flex-direction:row;flex-wrap:wrap}'

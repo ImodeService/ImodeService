@@ -131,6 +131,18 @@
     }catch(e){return false}
    }
   },
+  request:{
+   th:'คำขอจากลูกค้า', en:'Customer requests', icon:'📥', table:'line_customer_requests',
+   restore:function(p){
+    try{
+     if(!Array.isArray(lineRequests))return false;
+     if(lineRequests.some(function(r){return r.id===p.id}))return true;
+     lineRequests.unshift(p);
+     if(typeof cloudUpsertLineRequest==='function'){try{cloudUpsertLineRequest(p)}catch(e){}}
+     return true;
+    }catch(e){return false}
+   }
+  },
   customer:{
    th:'ลูกค้า', en:'Customers', icon:'🏢', table:'customers',
    restore:function(p){
@@ -466,7 +478,7 @@
   var host=document.getElementById('page-trash');
   if(!host)return;
   var list=window.imodeTrashList(),counts=window.imodeTrashCounts(),days=retentionDays();
-  var order=['case','quotation','customer','machine','document','account','employee'];
+  var order=['case','request','quotation','customer','machine','document','account','employee'];
   var known={};order.forEach(function(k){known[k]=1});
   Object.keys(counts).forEach(function(k){if(!known[k]){order.push(k);known[k]=1}});
 

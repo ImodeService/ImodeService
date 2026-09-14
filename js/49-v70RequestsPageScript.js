@@ -61,13 +61,19 @@
   window.imodeRegisterHomeModule({page:PAGE,icon:'📥',th:'คำขอจากลูกค้า',en:'Customer requests',
    perm:'line.view'},'first');
  }
- /* js/36 sorts the sidebar into named groups from a fixed page list; a page that is in
-    none of them lands in อื่น ๆ at the bottom. Intake comes before เคสงานบริการ. */
+ /* js/36 sorts the sidebar into named groups from a fixed page list; a page that is in none
+    of them lands in อื่น ๆ at the bottom. คำขอจากลูกค้า belongs with การแจ้งเตือน — both are
+    things arriving that nobody has dealt with yet. js/36 already lists it there, so this is
+    only a fallback for a build where that group is missing. */
  try{
   var groups=(window.imodeNavGroups&&window.imodeNavGroups.groups)||[];
-  for(var gi=0;gi<groups.length;gi++){
-   if(groups[gi].id!=='service')continue;
-   if(groups[gi].pages.indexOf(PAGE)<0)groups[gi].pages.unshift(PAGE);
+  var placed=groups.some(function(g){return g.pages.indexOf(PAGE)>=0});
+  if(!placed){
+   for(var gi=0;gi<groups.length;gi++){
+    if(groups[gi].id!=='alert'&&groups[gi].id!=='service')continue;
+    groups[gi].pages.unshift(PAGE);
+    break;
+   }
   }
  }catch(e){}
 

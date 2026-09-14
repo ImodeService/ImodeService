@@ -195,6 +195,24 @@ a{color:var(--imode-blue)}
 .sd-status.is-now{background:var(--imode-blue);border-color:var(--imode-blue);color:#fff;cursor:default}
 .sd-status:focus-visible{outline:2px solid var(--imode-blue);outline-offset:2px}
 
+/* ---------- the ใบตรวจ inside เอกสาร & รูปภาพ ---------- */
+.rp-card{border:1px solid var(--line-2);border-radius:12px;background:#fff;padding:13px 15px;margin-top:9px}
+.rp-card header{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  padding-bottom:8px;margin-bottom:9px;border-bottom:1px solid var(--line)}
+.rp-card header b{font-size:14.5px;color:var(--imode-navy)}
+.rp-card header span{font-size:12px;color:var(--muted)}
+.rp-kv{margin:0;display:grid;gap:6px}
+.rp-line{display:grid;grid-template-columns:128px 1fr;gap:4px 12px;font-size:12.8px}
+.rp-line dt{color:var(--muted);margin:0}
+.rp-line dd{margin:0;color:var(--imode-navy);font-weight:600;overflow-wrap:anywhere;white-space:pre-wrap}
+.rp-parts{margin-top:10px;font-size:12.8px}
+.rp-parts b{display:block;color:var(--muted);font-weight:600;margin-bottom:3px}
+.rp-parts ul{margin:0;padding-left:18px;color:var(--imode-navy)}
+.rp-sign{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:11px;font-size:12px}
+.rp-sign .ok{color:var(--ok);font-weight:700}
+.rp-sign .no{color:var(--muted)}
+.rp-card .sd-go{margin-top:11px}
+
 /* ---------- 12. case age ---------- */
 .scd-age.is-warn{color:#9a6516;font-weight:700}
 .scd-age.is-late{color:#b3261e;font-weight:700}
@@ -778,6 +796,9 @@ function buildModel(c){
     m.history=r[11];
     var reports=r[12];
     m.service.reportStatus=reports.length?'ready':'';
+    /* The reports themselves, not just the fact that one exists — เอกสาร & รูปภาพ shows the
+       ใบตรวจ, and only the record has its contents. Read only. */
+    m.reports=reports.slice();
     m.closing={
       qcCompleted:false,
       customerSignature:reports.some(function(x){return !!x.customerSignature}),
@@ -1472,12 +1493,51 @@ function historyHTML(){
   +'<p class="scd-empty" style="margin-top:12px">เอกสารเครื่อง คู่มือ สเปก และเอกสารประกันของเครื่องนี้'
   +' จะรวมอยู่ในมุมมองนี้ ไม่แยกเป็นการ์ดของตัวเองบนหน้าเคส</p>';
 }
+/* เอกสาร = the ใบตรวจ the technician filed. The printable sheet is built in js/03 and
+   belongs to the application, so what is shown here is the report's own contents — which is
+   what the sheet prints — plus a way to open the real thing. */
+function reportDocsHTML(){
+  var rs=caseDetailModel.reports||[];
+  if(!rs.length){
+    return '<div class="cmp-block"><small>📄 เอกสาร · ใบตรวจ</small>'
+      +'<p class="scd-empty">ยังไม่มีใบตรวจสำหรับเคสนี้ — ช่างจะบันทึกจากหน้างาน</p></div>';
+  }
+  return '<div class="cmp-block"><small>📄 เอกสาร · ใบตรวจ '+rs.length+' ฉบับ</small>'
+    +rs.map(function(r){
+      var parts=(r.parts||[]).filter(function(p){return p&&(p.name||p.code)});
+      var line=function(label,v){
+        return v?'<div class="rp-line"><dt>'+esc(label)+'</dt><dd>'+esc(v)+'</dd></div>':'';
+      };
+      return '<article class="rp-card">'
+        +'<header><b>'+esc(r.reportNo||r.id||'ใบตรวจ')+'</b>'
+        +'<span>'+esc(fmtDateTime(r.createdAt||r.reportDate))+'</span></header>'
+        +'<dl class="rp-kv">'
+        +line('ประเภทงาน',r.workType)
+        +line('ช่างผู้รับผิดชอบ',r.technicianName||r.technician)
+        +line('สิ่งที่ตรวจพบ',r.diagnosis)
+        +line('งานที่ดำเนินการ',r.workPerformed)
+        +line('คำแนะนำ',r.recommendation)
+        +line('PM ครั้งถัดไป',r.nextPm?fmtDay(r.nextPm):'')
+        +'</dl>'
+        +(parts.length?'<div class="rp-parts"><b>อะไหล่ที่ใช้</b><ul>'
+          +parts.map(function(p){return '<li>'+esc(p.name||p.code||'-')+' × '+esc(p.qty||1)+'</li>'}).join('')
+          +'</ul></div>':'')
+        +'<div class="rp-sign">'
+        +'<span class="'+(r.customerSignature?'ok':'no')+'">'+(r.customerSignature?'✔':'✕')+' ลายเซ็นลูกค้า</span>'
+        +'<span class="'+(r.techSignature?'ok':'no')+'">'+(r.techSignature?'✔':'✕')+' ลายเซ็นช่าง</span>'
+        +'</div>'
+        +'<button type="button" class="sd-go" data-action="open-report-in-app">เปิด / พิมพ์ใบตรวจในระบบหลัก ›</button>'
+        +'</article>';
+     }).join('')+'</div>';
+}
+
 function attachmentsHTML(){
-  var a=caseDetailModel.attachments;
-  if(!a.length)return '<p class="scd-empty">ยังไม่มีรูปหรือวิดีโอในเคสนี้</p>';
+  var a=caseDetailModel.attachments||[];
   var indexed=a.map(function(x,i){return {a:x,i:i}}).slice(0,24);
-  return mediaBlock('📎 ไฟล์ที่ลูกค้าแนบมากับเคส',indexed.filter(function(x){return x.a.from==='customer'}))
-    +mediaBlock('🧰 หลักฐานหน้างาน / ใบตรวจ',indexed.filter(function(x){return x.a.from!=='customer'}));
+  return reportDocsHTML()
+    +mediaBlock('📎 ไฟล์ที่ลูกค้าแนบมากับเคส',indexed.filter(function(x){return x.a.from==='customer'}))
+    +mediaBlock('🖼 รูปและวิดีโอจากหน้างาน',indexed.filter(function(x){return x.a.from!=='customer'}))
+    +(a.length?'':'<p class="scd-empty">ยังไม่มีรูปหรือวิดีโอในเคสนี้</p>');
 }
 
 /* The lightbox. Escape and a backdrop click close it; the close button takes focus so a
@@ -1537,6 +1597,10 @@ var HANDLERS={
   'change-status':changeCaseStatus,
   'edit-case':editCase,
   'close-step':function(){openStep=null;repaintProgress()},
+  /* The printable sheet is js/03's; this hands the visitor to the case there. */
+  'open-report-in-app':function(){
+    goApp('cases','&caseId='+encodeURIComponent(caseDetailModel.case.id)+'&intent=status');
+  },
   'delete-case':deleteCase,
   'mark-responded':markResponded,
   'open-machine-history':openMachineHistory,

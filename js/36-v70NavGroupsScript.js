@@ -50,7 +50,9 @@
     ('service', 'money'), so an id may be re-ordered and renamed but never renumbered away. */
  var GROUPS=[
   {id:'overview', th:'ภาพรวม',              en:'Overview',
-   pages:['dashboard','notifications']},
+   pages:['dashboard']},
+  {id:'alert',    th:'การแจ้งเตือน',          en:'Inbox',
+   pages:['notifications','requests']},
   {id:'service',  th:'งานบริการ',            en:'Service work',
    pages:['cases','assign','my-work','field-service','calendar']},
   {id:'money',    th:'ราคาและค่าใช้จ่าย',      en:'Pricing & expenses',
@@ -111,9 +113,13 @@
   GROUPS.forEach(function(g){g.pages.forEach(function(p){known[p]=1})});
   Object.keys(items).forEach(function(p){if(!known[p])loose.push(p)});
 
+  /* A page listed in two groups would be moved twice and end up under whichever group ran
+     last — silently, and not where the earlier group says it is. First claim wins. */
+  var placed={};
   GROUPS.forEach(function(g){
    var list=(g.id==='other')?loose:g.pages;
-   var present=list.filter(function(p){return items[p]});
+   var present=list.filter(function(p){return items[p]&&!placed[p]});
+   present.forEach(function(p){placed[p]=1});
    var head=n.querySelector('[data-navgroup="'+g.id+'"]');
    if(!present.length){if(head)head.remove();return}
    if(!head)head=header(g);

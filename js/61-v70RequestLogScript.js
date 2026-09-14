@@ -258,6 +258,35 @@
    +(list.length>shown.length?'<button type="button" class="soft-btn" onclick="imodeReqLogLimit(0)">'
       +esc2(tl('แสดงทั้งหมด','Show all'))+'</button>':'')+'</div>'
    +'</div>';
+  wireRows(host);
+ }
+
+ /* THE ROW IS THE BUTTON, like every other list in the application. js/49 already owns the
+    request detail popup and its reqList() is unfiltered, so it opens a picked-up request
+    here just as happily as a waiting one — there is no second detail view to keep in step.
+    Buttons inside the row keep their own jobs; a click on one never reaches this. */
+ function wireRows(host){
+  host.querySelectorAll('tbody tr[data-req]').forEach(function(row){
+   if(row.dataset.rlWired)return;
+   row.dataset.rlWired='1';
+   row.classList.add('rl-rowlink');
+   row.setAttribute('role','button');
+   row.setAttribute('tabindex','0');
+   var who=row.querySelector('td:nth-child(3) b');
+   row.setAttribute('aria-label',tl('เปิดคำขอของ ','Open request from ')+((who&&who.textContent)||row.getAttribute('data-req')));
+   var open=function(){
+    if(typeof window.imodeOpenRequest==='function')window.imodeOpenRequest(row.getAttribute('data-req'));
+   };
+   row.addEventListener('click',function(e){
+    if(e.target.closest('button,a,select,input,textarea,label'))return;
+    open();
+   });
+   row.addEventListener('keydown',function(e){
+    if(e.target!==row)return;
+    if(['Enter',' ','Spacebar'].indexOf(e.key)<0)return;
+    e.preventDefault();open();
+   });
+  });
  }
  window.imodeRenderRequestLog=render;
 
@@ -311,6 +340,9 @@
  +'.rl-status.is-new{background:#fdeee0;border-color:#f3d3b2;color:#b4600a}'
  +'.rl-status.is-done{background:#e9f8ef;border-color:#b6e6c9;color:#0a6b3d}'
  +'.rl-msg{max-width:320px;overflow-wrap:anywhere}'
+ +'.rl-rowlink{cursor:pointer}'
+ +'.rl-rowlink:hover td{background:#f4f8ff}'
+ +'.rl-rowlink:focus-visible{outline:2px solid #0b63e5;outline-offset:-2px}'
  +'.rl-ops{white-space:nowrap}'
  +'.rl-act{border:1px solid #d9e6fa;border-radius:10px;padding:6px 11px;cursor:pointer;background:#fff;'
  +'color:#0c225e;font-size:12px;font-weight:700;margin:2px 3px 2px 0;font-family:inherit}'

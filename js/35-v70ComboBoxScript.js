@@ -97,6 +97,30 @@
   }
   function syncInput(){input.value=currentLabel()}
 
+ /* THE VISIBLE BOX HAS TO FOLLOW A PROGRAMMATIC `.value`.
+    Reported: opening ทำใบเสนอราคา from a case filled in the customer but left อ้างอิง
+    Service Case looking empty. Measured: the <select> really held the case id — it was the
+    text box that was blank, and the same was true of ลูกค้า. Nothing here was ever told,
+    because assigning `.value` fires no event: prepareQuotation() does `qCase.value=cid`,
+    loadCaseIntoQuote() does `qCustomer.value=...`, resetQuote() clears a dozen fields and
+    renderQuotations() re-selects both after rebuilding their options. Refreshing the combo
+    at each of those call sites would mean editing js/03 in a dozen places and would miss
+    the next one.
+    So the seam is the property itself: `value` is shadowed on this one element, delegating
+    to the prototype's own accessor and resyncing the input afterwards. Reads are unchanged,
+    every present and future caller is covered, and nothing outside this element is touched.
+    selectedIndex is not shadowed — nothing in this application assigns it. */
+  try{
+   var vd=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value');
+   if(vd&&vd.get&&vd.set){
+    Object.defineProperty(select,'value',{
+     configurable:true,
+     get:function(){return vd.get.call(this)},
+     set:function(v){vd.set.call(this,v);try{syncInput()}catch(e){}}
+    });
+   }
+  }catch(e){}
+
   function build(){
    var q=norm(input.value),all=options();
    /* data-search lets an option be found by text that is not on its face — the account

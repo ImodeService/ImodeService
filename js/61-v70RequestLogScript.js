@@ -84,18 +84,24 @@
   sec.className='page';
   main.appendChild(sec);
  }
+ /* THE SELECTOR IS `.sidebar .side-nav`. Every module that adds a nav item uses it — js/40,
+    js/43, js/45, js/49 — and the first version of this file invented `.sidebar-nav`, which
+    matches nothing, so querySelector returned null, ensureNav() returned early and the menu
+    entry was never created at all. The page worked; there was just no way to reach it.
+    The markup is <span>icon</span><b>label</b>, matching the items already in the nav. */
  function ensureNav(){
-  var nav=document.querySelector('.sidebar-nav');
-  if(!nav||nav.querySelector('[data-page="'+PAGE+'"]'))return;
-  var ref=nav.querySelector('[data-page="requests"]')||nav.querySelector('[data-page="cases"]');
+  var nav=document.querySelector('.sidebar .side-nav');
+  if(!nav||nav.querySelector('.nav-item[data-page="'+PAGE+'"]'))return;
   var b=document.createElement('button');
   b.className='nav-item';
   b.setAttribute('data-page',PAGE);
-  b.innerHTML='<i>🗂</i><span>'+esc2(tl('ประวัติคำขอ','Request history'))+'</span>';
+  b.innerHTML='<span>🗂</span><b>'+esc2(tl('ประวัติคำขอ','Request history'))+'</b>';
   b.onclick=function(){goPage(PAGE)};
+  var ref=nav.querySelector('.nav-item[data-page="requests"]')
+        ||nav.querySelector('.nav-item[data-page="cases"]');
   if(ref&&ref.parentNode)ref.parentNode.insertBefore(b,ref.nextSibling);
   else nav.appendChild(b);
-  if(typeof applyRoleVisibility==='function')applyRoleVisibility();
+  try{if(typeof applyRoleVisibility==='function')applyRoleVisibility()}catch(e){}
   try{if(window.imodeNavGroups&&window.imodeNavGroups.layout)window.imodeNavGroups.layout()}catch(e){}
  }
 

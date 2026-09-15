@@ -520,8 +520,22 @@ function techAvatarHTML(t,detail=false){
 }
 function techStatusClass(s){return s==='ไม่พร้อม'?'off':s==='กำลังปฏิบัติงาน'||s==='ลงพื้นที่'?'busy':''}
 function techSkillTags(t){return (t.skills||'').split(/[,/]/).map(x=>x.trim()).filter(Boolean).slice(0,5).map(x=>`<span class="skill-tag">${esc(x)}</span>`).join('')}
-function teamClass(team){return team==='R&D'?'rd':'technical'}
-function teamBadge(team){const t=team||'Technical';return `<span class="team-badge ${teamClass(t)}">${t==='R&D'?'🧪 ทีม R&D':'🛠 ทีม Technical'}</span>`}
+/* 2026-09-15: the team vocabulary. It was two values; แอดมิน / เซลส์ / ผู้จัดการ were added so
+   that everyone with a login has a group on the ทีมงาน page, not only technicians. `Admin` and
+   `Management` are the spellings the seeded people at js/03:206-207 already carry — nothing was
+   renamed. An unknown team falls back to Technical, which is what every caller did before. */
+const TEAM_META={
+ 'Technical':{cls:'technical',icon:'🛠',th:'ทีม Technical',en:'Technical'},
+ 'R&D':{cls:'rd',icon:'🧪',th:'ทีม R&D',en:'R&D'},
+ 'Admin':{cls:'adminteam',icon:'🗂',th:'แอดมิน',en:'Admin'},
+ 'Sales':{cls:'sales',icon:'💼',th:'เซลส์',en:'Sales'},
+ 'Management':{cls:'management',icon:'👔',th:'ผู้จัดการ',en:'Management'}
+};
+const TEAM_LIST=Object.keys(TEAM_META);
+function teamMeta(team){return TEAM_META[team]||TEAM_META['Technical']}
+function teamLabel(team){const m=teamMeta(team);return settings.language==='en'?m.en:m.th}
+function teamClass(team){return teamMeta(team).cls}
+function teamBadge(team){const t=team||'Technical',m=teamMeta(t);return `<span class="team-badge ${m.cls}">${m.icon} ${esc(settings.language==='en'?m.en:m.th)}</span>`}
 const MACHINE_FAMILY_PHOTOS=Object.freeze({
  hydrogenHo500:'./assets/machines/hydrogen-ho500wt.webp',
  hydrogenHo200:'./assets/machines/hydrogen-ho200wt.webp',
@@ -564,9 +578,11 @@ function filteredTechnicians(team=techTeamFilter){return technicians.filter(t=>t
 function setTechTeamFilter(team='all'){techTeamFilter=team;renderTechnicians();renderCalendar()}window.setTechTeamFilter=setTechTeamFilter;
 function renderTechnicians(){
  const list=filteredTechnicians();
- const technical=technicians.filter(t=>(t.team||'Technical')==='Technical').length;
- const rd=technicians.filter(t=>(t.team||'Technical')==='R&D').length;
- if(typeof technicianTeamSummary!=='undefined')technicianTeamSummary.innerHTML=`<div class="team-stat"><small>บุคลากรทั้งหมด</small><b>${technicians.length}</b></div><div class="team-stat"><small>ทีม Technical</small><b>${technical}</b></div><div class="team-stat"><small>ทีม R&D</small><b>${rd}</b></div>`;
+ /* 2026-09-15: one tile per team instead of the two that were hard-coded, so แอดมิน / เซลส์ /
+    ผู้จัดการ are counted too. A team with nobody in it is left out rather than shown as 0 — the
+    row would otherwise be mostly empty on a small site. */
+ const teamCounts=TEAM_LIST.map(name=>({name,n:technicians.filter(t=>(t.team||'Technical')===name).length})).filter(x=>x.n>0);
+ if(typeof technicianTeamSummary!=='undefined')technicianTeamSummary.innerHTML=`<div class="team-stat"><small>บุคลากรทั้งหมด</small><b>${technicians.length}</b></div>`+teamCounts.map(x=>`<div class="team-stat"><small>${esc(teamLabel(x.name))}</small><b>${x.n}</b></div>`).join('');
  document.querySelectorAll('#techTeamSegment .seg-btn').forEach(btn=>btn.classList.toggle('active',btn.dataset.team===techTeamFilter));
  technicianGrid.innerHTML=list.map(t=>{const jobs=openCases().filter(c=>c.assignee===t.id).length;return `<div class="person-card"><div class="person-card-top"><div class="person-card-main"><h4>${esc(t.name)}</h4><p class="person-role">${esc(t.role||'Service Technician')}</p><div class="person-badges">${teamBadge(t.team)}<span class="tech-status-dot ${techStatusClass(t.status)}">${esc(t.status||'พร้อมรับงาน')}</span></div>${t.skills?`<div class="skill-tags">${techSkillTags(t)}</div>`:''}<p class="person-phone">${esc(t.phone||'-')}</p></div><div class="person-hero">${techAvatarHTML(t)}</div></div><div class="person-bottom"><div class="person-stat"><span>งานเปิด</span><b>${jobs}</b></div><div class="person-actions"><button class="soft-btn" onclick="openFieldService('${t.id}')">งานหน้างาน</button><button class="soft-btn" onclick="openTechnicianDetail('${t.id}')">รายละเอียด</button><button class="primary-btn" onclick="openTechnicianModal('${t.id}')">แก้ไข</button></div></div></div>`}).join('')||'<div class="empty">ไม่มีรายชื่อในทีมนี้</div>'
 }

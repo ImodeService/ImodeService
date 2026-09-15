@@ -208,6 +208,14 @@
   if(acc&&key(acc.username)===key(meName())&&key(uname)!==key(acc.username))
    return {ok:false,message:tl('เปลี่ยนชื่อผู้ใช้ของบัญชีที่กำลังใช้งานอยู่ไม่ได้ กรุณาเข้าสู่ระบบด้วยบัญชีอื่นก่อน',
                                'You cannot rename the account you are signed in as. Sign in as somebody else first.')};
+  /* 2026-09-15 item 3: a technician account with no record no longer fails — it gets one.
+     This has to happen HERE, before the guard below, not after the save: the guard is what
+     used to reject it, so an auto-create placed further down was never reached at all.
+     An account being edited that already points at a live record is untouched. */
+  if(data.accountType==='technician'&&!hasRecord(String(data.technicianId||'').trim())){
+   var autoId=createRecordFor({username:uname,name:data.name,role:data.role,team:data.team},data.team);
+   if(autoId)data=Object.assign({},data,{technicianId:autoId});
+  }
   if(data.accountType==='technician'&&!String(data.technicianId||'').trim())
    return {ok:false,message:tl('บัญชีช่างต้องเลือกระเบียนช่าง','A technician account must be linked to a technician record')};
 
@@ -249,6 +257,11 @@
   persist();
   return {ok:true};
  };
+ function hasRecord(id){
+  if(!id)return false;
+  try{return !!(Array.isArray(technicians)?technicians:[]).filter(function(t){return t.id===id})[0]}
+  catch(e){return false}
+ }
 
  window.imodeAccountDelete=function(username){
   var acc=find(username);
@@ -276,6 +289,17 @@
  };
 
  window.imodeAccountList=merged;
+ /* 2026-09-15: js/64 opens this same form from the ทีมช่าง page, so there is one account form
+    in the project rather than a second one to keep in step. The submit and cancel handlers
+    live on #modalBody (see wire()), which is where js/64 inserts it, so the form works there
+    with no wiring of its own. Exported rather than duplicated. */
+ window.imodeAccountForm=formHTML;
+ window.imodeAccountWire=wire;
+ window.imodeAccountSyncTypeFields=syncTypeFields;
+ window.imodeAccountFind=find;
+ /* js/64 saves the form itself (it has no account list to refresh), so it needs the same
+    reader this file's own submit handler uses — one way of reading the form, not two. */
+ window.imodeAccountRead=readForm;
 
  /* ------------------------------------------------------------------- the screen -- */
  function techOptions(sel){
@@ -286,6 +310,20 @@
     return '<option value="'+esc2(t.id)+'"'+(t.id===sel?' selected':'')+'>'
      +esc2(t.name)+' · '+esc2(t.id)+' · '+esc2(t.team||'Technical')+'</option>';
    }).join('');
+ }
+ /* The five teams live in js/03's TEAM_META (a lexical const, so read by bare identifier —
+    window.TEAM_META is undefined, the trap this project has hit repeatedly). The fallback keeps
+    this file working on its own if that ever moves. */
+ function teamOptions(sel){
+  var list=[];
+  try{list=(typeof TEAM_LIST!=='undefined'&&TEAM_LIST.length)?TEAM_LIST.slice():[]}catch(e){}
+  if(!list.length)list=['Technical','R&D','Admin','Sales','Management'];
+  if(sel&&list.indexOf(sel)<0)list.push(sel);
+  return list.map(function(n){
+   var label=n;
+   try{if(typeof teamLabel==='function')label=teamLabel(n)}catch(e){}
+   return '<option value="'+esc2(n)+'"'+(n===sel?' selected':'')+'>'+esc2(label)+'</option>';
+  }).join('');
  }
  function roleOptions(sel){
   var list=[];
@@ -312,11 +350,7 @@
    +'<label><span>'+esc2(tl('บทบาท / สิทธิ์','Role'))+'</span>'
    +'<select name="role">'+roleOptions(a.role||'')+'</select></label>'
    +'<label><span>'+esc2(tl('ทีม','Team'))+'</span>'
-   +'<select name="team">'
-   +'<option value="Technical"'+(a.team==='Technical'?' selected':'')+'>Technical</option>'
-   +'<option value="R&D"'+(a.team==='R&D'?' selected':'')+'>R&amp;D</option>'
-   +'<option value="Admin"'+(a.team==='Admin'?' selected':'')+'>Admin</option>'
-   +'</select></label>'
+   +'<select name="team">'+teamOptions(a.team||'')+'</select></label>'
    +'<label class="acctmg-tech"><span>'+esc2(tl('ผูกกับระเบียนช่าง','Technician record'))+'</span>'
    +'<select name="technicianId">'+techOptions(a.technicianId||'')+'</select></label>'
    +'<label class="acctmg-wide"><span>'
@@ -332,19 +366,45 @@
    +'<button type="submit" class="acctmg-btn is-primary">'+esc2(acc?tl('บันทึก','Save'):tl('เพิ่มบัญชี','Add account'))+'</button>'
    +'</div></form>';
  }
+ /* Does this account point at a record that actually exists? A technicianId left over from a
+    deleted record counts as unlinked — it is exactly the case ผูกบัญชี is there to repair. */
+ function linkedRecord(a){
+  if(!a||a.accountType!=='technician')return null;
+  var id=String(a.technicianId||'');
+  if(!id)return null;
+  try{return (Array.isArray(technicians)?technicians:[]).filter(function(t){return t.id===id})[0]||null}
+  catch(e){return null}
+ }
  function rowHTML(a){
   var me=key(a.username)===key(meName());
-  var link=a.accountType==='technician'
-   ? esc2(tl('ช่าง ','Technician '))+esc2(a.technicianId||'-')
-   : esc2(tl('ไม่ผูกกับระเบียนช่าง','Not linked to a technician'));
-  return '<div class="acctmg-row'+(me?' is-current':'')+'" data-user="'+esc2(a.username)+'">'
+  var rec=linkedRecord(a);
+  var unlinked=!rec;
+  var link;
+  if(a.accountType==='technician'){
+   link=rec?esc2(tl('ทีมงาน · ','Team member · ')+(rec.name||rec.id))
+           :'<em class="acctmg-unlinked">'+esc2(a.technicianId
+              ?tl('ระเบียนที่ผูกไว้หายไป','The linked record is missing')
+              :tl('ยังไม่ผูกกับระเบียนทีมงาน','Not linked to a team record'))+'</em>';
+  }else{
+   link='<em class="acctmg-unlinked">'+esc2(tl('ยังไม่ผูกกับระเบียนทีมงาน','Not linked to a team record'))+'</em>';
+  }
+  /* 2026-09-15 item 1: the whole bar opens the editor. Reaching for a small แก้ไข button on a
+     long row is fussy, and every other list in this project (มอบหมายงาน, คำขอ, ประวัติคำขอ)
+     already works this way. role="button" + tabindex so Enter and Space work too. */
+  return '<div class="acctmg-row'+(me?' is-current':'')+(unlinked?' is-unlinked':'')+'"'
+   +' data-user="'+esc2(a.username)+'" role="button" tabindex="0"'
+   +' aria-label="'+esc2(tl('แก้ไขบัญชี ','Edit the account ')+a.username)+'">'
    +'<div class="acctmg-id"><b>'+esc2(a.username)+'</b>'
    +(me?'<i>'+esc2(tl('ใช้งานอยู่','signed in'))+'</i>':'')
    +(a.builtIn?'':'<u>'+esc2(tl('สร้างเอง','created'))+'</u>')
    +'<small>'+link+'</small></div>'
    +'<span class="acctmg-role">'+esc2(a.role||'-')+'</span>'
-   +'<span class="acctmg-team">'+esc2(a.team||'-')+'</span>'
+   +'<span class="acctmg-team">'+esc2(a.team?(typeof teamLabel==='function'?teamLabel(a.team):a.team):'-')+'</span>'
    +'<div class="acctmg-ops">'
+   /* item 2: a way to attach an account that has no team record — either to an existing one
+      or to a record created on the spot. Only offered where it means something. */
+   +(unlinked?'<button type="button" class="acctmg-mini is-link" data-act="link">🔗 '
+     +esc2(tl('ผูกบัญชี','Link'))+'</button>':'')
    +'<button type="button" class="acctmg-mini" data-act="edit">'+esc2(tl('แก้ไข','Edit'))+'</button>'
    +'<button type="button" class="acctmg-mini is-danger" data-act="del"'+(me?' disabled':'')+'>'
    +esc2(tl('ลบ','Delete'))+'</button>'
@@ -367,6 +427,89 @@
    +'</div>';
  }
 
+ /* ------------------------------------------------- item 2: ผูกบัญชี ---- */
+ /* An account with no team record gets one of two things: attached to a record that already
+    exists, or a record created for it from what the account already knows. Both write through
+    imodeAccountSave()/saveTech's own shape — nothing here invents a second storage path. */
+ function recordOptions(){
+  var list=[];
+  try{list=Array.isArray(technicians)?technicians:[]}catch(e){}
+  /* A record that already belongs to another account is not offered: two logins pointing at
+     one person is the state ผูกบัญชี exists to avoid, not to create. */
+  var taken={};
+  try{
+   merged().forEach(function(a){
+    if(a.accountType==='technician'&&a.technicianId)taken[a.technicianId]=a.username;
+   });
+  }catch(e){}
+  return list.map(function(t){
+   var who=taken[t.id];
+   return '<option value="'+esc2(t.id)+'"'+(who?' disabled':'')+'>'
+    +esc2(t.name||t.id)+' · '+esc2(t.team||'Technical')
+    +(who?esc2(tl(' (ใช้กับ ','  (used by ')+who+')'):'')+'</option>';
+  }).join('');
+ }
+ /* The record shape is saveTech()'s (js/03:1209) exactly — same fields, same id convention —
+    so a record made here is indistinguishable from one added on the ทีมงาน page. */
+ function createRecordFor(acc,team){
+  if(!acc)return '';
+  var id='T'+Date.now();
+  var rec={id:id,name:acc.name||acc.username,role:acc.role||'',team:team||'Technical',
+           phone:'',email:'',status:'พร้อมรับงาน',skills:'',color:'#0b63e5',photo:''};
+  try{
+   if(!Array.isArray(technicians))return '';
+   technicians.push(rec);
+   if(typeof saveLocal==='function')saveLocal();
+   if(typeof cloudUpsert==='function'){try{cloudUpsert('technicians',rec)}catch(e){}}
+  }catch(e){return ''}
+  return id;
+ }
+ function openLinkPanel(row,acc){
+  if(!row||!acc)return;
+  var slot=row.querySelector('.acctmg-slot');
+  if(!slot)return;
+  if(slot.innerHTML){slot.innerHTML='';return}
+  slot.innerHTML='<div class="acctmg-link" data-user="'+esc2(acc.username)+'">'
+   +'<p class="acctmg-note">'+esc2(tl('ผูกบัญชีนี้กับระเบียนในหน้าทีมงาน เพื่อให้รับงาน มอบหมายงาน และขึ้นในปฏิทินได้',
+                                      'Link this account to a team record so it can be assigned work and appear on the calendar'))+'</p>'
+   +'<div class="acctmg-grid">'
+   +'<label><span>'+esc2(tl('ผูกกับระเบียนที่มีอยู่','Link to an existing record'))+'</span>'
+   +'<select name="linkTo"><option value="">'+esc2(tl('— เลือกระเบียน —','— pick a record —'))+'</option>'
+   +recordOptions()+'</select></label>'
+   +'<label><span>'+esc2(tl('หรือสร้างระเบียนใหม่ในทีม','Or create a new record in team'))+'</span>'
+   +'<select name="linkTeam">'+teamOptions(acc.team||'Technical')+'</select></label>'
+   +'</div>'
+   +'<div class="acctmg-actions">'
+   +'<button type="button" class="acctmg-btn" data-act="cancel-link">'+esc2(tl('ยกเลิก','Cancel'))+'</button>'
+   +'<button type="button" class="acctmg-btn" data-act="link-new">＋ '+esc2(tl('สร้างระเบียนใหม่','Create a record'))+'</button>'
+   +'<button type="button" class="acctmg-btn is-primary" data-act="link-save">'+esc2(tl('ผูกบัญชี','Link'))+'</button>'
+   +'</div></div>';
+ }
+ function doLink(row,useExisting){
+  var box=row.querySelector('.acctmg-link');
+  if(!box)return;
+  var acc=find(box.getAttribute('data-user'));
+  if(!acc)return;
+  var recId='';
+  if(useExisting){
+   var sel=box.querySelector('[name="linkTo"]');
+   recId=sel?String(sel.value||''):'';
+   if(!recId){toast(tl('กรุณาเลือกระเบียน หรือกดสร้างระเบียนใหม่','Pick a record, or create one'));return}
+  }else{
+   var teamSel=box.querySelector('[name="linkTeam"]');
+   var team=teamSel?String(teamSel.value||'Technical'):'Technical';
+   recId=createRecordFor(acc,team);
+   if(!recId){toast(tl('สร้างระเบียนไม่สำเร็จ','Could not create the record'));return}
+  }
+  var res=window.imodeAccountSave(acc.username,{
+   username:acc.username,name:acc.name||'',accountType:'technician',
+   role:acc.role||'',team:acc.team||'Technical',technicianId:recId,password:''});
+  toast(res&&res.ok?tl('ผูกบัญชีแล้ว','Account linked'):((res&&res.message)||tl('ผูกไม่สำเร็จ','Could not link')));
+  if(res&&res.ok){
+   try{if(typeof renderAll==='function')renderAll()}catch(e){}
+   refresh();
+  }
+ }
  function readForm(form){
   function v(n){var el=form.querySelector('[name="'+n+'"]');return el?el.value:''}
   return {username:v('username'),name:v('name'),accountType:v('accountType'),
@@ -417,6 +560,8 @@
     var s=row.querySelector('.acctmg-slot');
     if(s)s.innerHTML=s.innerHTML?'':formHTML(find(user));
     syncTypeFields();
+   }else if(a==='link'){
+    openLinkPanel(row,find(user));
    }else if(a==='del'){
     if(!confirm(tl('ลบบัญชี ','Delete the account ')+user+tl(' ใช่หรือไม่?','?')))return;
     var res=window.imodeAccountDelete(user);
@@ -425,7 +570,36 @@
    }else if(a==='cancel'){
     var f=act.closest('.acctmg-form');
     if(f)f.parentElement.innerHTML='';
+   }else if(a==='cancel-link'){
+    var lb=act.closest('.acctmg-link');
+    if(lb)lb.parentElement.innerHTML='';
+   }else if(a==='link-save'){
+    doLink(row,true);
+   }else if(a==='link-new'){
+    doLink(row,false);
    }
+  });
+  /* item 1: the bar itself opens the editor. Anything that is already a control keeps its own
+     job — the ops buttons, and every field inside an open form or link panel, which live
+     inside the row and would otherwise re-close it on every click. */
+  b.addEventListener('click',function(e){
+   var t=e.target;
+   if(!t||!t.closest)return;
+   var row=t.closest('.acctmg-row');
+   if(!row||!b.contains(row))return;
+   if(t.closest('[data-act]')||t.closest('button,a,input,select,textarea,label,form'))return;
+   var s=row.querySelector('.acctmg-slot');
+   if(s)s.innerHTML=s.innerHTML?'':formHTML(find(row.getAttribute('data-user')));
+   syncTypeFields();
+  });
+  b.addEventListener('keydown',function(e){
+   if(['Enter',' ','Spacebar'].indexOf(e.key)<0)return;
+   var row=e.target&&e.target.closest&&e.target.closest('.acctmg-row');
+   if(!row||e.target!==row)return;
+   e.preventDefault();
+   var s=row.querySelector('.acctmg-slot');
+   if(s)s.innerHTML=s.innerHTML?'':formHTML(find(row.getAttribute('data-user')));
+   syncTypeFields();
   });
   b.addEventListener('change',function(e){
    if(e.target&&e.target.name==='accountType')syncTypeFields();
@@ -491,6 +665,16 @@
  +'.acctmg-mini.is-danger{color:#c02626;border-color:#f3cdcd}'
  +'.acctmg-mini.is-danger:hover{background:#fdeeee}'
  +'.acctmg-mini[disabled]{opacity:.42;cursor:not-allowed}'
+ /* item 1: the bar is the button, so it has to look like one. */
+ +'.acctmg-row[role="button"]{cursor:pointer}'
+ +'.acctmg-row[role="button"]:hover{border-color:#b9d3f5;background:#f6faff}'
+ +'.acctmg-row[role="button"]:focus-visible{outline:2px solid #0b63e5;outline-offset:2px}'
+ /* item 2: an account with nobody behind it on the ทีมงาน page. */
+ +'.acctmg-row.is-unlinked{border-left:3px solid #f0a42a}'
+ +'.acctmg-unlinked{font-style:normal;color:#a8660c}'
+ +'.acctmg-mini.is-link{border-color:#f3c98b;color:#a8660c;background:#fffaf2}'
+ +'.acctmg-mini.is-link:hover{background:#fff3e2}'
+ +'.acctmg-link{margin-top:9px;padding:11px;border:1px dashed #f0cf9f;border-radius:11px;background:#fffaf3}'
  +'.acctmg-form{margin-top:9px;padding:11px;border:1px dashed #c9dcf6;border-radius:11px;background:#f4f9ff}'
  +'.acctmg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px}'
  +'.acctmg-grid label{display:flex;flex-direction:column;gap:4px;min-width:0}'

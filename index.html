@@ -343,7 +343,7 @@
     <section class="page" id="page-technicians">
       
       <div class="panel">
-        <div class="panel-head toolbar-head"><div class="team-segment" id="techTeamSegment"><button class="seg-btn active" data-team="all" onclick="setTechTeamFilter('all')">ทั้งหมด</button><button class="seg-btn" data-team="Technical" onclick="setTechTeamFilter('Technical')">ทีม Technical</button><button class="seg-btn" data-team="R&D" onclick="setTechTeamFilter('R&D')">ทีม R&D</button></div><div class="button-row"><button class="soft-btn action-3d-orange-soft ui-emphasis-action" onclick="goPage('onsite')">📍 โมดูลหน้างาน</button><button class="primary-btn action-3d-orange ui-emphasis-action" onclick="openTechnicianModal()">＋ เพิ่มพนักงาน Service</button></div></div>
+        <div class="panel-head toolbar-head"><div class="team-segment" id="techTeamSegment"><button class="seg-btn active" data-team="all" onclick="setTechTeamFilter('all')">ทั้งหมด</button><button class="seg-btn" data-team="Technical" onclick="setTechTeamFilter('Technical')">ทีม Technical</button><button class="seg-btn" data-team="R&D" onclick="setTechTeamFilter('R&D')">ทีม R&D</button><button class="seg-btn" data-team="Admin" onclick="setTechTeamFilter('Admin')">แอดมิน</button><button class="seg-btn" data-team="Sales" onclick="setTechTeamFilter('Sales')">เซลส์</button><button class="seg-btn" data-team="Management" onclick="setTechTeamFilter('Management')">ผู้จัดการ</button></div><div class="button-row"><button class="soft-btn action-3d-orange-soft ui-emphasis-action" onclick="goPage('onsite')">📍 โมดูลหน้างาน</button><button class="primary-btn action-3d-orange ui-emphasis-action" onclick="openTechnicianModal()">＋ เพิ่มพนักงาน Service</button></div></div>
         <div class="team-toolbar">
           <div id="technicianTeamSummary" class="team-summary-grid"></div>
         </div>
@@ -628,6 +628,16 @@
         <div class="panel"><div class="panel-head"><div><h3>ฐานข้อมูล Cloud</h3><p>Supabase Database + Storage</p></div><span class="setting-state" id="setCloudState">Local</span></div><div class="panel-body"><div class="info-box">ส่วนนี้สำหรับ IT เชื่อมฐานข้อมูลกลางภายหลัง โดยระบบยังใช้งานแบบ Local ได้ตามปกติ</div><div class="field"><label>URL โครงการ Supabase</label><input id="supabaseUrl" placeholder="https://xxxx.supabase.co"></div><div class="field"><label>Publishable / Anon Key</label><textarea id="supabaseKey" placeholder="sb_publishable_..."></textarea></div><div class="button-row"><button class="soft-btn" onclick="disconnectCloud()">ใช้ข้อมูลในเครื่อง</button><button class="primary-btn" onclick="saveCloudSettings()">เชื่อม Cloud</button></div><div id="cloudResult" class="cloud-result"></div></div></div>
         <div class="panel"><div class="panel-head"><div><h3>สรุปค่ากำหนดระบบ</h3><p>ค่าหลักที่ระบบกำลังใช้งาน</p></div><button class="soft-btn" onclick="exportSettings()">ส่งออก JSON</button></div><div id="settingsSnapshot" class="settings-snapshot"></div></div>
         <div class="panel span2"><div class="panel-head"><div><h3>สถานะระบบ</h3><p>จำนวนข้อมูลและการเชื่อมต่อ</p></div></div><div id="systemStatus" class="system-status"></div></div>
+      </div>
+      <!-- 2026-09-15: สำหรับเทสระบบ. Admin only, and gated on settings.manage rather than a new
+           permission key on purpose: a script that pushes a key into PERMISSION_CATALOG must
+           load before js/20, which repairs roles against the catalog as it stands at that
+           moment — and this is markup, which is not in that chain at all. Only Admin /
+           Coordinator and Service Manager hold settings.manage, and they are the only roles
+           that can open this page in the first place. -->
+      <div class="settings-section-head settings-section-accent" data-perm="settings.manage"><div><b>สำหรับเทสระบบ</b><small>เครื่องมือสำหรับทดสอบ UAT — เปิดหน้าที่ปกติเข้าได้จาก QR หรือ LINE OA เท่านั้น</small></div></div>
+      <div class="settings-card-grid" data-perm="settings.manage">
+        <button class="setting-action-card" onclick="goPage('customer-entry')"><span class="setting-icon">📷</span><div><b>หน้าลูกค้า · สแกน QR / กรอกซีเรียล</b><small>เปิดหน้าที่ลูกค้าเห็นตอนสแกน QR บนเครื่อง — บน PC ที่ไม่มีกล้องให้พิมพ์ซีเรียลแทน</small></div><strong>›</strong></button>
       </div>
     </section>
 </main>
@@ -925,6 +935,10 @@
      for confirmation and then really finishes the case so the job leaves งานของฉัน.
      Must stay after js/32 — its openModal wrapper has to see the sheet markup first. -->
 <script src="./js/63-v70FieldSheetScript.js"></script>
+
+<!-- 2026-09-15: create or change a technician's login account from the ทีมช่าง page. Loads
+     after js/39, whose account form and save path it reuses rather than duplicating. -->
+<script src="./js/64-v70TechAccountScript.js"></script>
 
 </body>
 </html>

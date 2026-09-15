@@ -70,15 +70,81 @@
 
  function nav(){return document.querySelector('.sidebar .side-nav')}
 
+ /* 2026-09-15: the groups open and close. The header stopped being decoration the moment it
+    became the control, so it is a real <button> with aria-expanded and a caret — it can no
+    longer be aria-hidden, and it takes the keyboard for free by being a button.
+    Which groups are shut is remembered per device in its own key: it is a per-person view
+    preference about one sidebar, it must not travel to everybody through `settings`, and
+    losing it only means the sidebar opens fully expanded. */
+ var COLLAPSE_KEY='imode_v70_nav_collapsed';
+ function collapsedSet(){
+  try{
+   var raw=JSON.parse(localStorage.getItem(COLLAPSE_KEY)||'{}');
+   return (raw&&typeof raw==='object')?raw:{};
+  }catch(e){return {}}
+ }
+ function setCollapsed(id,on){
+  var m=collapsedSet();
+  if(on)m[id]=1; else delete m[id];
+  try{localStorage.setItem(COLLAPSE_KEY,JSON.stringify(m))}catch(e){}
+ }
  function header(g){
-  var el=document.createElement('div');
+  var el=document.createElement('button');
+  el.type='button';
   el.className='nav-group';
   el.setAttribute('data-navgroup',g.id);
   el.setAttribute('data-no-i18n','true');
-  el.setAttribute('aria-hidden','true');   /* decoration: the buttons carry the meaning */
-  el.textContent=tl(g.th,g.en);
+  el.innerHTML='<span class="nav-group-label"></span><span class="nav-group-caret" aria-hidden="true">▾</span>';
+  el.querySelector('.nav-group-label').textContent=tl(g.th,g.en);
+  el.addEventListener('click',function(e){
+   e.preventDefault();
+   e.stopPropagation();
+   toggleGroup(g.id);
+  });
   return el;
  }
+
+ /* The items of a group are its following siblings up to the next header — the same forward
+    walk sync() does, because there is no containment to ask. Wrapping them in a real element
+    would be cleaner to animate but would mean rebuilding the nav, and applyRoleVisibility()
+    and three other scripts address .nav-item as a direct child of .side-nav. */
+ function itemsOf(head){
+  var out=[],el=head.nextElementSibling;
+  while(el&&!(el.hasAttribute&&el.hasAttribute('data-navgroup'))){
+   if(el.classList&&el.classList.contains('nav-item'))out.push(el);
+   el=el.nextElementSibling;
+  }
+  return out;
+ }
+ /* Height cannot be animated from `auto`, so each item is given its own measured height and
+    animates to 0 on a small stagger — which is what makes it read as a fold rather than a
+    disappearance. The items are not hidden with [hidden] or display:none: an author display
+    rule beats the UA [hidden] rule (the trap this project has hit four times), and a
+    display change cannot be transitioned at all. */
+ function applyCollapse(head,on,animate){
+  var items=itemsOf(head);
+  head.setAttribute('aria-expanded',on?'false':'true');
+  head.classList.toggle('is-collapsed',!!on);
+  items.forEach(function(it,i){
+   it.classList.toggle('nav-item-collapsed',!!on);
+   if(!animate){it.style.transitionDelay='';return}
+   /* Opening reveals top-down, closing folds bottom-up, so the group collapses toward its
+      own header instead of appearing to fall off the list. */
+   var k=on?(items.length-1-i):i;
+   it.style.transitionDelay=(k*22)+'ms';
+   setTimeout(function(){it.style.transitionDelay=''},k*22+240);
+  });
+ }
+ function toggleGroup(id){
+  var n=nav();
+  if(!n)return;
+  var head=n.querySelector('[data-navgroup="'+id+'"]');
+  if(!head)return;
+  var on=!head.classList.contains('is-collapsed');
+  setCollapsed(id,on);
+  applyCollapse(head,on,true);
+ }
+ window.imodeToggleNavGroup=toggleGroup;
 
  /* Reorders whatever is there right now. Safe to run repeatedly: appendChild moves an
     existing node rather than copying it, so a second pass is a no-op on an already
@@ -139,13 +205,23 @@
    var el=kids[i];
    if(!el.hasAttribute||!el.hasAttribute('data-navgroup'))continue;
    var g=GROUPS.filter(function(x){return x.id===el.getAttribute('data-navgroup')})[0];
-   if(g)el.textContent=tl(g.th,g.en);
+   /* textContent here would delete the caret and the label span with it — the header is a
+      button with structure now, not a text node. */
+   if(g){
+    var lab=el.querySelector('.nav-group-label');
+    if(lab)lab.textContent=tl(g.th,g.en);
+    else el.textContent=tl(g.th,g.en);
+   }
    var any=false;
    for(j=i+1;j<kids.length;j++){
     if(kids[j].hasAttribute&&kids[j].hasAttribute('data-navgroup'))break;
     if(kids[j].classList&&kids[j].classList.contains('nav-item')&&kids[j].style.display!=='none'){any=true;break}
    }
    el.style.display=any?'':'none';
+   /* A relayout re-reads the stored state, so a group the person shut stays shut when a
+      script adds a nav item later (js/40 and js/49 both do). No animation on this path: it
+      is a restore, not an interaction. */
+   if(g)applyCollapse(el,!!collapsedSet()[g.id],false);
   }
  }
 
@@ -161,9 +237,49 @@
  var st=document.createElement('style');
  st.id='v70NavGroupStyle';
  st.textContent=''
+ /* The header is a button now. It keeps the look it had, plus a caret and a hit area. */
+ +'.side-nav .nav-group{display:flex;align-items:center;gap:6px;width:100%;border:0;background:transparent;'
+ +'font-family:inherit;text-align:left;cursor:pointer;border-radius:9px}'
+ +'.side-nav .nav-group:hover{background:rgba(255,255,255,.08)}'
+ +'.side-nav .nav-group:focus-visible{outline:2px solid rgba(255,255,255,.75);outline-offset:-2px}'
+ +'.side-nav .nav-group-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+ +'.side-nav .nav-group-caret{flex:none;font-size:9px;opacity:.75;transition:transform .22s ease}'
+ +'.side-nav .nav-group.is-collapsed .nav-group-caret{transform:rotate(-90deg)}'
+ /* The fold. Height is animated from a measured value rather than auto, and display is never
+    touched — an author display rule beats [hidden], and display cannot be transitioned. */
+ /* THE TRANSITION MUST WIN. A later stylesheet sets transition on the nav buttons for the
+    tactile press (transform / box-shadow / background / border-color / color) and, loading after
+    this runtime <style>, replaced this list outright — max-height was not in it, so the group
+    snapped shut in one frame. Measured: 55px → 0 on the first frame after the click.
+    !important, and the five properties that rule animates are kept in the list so the press
+    and hover feel is unchanged. */
+ /* min-height is in the list too: css/01 gives nav items min-height 47px !important, and the
+    collapsed rule takes it to 0 — left out, it snapped away in the first frame and the fold
+    visibly jumped from 55px to 16px before anything animated. */
+ +'.side-nav .nav-item{transition:max-height .34s cubic-bezier(.2,.8,.2,1),min-height .34s cubic-bezier(.2,.8,.2,1),opacity .26s ease,'
+ +'margin .34s cubic-bezier(.2,.8,.2,1),padding .34s cubic-bezier(.2,.8,.2,1),'
+ +'transform .26s cubic-bezier(.2,.8,.2,1),box-shadow .2s,background .2s,border-color .2s,color .2s!important;'
+ +'max-height:64px;overflow:hidden}'
+ /* A small lift as each item folds away, so it reads as tucking under the header rather than
+    being cut off. Collapsed items take no pointer events, so this never fights the hover lift. */
+ +'.side-nav .nav-item.nav-item-collapsed{transform:translateY(-6px) scale(.97)}'
+ /* min-height on .nav-item is declared !important twice in css/01 (lines 418 and 643), and a
+    min-height beats max-height outright — without overriding it here the group would animate
+    to 47px and stop, i.e. not close at all. Every collapsed property has to win the same way. */
+ +'.side-nav .nav-item.nav-item-collapsed{max-height:0!important;min-height:0!important;opacity:0;'
+ +'margin-top:0!important;margin-bottom:0!important;padding-top:0!important;padding-bottom:0!important;'
+ +'pointer-events:none;border-width:0!important}'
+ /* Has to be !important too, or the transition above — now !important — would override it and
+    animate for somebody who asked the system not to. */
+ +'@media (prefers-reduced-motion:reduce){.side-nav .nav-item,.side-nav .nav-group-caret{transition:none!important}'
+ +'.side-nav .nav-item.nav-item-collapsed{transform:none}}'
  +'.side-nav .nav-group{padding:13px 12px 4px;font-size:10.5px;font-weight:800;'
  +'letter-spacing:.09em;text-transform:uppercase;color:rgba(233,240,255,.52);'
- +'line-height:1.2;user-select:none;pointer-events:none}'
+ /* pointer-events was `none` here from when the header was decoration. It sits AFTER the
+    button rules above at the same specificity, so it won — every real click fell straight
+    through the header while element.click() in the test suite, which ignores pointer-events,
+    passed. The header is the control now. */
+ +'line-height:1.2;user-select:none;pointer-events:auto}'
  /* No rule above the first group — a divider against the brand block reads as a seam. */
  +'.side-nav .nav-group:first-child{padding-top:2px}'
  +'.side-nav .nav-group[style*="display: none"]{display:none!important}'

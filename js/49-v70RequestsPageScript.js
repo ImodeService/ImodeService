@@ -306,7 +306,11 @@
       this list; ปิดเรื่องแล้ว cannot, because a closed request has already left this page
       (pickedUp() drops it), so filtering here would always show nothing. That one opens
       ประวัติคำขอ, where closed requests live, already filtered to เสร็จสิ้น. */
+   /* Order, on the owner's instruction: ทั้งหมด first on the left, the history door
+      (ปิดเรื่องแล้ว → ประวัติคำขอ) last on the far right. */
    +'<div class="req-kpi">'
+   +kpiTile(tl('ทั้งหมด','Total'),all.length,
+            '',"imodeRequestsShowAll()",!state.status&&!state.type)
    +kpiTile(tl('ใหม่ · รอรับเรื่อง','New'),all.filter(isNew).length,
             newCount()?' is-new':'',"imodeRequestsSet('status','ใหม่')",state.status==='ใหม่')
    +kpiTile(tl('กำลังดำเนินการ','In progress'),all.filter(function(r){return !isNew(r)&&!isDone(r)}).length,
@@ -314,8 +318,6 @@
    +kpiTile(tl('ปิดเรื่องแล้ว','Closed'),everything.filter(isDone).length,
             ' is-link',"imodeRequestsOpenClosed()",false,
             tl('เปิดในประวัติคำขอ','Opens in the request history'))
-   +kpiTile(tl('ทั้งหมด','Total'),all.length,
-            '',"imodeRequestsShowAll()",!state.status&&!state.type)
    +'</div>'
    +'<div class="req-filters">'
    +'<input type="search" class="req-search" placeholder="'

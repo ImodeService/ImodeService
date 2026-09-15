@@ -36,7 +36,16 @@
   var changed=false;
   try{if(typeof window.imodeRoleScopeMigrate==='function'&&window.imodeRoleScopeMigrate())changed=true}catch(e){}
   try{if(typeof window.imodeWorkMigrate==='function'){window.imodeWorkMigrate();changed=true}}catch(e){}
-  try{if(typeof window.imodeRepairRolePermissions==='function'&&window.imodeRepairRolePermissions())changed=true}catch(e){}
+  /* 2026-09-15: js/20's imodeRepairRolePermissions() is NOT re-run here any more. It restores
+     every permission found in THIS device's pre-boot snapshot — right at boot, wrong after a
+     sync. Reported: an admin unticked ดูเคส on Technician and saved, the technician reloaded,
+     and it came back. Measured on the live row: Technician still held case.view and
+     rolePresetOptOut was empty. The technician's device downloaded the admin's roles without
+     case.view, this call put it back from its own older snapshot, and line 67 below pushed
+     that up for everybody — so ANY untick was undone by the next device to sync.
+     The cloud copy is still protected against the catalog strip it was guarding: js/20's
+     mergeSettings wrapper (restoreInto) restores from the raw copy being merged, which after
+     a sync is the cloud's own row — the right source. */
   return changed;
  }
  /* js/16's migrate() returns nothing and is add-only, so "changed" above is optimistic.

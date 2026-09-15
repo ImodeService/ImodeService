@@ -290,8 +290,17 @@
   var host=document.getElementById('page-'+PAGE);
   if(!host)return;
   var all=quoteList();
-  var list=sorted(all.filter(matches));
-  var shown=list.slice(0,state.limit);
+  /* 2026-09-15: a ปี/เดือน/สัปดาห์ period filter (js/66, "all" by default as before) and the
+     shared page-size control every other list uses, in place of "แสดงเพิ่ม". LIST_PAGER_CONFIG
+     is js/03's top-level const — a lexical global, so it is reached by bare name; registering
+     here is what lets setListLimit('quoteView',…) find this render. */
+  try{if(!LIST_PAGER_CONFIG.quoteView)LIST_PAGER_CONFIG.quoteView={pageId:'page-'+PAGE,render:'imodeRenderQuoteView',unit:tl('ใบ','quotes')}}catch(e){}
+  var inPeriod=function(q){return !window.imodePeriod||window.imodePeriod.contains('quoteView',q.createdAt||q.date||q.updatedAt)};
+  var list=sorted(all.filter(matches).filter(inPeriod));
+  var info=(typeof paginateList==='function')
+   ? paginateList('quoteView',list,[state.q,state.status,state.customer,window.imodePeriod?window.imodePeriod.sig('quoteView'):''].join('|'))
+   : {list:list.slice(0,state.limit),total:list.length};
+  var shown=info.list;
 
   var statuses=[];
   try{statuses=(settings.quotationStatuses||[]).slice()}catch(e){}
@@ -305,9 +314,11 @@
   });
   custs.sort(function(a,b){return String(a.name).localeCompare(String(b.name),'th')});
 
-  var drafts=all.filter(isDraft).length;
-  var total=all.reduce(function(s,q){return s+(Number(q.grand)||0)},0);
-  var sentTotal=all.filter(function(q){return !isDraft(q)})
+  /* The totals follow EVERY filter — period, status, customer and search — on the owner's
+     choice: what is listed is what is added up. They used to cover every quotation. */
+  var drafts=list.filter(isDraft).length;
+  var total=list.reduce(function(s,q){return s+(Number(q.grand)||0)},0);
+  var sentTotal=list.filter(function(q){return !isDraft(q)})
    .reduce(function(s,q){return s+(Number(q.grand)||0)},0);
 
   host.innerHTML='<div class="panel">'
@@ -319,8 +330,9 @@
      ?'<button class="primary-btn action-3d-orange" onclick="goPage(\'quotation\')">＋ '
       +esc2(tl('ทำใบเสนอราคาใหม่','New quotation'))+'</button>':'')
    +'</div>'
+   +'<div id="qvPeriodHost" class="qv-period"></div>'
    +'<div class="qv-kpi">'
-   +'<div class="qv-kpi-box"><small>'+esc2(tl('ทั้งหมด','Total'))+'</small><b>'+all.length+'</b></div>'
+   +'<div class="qv-kpi-box"><small>'+esc2(tl('ทั้งหมด','Total'))+'</small><b>'+list.length+'</b></div>'
    +'<div class="qv-kpi-box'+(drafts?' is-warn':'')+'"><small>'+esc2(tl('ร่าง · ยังไม่ส่ง','Draft'))+'</small><b>'+drafts+'</b></div>'
    +'<div class="qv-kpi-box"><small>'+esc2(tl('มูลค่าที่ส่งแล้ว','Sent value'))+'</small><b>'+money2(sentTotal)+'</b></div>'
    +'<div class="qv-kpi-box"><small>'+esc2(tl('มูลค่ารวม','All value'))+'</small><b>'+money2(total)+'</b></div>'
@@ -339,13 +351,26 @@
       return '<option value="'+esc2(c.id)+'"'+(state.customer===c.id?' selected':'')+'>'+esc2(c.name)+'</option>';
      }).join('')+'</select>'
    +'</div>'
+   /* The page-size control every other list has — the same markup and ids renderListPager()
+      looks for: <key>DisplayLimit, <key>TotalCount, <key>Pagination. */
+   +'<div class="qv-meta machine-list-meta">'
+   +'<label class="machine-display-control">'+esc2(tl('แสดง ','Show '))
+   +'<select id="quoteViewDisplayLimit" onchange="setListLimit(\'quoteView\',this.value)">'
+   +[['10','10'],['25','25'],['50','50'],['100','100'],['all',tl('ทั้งหมด','All')]].map(function(o){
+      return '<option value="'+o[0]+'">'+esc2(o[1])+'</option>';
+     }).join('')
+   +'</select> '+esc2(tl('ใบ','quotes'))+'</label>'
+   +'<span class="machine-total-chip">'+esc2(tl('ทั้งหมด ','Total '))+'<b id="quoteViewTotalCount">0</b> '+esc2(tl('ใบ','quotes'))+'</span>'
+   +'</div>'
    +'<div class="qv-list">'+(shown.length?shown.map(rowHTML).join('')
       :'<div class="empty">'+esc2(all.length?tl('ไม่พบใบเสนอราคาตามเงื่อนไขนี้','No quotation matches this filter')
                                             :tl('ยังไม่มีใบเสนอราคา','No quotations yet'))+'</div>')+'</div>'
-   +(list.length>shown.length
-     ?'<div class="qv-more"><button type="button" class="soft-btn" onclick="imodeQuoteViewMore()">'
-      +esc2(tl('แสดงเพิ่ม','Show more'))+' ('+(list.length-shown.length)+')</button></div>':'')
+   +'<div id="quoteViewPagination" class="machine-pagination" aria-label="'+esc2(tl('แบ่งหน้าใบเสนอราคา','Quotation pages'))+'"></div>'
    +'</div>';
+  /* After the markup exists: the period control draws into its host, and the shared pager sets
+     the size select and the page buttons from the same state paginateList() used above. */
+  try{if(window.imodePeriod)window.imodePeriod.mount('quoteView','qvPeriodHost','all',render)}catch(e){}
+  try{if(typeof renderListPager==='function'&&info.pageCount!=null)renderListPager('quoteView',info,all.length)}catch(e){}
 
   host.querySelectorAll('.qv-row').forEach(function(row){
    var open=function(){window.imodeOpenQuoteDoc(row.getAttribute('data-quote'))};
@@ -454,6 +479,10 @@
  +'.qv-send:active{transform:translateY(3px);box-shadow:0 1px 0 #c96a08}'
  +'.qv-send:focus-visible{outline:2px solid #0b63e5;outline-offset:2px}'
  +'.qv-more{padding:0 14px 16px}'
+ /* the period row above the totals, and the page-size row above the list */
+ +'.qv-period{padding:0 14px 12px}'
+ +'.qv-meta{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:0 14px 10px}'
+ +'#quoteViewPagination{padding:4px 14px 16px}'
  +'.qv-draftnote{margin-bottom:12px;padding:10px 13px;border-radius:12px;background:#fff8ef;'
  +'border:1px solid #f3ddbd;color:#9a6516;font-size:12.5px;font-weight:700}'
  +'@media (max-width:640px){'

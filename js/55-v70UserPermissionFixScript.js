@@ -109,8 +109,9 @@
   var n=document.createElement('div');
   n.className='permx-autonote';
   n.setAttribute('data-no-i18n','true');
-  n.textContent=tl('เปิดโหมดสิทธิ์รายบุคคลให้อัตโนมัติแล้ว สิทธิ์ที่ติ๊กไว้ตรงนี้จะถูกใช้แทนสิทธิ์ของบทบาท',
-                   'Individual mode was switched on — the ticks here are used instead of the role.');
+  /* 2026-09-15: js/65 keeps only the difference from the role, so the role still applies. */
+  n.textContent=tl('เปิดโหมดสิทธิ์รายบุคคลแล้ว — ช่องที่ต่างจากบทบาทจะเก็บเป็นข้อยกเว้นของคนนี้ ถ้าแก้บทบาททีหลัง คนนี้จะเปลี่ยนตามด้วย',
+                   'Individual mode is on — boxes that differ from the role are kept as this person\'s exceptions; later role changes still apply.');
   bar.parentNode.insertBefore(n,bar.nextSibling);
  }
 
@@ -143,8 +144,8 @@
   if(hint&&!hint.dataset.permxHint){
    hint.dataset.permxHint='1';
    hint.setAttribute('data-no-i18n','true');
-   hint.textContent=tl('ช่องด้านล่างถูกเติมตามสิทธิ์ของบทบาทให้แล้ว ถ้าติ๊กออกหรือติ๊กเพิ่มตรงนี้ ระบบจะเปิดโหมดสิทธิ์รายบุคคลให้อัตโนมัติ และจะใช้สิทธิ์ชุดนี้แทนของบทบาท',
-                       'The boxes below are filled in from the role. Ticking anything here switches individual mode on, and this set is used instead of the role.');
+   hint.textContent=tl('ช่องด้านล่างถูกเติมตามสิทธิ์ของบทบาทให้แล้ว ติ๊กเพิ่มหรือเอาออกเพื่อทำเป็นข้อยกเว้นของคนนี้ — ถ้าแก้บทบาททีหลัง คนนี้จะเปลี่ยนตามบทบาทด้วย ยกเว้นช่องที่ตั้งเป็นข้อยกเว้นไว้',
+                       'The boxes below are filled in from the role. Tick or untick to make an exception for this person — later role changes still apply, except for the boxes set as exceptions.');
   }
  }
 

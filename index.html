@@ -950,5 +950,13 @@
 <!-- 2026-09-15: one ปี/เดือน/สัปดาห์ period filter, shared by ดูใบเสนอราคา and เงินสดย่อย. -->
 <script src="./js/66-v70PeriodFilterScript.js"></script>
 
+<!-- 2026-09-15: a popup with a real percentage while the customer's file is being prepared.
+     Last, so it wraps js/30's shrink wrapper and its promise covers shrink + preview. -->
+<script src="./js/67-v70UploadProgressScript.js"></script>
+
+<!-- 2026-09-15: จบงาน checks the customer's signature first. After js/63, so the gate is
+     decided before its "ยืนยันจบงาน" confirmation is raised. -->
+<script src="./js/68-v70CloseSignatureGateScript.js"></script>
+
 </body>
 </html>

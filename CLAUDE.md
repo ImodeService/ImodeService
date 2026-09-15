@@ -4296,3 +4296,111 @@ and an empty document. Filter for `type=='page'`, and pass `--disable-extensions
 7. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its
    serial or QR.
 
+---
+
+## Session Change Log — 2026-09-15 (part 23): the customer sees the upload, and จบงาน checks the signature
+
+Two reported items. Two new JS files, a progress hook added to one existing file, two script
+tags. No storage key, no schema, no Supabase setting, version untouched.
+
+| File | What |
+|---|---|
+| `js/67-v70UploadProgressScript.js` | **new** — a popup with a real percentage while a customer's file is prepared |
+| `js/68-v70CloseSignatureGateScript.js` | **new** — จบงาน is refused while the customer has not signed |
+| `js/30-v70MediaShrinkScript.js` | reports a fraction per file through `window.imodeMediaProgress` |
+| `index.html` | two `<script src>` tags |
+
+### 1. "ลูกค้าจะไม่รู้ว่าเพิ่มไฟล์แล้วแต่ทำไฟล์ไม่ขึ้น"
+
+A customer taps 📷 / 🎥 เพิ่มไฟล์ and the form does not change for seconds — js/30 shrinks the
+file first (a phone photo is 4-8 MB; a clip is re-encoded at playback speed) and only then does
+js/03 read it and draw the preview. The only sign of life was one toast, and when the file was
+genuinely refused (over 3 MB after shrinking, or a fifth file) the notice was another toast that
+read the same way.
+
+Now: a blocking popup with one row per file, each with its own percentage, and a big overall
+number. **The percentage is measured, not a timer** — js/30 now reports FileReader's own
+progress while the file is read, the encode pass for an image, and `currentTime/duration` for a
+video, which is exact because MediaRecorder encodes at playback speed.
+
+- The last stretch (js/03 re-reading the shrunk file and drawing the preview) cannot be measured
+  from outside, so the bar **holds at 96% under กำลังบันทึกไฟล์… with a shimmer** rather than
+  inventing a number.
+- The ending is decided by counting `window.portalIssuePendingMedia` **before and after** — that
+  array is what the preview and the submit both read, so it is the truth about whether a file was
+  added, and no assumption is made about why one was refused. Added → ✓ เพิ่มไฟล์แล้ว n ไฟล์ and
+  it closes itself. Added nothing → it **stays open, in red, with a ปิด button**, which is the
+  half of the report that actually mattered.
+- Blocking is deliberate: the backdrop swallows the second tap a customer makes when nothing
+  seems to happen.
+- `window.imodeMediaProgress` is a plain hook, not an event, and js/67 installs it **only while
+  its popup is up**. js/30 stands its own toast down exactly while it is installed, so the three
+  technician upload paths keep the old toast and nothing else changes for them.
+- `removePortalIssueMedia()` re-enters the same function with `{files:[]}` purely to redraw the
+  preview. That is not an upload and must not raise a popup — asserted.
+
+### 2. จบงาน checks the customer's signature — and the trap it had to get around
+
+**Every report already "has" a customer signature.** `signatureData(id)` is
+`canvas.toDataURL('image/png')` (js/03:1031), and a canvas nobody drew on still answers with a
+perfectly valid, transparent PNG. So `r.customerSignature` is a non-empty string on every report
+ever saved, signed or not: `if(r.customerSignature)` would have passed every case and looked like
+it worked.
+
+`js/68` counts the **ink** instead — the stored PNG is drawn into an offscreen canvas and its
+pixels are scanned (a data URL never taints a canvas, so they can be read). A blank pad has none;
+a signature has thousands. A canvas that cannot be read resolves **true**, because a technician
+holding a real signature must never be blocked by a probe failure.
+
+- Signed → straight through to the existing flow, including js/63's own ยืนยันจบงาน confirmation.
+  Nothing about จบงาน changes.
+- Not signed → a popup (ยังไม่ได้ลายเซ็นลูกค้า) with a button that opens the ใบตรวจ where the pad
+  is, and **the status change does not happen at all** — no timeline entry, no status write.
+  The wording separates the two real cases: no inspection sheet at all, or a sheet whose pad was
+  left empty.
+- The hook is `window.saveFieldStatus`, like js/63, so all three screens that reach จบงาน are
+  covered (js/32's step bar, js/26's stepper, js/03's status modal). Only the word จบงาน is
+  intercepted. js/68 loads **after js/63**, so it is the outermost wrapper and an unsigned job
+  never gets as far as being asked about.
+- The ink check needs an image decode, so the wrapper is **asynchronous**. That is safe here:
+  js/32's `advance()` removes the temporary `#fieldStatusSelect` when the promise it was given
+  settles, and ours settles after the base's, so the controls js/03 reads as id globals are still
+  in the document. A second tap inside that window is swallowed by an in-flight guard.
+
+**Not covered, deliberately:** saving the ใบตรวจ itself also closes the job (js/03 sets รอส่งงาน,
+js/44 promotes it to เสร็จสิ้น). That door is the report form, where the pad is on screen. The
+gate is on the status-update door the owner named.
+
+### Tests
+
+Three suites, six runs at 1440×1000 and 390×844 (`Emulation.setDeviceMetricsOverride`),
+**113 assertions, 0 failures, 0 page errors**:
+
+- **up1 (22 + 24)** — the popup appears, names the file and its size, shows a percentage strictly
+  between 0 and 100 that only ever rises and reaches 100, the hook is installed while it runs and
+  removed afterwards, the file is added, shrunk and previewed; removing a file raises no popup; a
+  refused file is reported **in the popup** with its reason, waits instead of closing itself, and
+  its ปิด button works; on the phone the card fits and nothing scrolls sideways.
+- **sg1 (20 + 21)** — จบงาน blocked with no sheet, blocked with a sheet whose pad is blank (the
+  case this file exists for), the wording differing between the two, no status write and no
+  timeline entry either time, the button opening the real ใบตรวจ with `#srCustomerSignPad`, an
+  ordinary status step untouched and still saving, and a genuinely inked signature letting the
+  job finish to เสร็จสิ้น / `fieldStatus จบงาน`.
+- **reg1 (13 + 13)** — 24 sidebar pages still open (`my-work` still bounces for an admin, part
+  13), both version strings, the machines pager, the cases KPI, `compressPhoto` still returning a
+  JPEG under its 420 KB target after the js/30 change, and no horizontal overflow.
+
+`node --check` passes on all 73 files in `js/`, `auth/` and `pages/`.
+
+### Open / risk
+
+1. The upload popup blocks the form while a file is prepared. That is the point, but a customer
+   cannot start typing the problem description during those seconds.
+2. `imode_v70_field_last_job` and everything else is untouched; the only new global is the
+   `window.imodeMediaProgress` hook, which exists only while the popup is up.
+3. The signature gate has **no override**. A technician whose customer has left cannot close the
+   job from หน้างาน; it has to be closed from the case page, or the customer has to sign.
+4. Unchanged from part 15: `04-anon-uat.sql` means anyone on the internet can read and write this
+   database.
+5. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its
+   serial or QR.

@@ -35,7 +35,14 @@
 
    No storage key, no schema and no existing function body is changed. The three video
    callers are wrapped by handing the untouched original function a {files:[...]} object
-   holding the shrunk files, so their previews, counters and limits keep working. */
+   holding the shrunk files, so their previews, counters and limits keep working.
+
+   2026-09-15: the work above takes seconds on a phone and said almost nothing while it ran,
+   so shrinkList now reports a real fraction per file through window.imodeMediaProgress —
+   FileReader's own progress events while the file is read, the encode pass for an image, and
+   currentTime/duration for a video, which is exact because MediaRecorder encodes at playback
+   speed. It is a plain hook, not an event: with no consumer installed it costs one typeof,
+   and js/67 (the customer's popup) is the only consumer today. */
 (function(){
  'use strict';
 
@@ -54,11 +61,14 @@
  var IMG_TARGET=420*1024;    /* bytes of encoded JPEG */
  var IMG_QUALITIES=[0.82,0.72,0.62,0.52,0.44];
 
- function readDataURL(file){
+ function readDataURL(file,onp){
   return new Promise(function(res,rej){
    var r=new FileReader();
    r.onload=function(){res(String(r.result||''))};
    r.onerror=function(){rej(new Error('read failed'))};
+   if(typeof onp==='function'){
+    r.onprogress=function(e){if(e&&e.lengthComputable&&e.total)onp(e.loaded/e.total)};
+   }
    r.readAsDataURL(file);
   });
  }
@@ -96,19 +106,25 @@
     window.compressPhoto and the binding addReportPhotos() calls are the same property —
     assigning here really does redirect every caller. Same contract: a File in, a JPEG
     data URL out, so nothing downstream changes. */
- function shrinkImage(file){
-  return readDataURL(file).then(loadImage).then(function(img){
+ function shrinkImage(file,onp){
+  var p=typeof onp==='function'?onp:function(){};
+  return readDataURL(file,function(f){p(f*0.35)}).then(function(u){
+   p(0.4);
+   return loadImage(u);
+  }).then(function(img){
    var edge=IMG_MAX_EDGE,best='';
    for(var pass=0;pass<4;pass++){
+    p(0.45+pass*0.12);
     var cv=drawTo(img,edge);
     for(var q=0;q<IMG_QUALITIES.length;q++){
      var out=cv.toDataURL('image/jpeg',IMG_QUALITIES[q]);
      if(!best||dataUrlBytes(out)<dataUrlBytes(best))best=out;
-     if(dataUrlBytes(out)<=IMG_TARGET)return out;
+     if(dataUrlBytes(out)<=IMG_TARGET){p(0.98);return out}
     }
     if(edge<=IMG_MIN_EDGE)break;
     edge=Math.max(IMG_MIN_EDGE,Math.round(edge*0.72));
    }
+   p(0.98);
    return best;
   }).catch(function(){
    /* An image the browser cannot decode (HEIC on a desktop, a corrupt file) is passed
@@ -144,7 +160,8 @@
 
  /* Re-encode one clip. Resolves with the original file whenever the shrunk copy would not
     actually be an improvement, so a caller never has to ask whether it worked. */
- function shrinkVideo(file){
+ function shrinkVideo(file,onp){
+  var prog=typeof onp==='function'?onp:function(){};
   if(!canEncodeVideo())return Promise.resolve(file);
   var mime=pickMime();
   if(!mime)return Promise.resolve(file);
@@ -227,6 +244,9 @@
     var paint=function(){
      if(done)return;
      try{ctx.drawImage(v,0,0,cv.width,cv.height)}catch(e){}
+     /* A real percentage: the encode runs at playback speed, so how far the clip has
+        played is how far the encode has got. */
+     try{prog(0.05+0.9*Math.min(1,(Number(v.currentTime)||0)/dur))}catch(e){}
      raf=requestAnimationFrame(paint);
     };
     v.onended=function(){
@@ -248,19 +268,49 @@
     with the same two members lets the original function run untouched over shrunk files —
     its previews, its per-type counters and its MB rule all stay exactly where they are. */
  function shrinkList(files,opts){
-  var jobs=files.map(function(f){
+  /* One fraction per file. The jobs run in parallel, so there is no single "current file"
+     to name — the consumer is handed every file's own share and the mean of them. */
+  var parts=files.map(function(){return 0});
+  function step(i,v){
+   var n=Math.max(0,Math.min(1,Number(v)||0));
+   if(n<=parts[i])return;
+   parts[i]=n;
+   emitProgress(files,parts);
+  }
+  function settle(i,out){parts[i]=1;emitProgress(files,parts);return out}
+  var jobs=files.map(function(f,i){
    var t=String(f.type||'');
-   if(opts.video&&t.indexOf('video/')===0)return shrinkVideo(f).catch(function(){return f});
-   if(opts.image&&t.indexOf('image/')===0){
-    return shrinkImage(f).then(function(data){
-     var blob=dataUrlToBlob(data);
-     if(!blob||blob.size>=f.size)return f;
-     return fileFrom(blob,String(f.name||'photo').replace(/\.[^.]+$/,'')+'.jpg','image/jpeg');
-    }).catch(function(){return f});
+   var on=function(v){step(i,v)};
+   if(opts.video&&t.indexOf('video/')===0){
+    return shrinkVideo(f,on).then(function(out){return settle(i,out)},function(){return settle(i,f)});
    }
-   return Promise.resolve(f);
+   if(opts.image&&t.indexOf('image/')===0){
+    return shrinkImage(f,on).then(function(data){
+     var blob=dataUrlToBlob(data);
+     if(!blob||blob.size>=f.size)return settle(i,f);
+     return settle(i,fileFrom(blob,String(f.name||'photo').replace(/\.[^.]+$/,'')+'.jpg','image/jpeg'));
+    },function(){return settle(i,f)});
+   }
+   return Promise.resolve(settle(i,f));
   });
   return Promise.all(jobs);
+ }
+ /* The progress hook. Nothing here depends on a consumer existing: with no overlay
+    installed this costs one typeof per step. js/67 is the only consumer today, and it
+    installs the hook only while its own popup is on screen. */
+ function emitProgress(files,parts){
+  var fn=window.imodeMediaProgress;
+  if(typeof fn!=='function')return;
+  var total=0,i;
+  for(i=0;i<parts.length;i++)total+=parts[i];
+  try{
+   fn({
+    percent:parts.length?Math.round(total/parts.length*100):0,
+    files:files.map(function(f,k){
+     return {name:String(f.name||''),size:Number(f.size)||0,type:String(f.type||''),percent:Math.round(parts[k]*100)};
+    })
+   });
+  }catch(e){}
  }
  function dataUrlToBlob(u){
   try{
@@ -285,7 +335,9 @@
    var heavy=files.some(function(f){
     return (opts.video&&String(f.type||'').indexOf('video/')===0)||f.size>1200*1024;
    });
-   if(heavy)toast(BUSY_MSG);
+   /* The toast is the fallback notice. When a progress popup is listening it says the
+      same thing twice, and worse than the popup does, so it stands down. */
+   if(heavy&&typeof window.imodeMediaProgress!=='function')toast(BUSY_MSG);
    var self=this;
    return shrinkList(files,opts).then(function(out){
     try{if(input)input.value=''}catch(e){}

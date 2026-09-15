@@ -88,27 +88,60 @@
     object, a role an admin later creates with one of these names on purpose is left alone;
     a stale copy (device or cloud) without the flag is merged again and the flag travels
     back up with the push. Everything that named the old roles is pointed at Technician. */
- var DUP_TECH_ROLES=['Technician - Technical','Technician - R&D'];
+ /* VERSION 2, same day. The owner's full intent was FOUR technician-side roles — Technician,
+    R&D, Technical Lead, R&D Lead. Version 1 removed 'Technician - R&D' outright and put its
+    accounts on Technician; that role was really R&D under an old name, and v1 had already
+    shipped. v2 therefore:
+      - removes 'Technician - Technical' (Technician IS the Technical role) — unchanged;
+      - renames 'Technician - R&D' to 'R&D' where it still exists, and re-creates R&D from
+        Technician's permissions where v1 already removed it;
+      - puts R&D-team technician accounts on R&D — the ones v1 moved to Technician included,
+        which is only recoverable by team, since v1 did not record who it moved.
+    A device or cloud copy at v1 (or none) runs this once; v2 travels back up with the push. */
+ var MERGE_VERSION=2;
  function mergeTechRoles(){
-  if(settings.v70TechRoleMerge===1)return false;
-  var changed=false;
-  function remap(o){if(o&&DUP_TECH_ROLES.indexOf(o.role)>=0){o.role='Technician';changed=true}}
-  if(Array.isArray(settings.roles)){
-   var kept=settings.roles.filter(function(r){return !(r&&DUP_TECH_ROLES.indexOf(r.name)>=0)});
-   if(kept.length!==settings.roles.length){settings.roles=kept;changed=true}
+  if(settings.v70TechRoleMerge===MERGE_VERSION)return false;
+  var roles=Array.isArray(settings.roles)?settings.roles:[];
+  function byName(n){return roles.filter(function(r){return r&&r.name===n})[0]||null}
+  var tech=byName('Technician');
+  var rd=byName('R&D'),oldRd=byName('Technician - R&D');
+  if(oldRd&&!rd){oldRd.name='R&D';oldRd.teamScope='R&D';rd=oldRd}
+  roles=roles.filter(function(r){return !(r&&(r.name==='Technician - Technical'||r.name==='Technician - R&D'))});
+  if(!rd){
+   rd={name:'R&D',users:0,teamScope:'R&D',positionScope:'',
+       permissions:(tech&&Array.isArray(tech.permissions))?tech.permissions.slice():[]};
+   var at=roles.indexOf(tech);
+   if(at>=0)roles.splice(at+1,0,rd);else roles.push(rd);
+  }else if(!rd.teamScope)rd.teamScope='R&D';
+  settings.roles=roles;
+
+  function target(o){
+   if(!o)return null;
+   if(o.role==='Technician - Technical')return 'Technician';
+   if(o.role==='Technician - R&D')return 'R&D';
+   if(o.role==='Technician'&&o.team==='R&D'&&o.accountType==='technician')return 'R&D';
+   return null;
   }
+  function remap(o){var t=target(o);if(t)o.role=t}
   (Array.isArray(settings.uatAccounts)?settings.uatAccounts:[]).forEach(remap);
   var ed=settings.uatAccountEdits;
   if(ed&&typeof ed==='object')Object.keys(ed).forEach(function(k){remap(ed[k])});
   var off=settings.rolePresetOptOut;
-  if(off&&typeof off==='object')DUP_TECH_ROLES.forEach(function(n){if(off[n]){delete off[n];changed=true}});
+  if(off&&typeof off==='object'){
+   if(off['Technician - R&D']&&!off['R&D'])off['R&D']=off['Technician - R&D'];
+   delete off['Technician - R&D'];
+   delete off['Technician - Technical'];
+  }
   /* A session signed in before this shipped still carries the old role name. currentUser is
      a lexical global in js/03 — assigning to its properties by bare identifier is legal. */
   try{
-   if(currentUser&&DUP_TECH_ROLES.indexOf(currentUser.permissionRole)>=0)currentUser.permissionRole='Technician';
-   if(currentUser&&DUP_TECH_ROLES.indexOf(currentUser.role)>=0)currentUser.role='Technician';
+   if(currentUser){
+    var t=target({role:currentUser.permissionRole||currentUser.role,team:currentUser.team,
+                  accountType:currentUser.accountType});
+    if(t){currentUser.permissionRole=t;currentUser.role=t}
+   }
   }catch(e){}
-  settings.v70TechRoleMerge=1;
+  settings.v70TechRoleMerge=MERGE_VERSION;
   return true;   /* the flag itself is new on this object, so it must be saved and pushed */
  }
  window.imodeMergeTechRoles=mergeTechRoles;

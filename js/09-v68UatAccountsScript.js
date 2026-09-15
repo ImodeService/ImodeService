@@ -47,7 +47,7 @@
      it is typed; the hash is of the exact string, so the password itself stays case
      sensitive. Same UAT convention as every other account here: password = username. */
   {username:'tech_test1',hash:'2d42d1649d3e6ea478491a8a70ad1145e972cc1a7d76b9f4bce98a365224f0d5',accountType:'technician',technicianId:'T-TEST-1',role:'Technician',team:'Technical'},
-  {username:'R&D_test1',hash:'fd03830ab24e7008a66b2f7b3208a4b2fef5d672607bb1cbd0eed4a360eba4ba',accountType:'technician',technicianId:'T-RD-1',role:'Technician',team:'R&D'}
+  {username:'R&D_test1',hash:'fd03830ab24e7008a66b2f7b3208a4b2fef5d672607bb1cbd0eed4a360eba4ba',accountType:'technician',technicianId:'T-RD-1',role:'R&D',team:'R&D'}
  ];
 
  /* Every customer in the system gets an account. CUST-0001 -> customer_test1, and so on. */

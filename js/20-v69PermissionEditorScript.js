@@ -198,7 +198,9 @@
  function roleGroupId(name){
   var n=String(name||'').toLowerCase();
   if(/lead|หัวหน้า/.test(n))return 'lead';
-  if(/technician|ช่าง/.test(n))return 'tech';
+  /* 'R&D' is a technician role with no technician word in its name; without r&d here it fell
+     into the office catch-all. 'R&D Lead' is caught by the lead test above first. */
+  if(/technician|ช่าง|r&d/.test(n))return 'tech';
   return 'office';
  }
 

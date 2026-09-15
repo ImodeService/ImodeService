@@ -121,8 +121,16 @@
    }
   }catch(e){}
 
+  /* 2026-09-15: OPENING SHOWS EVERYTHING; ONLY TYPING FILTERS.
+     The box holds the current choice's full label, and build() filtered by it — so the list
+     opened with exactly one row, the item already chosen, and nothing else could be picked.
+     Reported on สิทธิ์รายบุคคล ("กดเลือกคนไม่ได้"), where a person is always selected; the same
+     was true of every combo here whenever it already held a value. `typed` is set by the
+     input event and cleared on open, and the text is selected on focus, so the first key
+     replaces the label instead of being appended to it. */
+  var typed=false;
   function build(){
-   var q=norm(input.value),all=options();
+   var q=typed?norm(input.value):'',all=options();
    /* data-search lets an option be found by text that is not on its face — the account
       picker labels a row "สมชาย ใจดี" but the admin is far more likely to type the
       username they sign in with. */
@@ -177,7 +185,13 @@
    open=true;list.hidden=false;
    input.setAttribute('aria-expanded','true');
    wrap.classList.add('is-open');
+   typed=false;
    build();
+   /* The whole list is showing, so start on the item already chosen rather than the top —
+      paint() scrolls it into view. */
+   for(var i=0;i<rows.length;i++){
+    if(rows[i].value===select.value){active=i;paint();break}
+   }
   }
   function close(restore){
    if(!open)return;
@@ -209,12 +223,21 @@
    }).catch(function(){close()});
   }
 
-  input.addEventListener('focus',show);
+  /* Focus selects the label so the first key replaces it. A click that focused the box would
+     otherwise clear that selection on mouseup, placing a caret at the end — the next key
+     would then be appended to the name and match nothing — so that one mouseup is cancelled. */
+  var justFocused=false;
+  input.addEventListener('focus',function(){
+   show();
+   justFocused=true;
+   try{input.select()}catch(e){}
+  });
+  input.addEventListener('mouseup',function(e){if(justFocused){e.preventDefault();justFocused=false}});
   input.addEventListener('click',show);
   caret.addEventListener('click',function(){
    if(open){close()}else{input.focus();show()}
   });
-  input.addEventListener('input',function(){if(!open)show();else build()});
+  input.addEventListener('input',function(){if(!open)show();typed=true;build()});
   input.addEventListener('keydown',function(e){
    if(e.key==='ArrowDown'||e.key==='ArrowUp'){
     e.preventDefault();

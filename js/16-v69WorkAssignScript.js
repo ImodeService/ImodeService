@@ -266,14 +266,81 @@
   }).join('');
   return '<div class="assign-panel is-modal" data-case="'+cid+'">'
    +(list.length?body:'<div class="empty">'+esc2(tl('ไม่มีช่างในขอบเขตของคุณ','No technicians in your scope'))+'</div>')
+   +appointmentFieldHTML(c)
    +'<div class="assign-foot"><small>'+esc2(tl('หัวหน้างานคือคนแรกที่เลือก','The first one chosen is the lead'))+'</small>'
    +'<button type="button" class="soft-btn" onclick="closeModal()">'+esc2(tl('ยกเลิก','Cancel'))+'</button>'
    +'<button type="button" class="primary-btn action-3d-orange" data-assign="'+cid+'">'
-   +esc2(tl('มอบหมาย','Assign'))+'</button></div>'
+   +esc2(tl('มอบหมายและนัดหมาย','Assign & schedule'))+'</button></div>'
    +'</div>';
  }
 
- window.imodeOpenAssignPicker=function(caseId){
+ /* 2026-09-15: มอบหมายงาน and นัดหมาย are one action now — "รวมปุ่ม มอบหมายงาน กับ นัดหมาย
+    ไว้ด้วยกัน … สามารถมอบหมายงานให้ช่างได้ตามที่โมดุลมอบหมายทำได้และสามารถกำหนดวันมอบหมายได้".
+    Both are required, on the owner's instruction: a job handed to a technician without a
+    date is the thing that used to go quiet.
+
+    The control is a plain datetime-local. js/51 upgrades every one of them into the 24-hour
+    date + hour + minute control on its own — it sweeps on a MutationObserver, so markup that
+    arrives inside a popup is caught without this file knowing anything about it. It is given
+    a whole row of its own rather than a third of one, which is what wrapped the hour and
+    minute selects onto separate lines in the old เพิ่ม/แก้ไขนัดหมาย popup. */
+ function appointmentFieldHTML(c){
+  var v=(c&&c.appointment)||'';
+  return '<div class="assign-when">'
+   +'<label for="assignWhen">'+esc2(tl('วันและเวลานัดหมาย','Appointment date & time'))
+   +' <b>*</b></label>'
+   +'<input type="datetime-local" id="assignWhen" class="assign-when-input" step="60"'
+   +' value="'+esc2(v)+'">'
+   +'<small>'+esc2(tl('ต้องระบุวันนัดก่อนจึงจะมอบหมายได้ · เมื่อบันทึกแล้วสถานะจะเป็น “นัดหมายแล้ว”',
+                     'A date is required · saving moves the case to “นัดหมายแล้ว”'))+'</small>'
+   +'</div>';
+ }
+ /* Read back from the panel, wherever it is. The hidden native input is the single source of
+    truth — js/51 keeps it in step with its own controls and every save path in this project
+    reads these by id, so nothing here has to know the 24-hour control exists. */
+ function chosenWhen(caseId){
+  var panel=panelOf(caseId);
+  var el=panel&&panel.querySelector('#assignWhen,.assign-when-input');
+  return el?String(el.value||'').trim():'';
+ }
+
+ /* 2026-09-15: the old เพิ่ม/แก้ไขนัดหมาย popup is gone, and two of its entry points start
+    with no case in mind — ＋เพิ่มนัดหมาย on the calendar, and 📅 เพิ่มนัดหมาย in a technician's
+    profile. They cannot open a case-scoped picker directly, so they ask which case first and
+    then hand over to the same merged popup everything else uses. One popup in the project,
+    no second appointment form to keep in step. */
+ window.imodeOpenAssignChooser=function(preTechId){
+  if(typeof openModal!=='function')return;
+  if(typeof requirePermission==='function'&&!requirePermission('case.assign'))return;
+  var list=caseList().filter(function(c){return !isClosed(c)}).sort(function(a,b){
+   return new Date(b.createdAt||0)-new Date(a.createdAt||0);
+  });
+  if(!list.length){
+   if(typeof toastMsg==='function')toastMsg(tl('ยังไม่มีเคสที่เปิดอยู่','No open cases'));
+   return;
+  }
+  openModal(tl('เลือกเคสที่จะมอบหมาย / นัดหมาย','Choose a case to assign & schedule'),
+   tl('เลือกเคส แล้วจึงเลือกช่างและวันเวลานัดหมาย','Pick the case, then the crew and the date'),
+   '<div class="assign-chooser">'+list.map(function(c){
+     var when=c.appointment?(typeof fmt==='function'?fmt(c.appointment):c.appointment)
+                           :tl('ยังไม่นัด','not scheduled');
+     return '<button type="button" class="assign-choose" data-choose="'+esc2(c.id)+'">'
+      +'<b>'+esc2(c.ticket||c.id)+'</b>'
+      +'<span>'+esc2(c.customer||'-')+' · '+esc2(c.machine||'-')+'</span>'
+      +'<small>'+esc2(c.status||'-')+' · '+esc2(tl('นัดหมาย ','Appointment '))+esc2(when)+'</small>'
+      +'</button>';
+    }).join('')+'</div>');
+  var body=document.getElementById('modalBody');
+  if(!body)return;
+  body.addEventListener('click',function(e){
+   var b=e.target&&e.target.closest&&e.target.closest('[data-choose]');
+   if(!b)return;
+   e.preventDefault();
+   window.imodeOpenAssignPicker(b.getAttribute('data-choose'),preTechId);
+  });
+ };
+
+ window.imodeOpenAssignPicker=function(caseId,preTechId){
   var c=caseById(caseId);
   if(!c)return;
   if(typeof openModal!=='function')return;
@@ -285,6 +352,17 @@
      the admin unticks them. */
   var panel=panelOf(caseId);
   if(panel)panel.__order=idsOf(c);
+  /* Opened from a technician's profile: that technician is who the visitor had in mind, so
+     tick them. Only when they are not already on the job, or the order — which decides the
+     lead — would be disturbed. */
+  if(panel&&preTechId&&idsOf(c).indexOf(preTechId)<0){
+   var cb=panel.querySelector('.assign-cb[value="'+preTechId+'"]');
+   if(cb&&!cb.checked){
+    cb.checked=true;
+    remember(panel,cb);
+    refreshCount(panel);
+   }
+  }
  };
  function renderAssign(){
   var host=document.getElementById('page-assign');
@@ -347,6 +425,18 @@
    if(typeof toastMsg==='function')toastMsg(tl('กรุณาเลือกช่างอย่างน้อย 1 คน','Please choose at least one technician'));
    return;
   }
+  /* Read BEFORE closeModal() below — the panel lives inside the popup, so once it is closed
+     the input is gone and this would always come back empty. */
+  var when=chosenWhen(caseId);
+  if(!when){
+   if(typeof toastMsg==='function')toastMsg(tl('กรุณาระบุวันและเวลานัดหมาย','Please set the appointment date and time'));
+   var wEl=panelOf(caseId)&&panelOf(caseId).querySelector('#assignWhen,.assign-when-input');
+   if(wEl){try{wEl.focus()}catch(e){}
+    var box=wEl.closest('.assign-when');
+    if(box){box.classList.add('is-missing');setTimeout(function(){box.classList.remove('is-missing')},1800)}
+   }
+   return;
+  }
   if(typeof requirePermission==='function'&&!requirePermission('case.assign'))return;
   /* Closed before the work, not after: renderAll() redraws every module and blocks the
      main thread, so a popup left open until then cannot be dismissed and feels stuck —
@@ -354,7 +444,16 @@
   if(typeof closeModal==='function'){try{closeModal()}catch(e){}}
   var before=idsOf(c);
   setIds(c,ids);
-  if(c.status==='เคสใหม่'&&(settings.statuses||[]).indexOf('มอบหมายแล้ว')>=0)c.status='มอบหมายแล้ว';
+  c.appointment=when;
+  /* The two steps now happen in one press, so the case lands on นัดหมายแล้ว (step 3) rather
+     than มอบหมายแล้ว (step 2) — there is a real date on it, which is exactly what that status
+     means. saveSchedule() in js/03 has always done this for the appointment half; the guard
+     is the same one, so a settings.statuses without it degrades instead of writing a status
+     the system does not have. A case already past this point keeps the status it has: a job
+     in progress being re-crewed must not be dragged backwards. */
+  var EARLY=['เคสใหม่','มอบหมายแล้ว'];
+  if(EARLY.indexOf(c.status)>=0&&(settings.statuses||[]).indexOf('นัดหมายแล้ว')>=0)c.status='นัดหมายแล้ว';
+  else if(c.status==='เคสใหม่'&&(settings.statuses||[]).indexOf('มอบหมายแล้ว')>=0)c.status='มอบหมายแล้ว';
   c.updatedAt=new Date().toISOString();
   /* One notice per technician who was not already on the job. Somebody who stays on it
      through a reassignment is not told again — nothing changed for them. */
@@ -367,9 +466,11 @@
   renderAssign();
   if(typeof toastMsg==='function'){
    var names=ids.map(function(id){return (techById(id)||{}).name||id});
-   toastMsg(ids.length===1
-    ? tl('มอบหมายงานให้ ','Assigned to ')+names[0]+tl(' แล้ว','')
-    : tl('มอบหมายงานให้ ','Assigned to ')+ids.length+tl(' คนแล้ว: ',' people: ')+names.join(', '));
+   var whenTxt=(typeof fmt==='function')?fmt(when):when;
+   toastMsg((ids.length===1
+    ? tl('มอบหมายงานให้ ','Assigned to ')+names[0]
+    : tl('มอบหมายงานให้ ','Assigned to ')+ids.length+tl(' คน: ',' people: ')+names.join(', '))
+    +tl(' · นัดหมาย ',' · appointment ')+whenTxt);
   }
  };
 
@@ -636,6 +737,28 @@
  +'.assign-member input{width:15px;height:15px;accent-color:#0b63e5;flex:none}'
  +'.assign-foot{display:flex;align-items:center;gap:9px;border-top:1px dashed #d8e4f6;padding-top:9px}'
  +'.assign-foot small{flex:1;min-width:0;font-size:10.5px;color:#7385a5}'
+ /* The appointment gets a full-width row of its own. The old เพิ่ม/แก้ไขนัดหมาย popup put the
+    same control in a 1-of-3 grid cell — 187px in a 620px dialog — and js/51's .t24 is a
+    flex-wrap container, so the hour and minute selects fell onto separate lines and the cell
+    grew to 247px against its neighbours' 70px. Full width is what keeps that from recurring. */
+ +'.assign-when{border:1px solid #dbe6f7;border-radius:12px;background:#f8fbff;padding:11px 12px}'
+ +'.assign-when label{display:block;font-size:11.5px;font-weight:700;color:#12356f;margin-bottom:6px}'
+ +'.assign-when label b{color:#d92d20}'
+ +'.assign-when .t24,.assign-when-input{width:100%;box-sizing:border-box}'
+ +'.assign-when-input{border:1px solid #d9e6fa;border-radius:11px;background:#fff;color:#0c225e;'
+ +'font-family:inherit;font-size:13px;padding:9px 11px;min-height:40px}'
+ +'.assign-when small{display:block;margin-top:6px;font-size:10.5px;color:#7385a5;line-height:1.5}'
+ +'.assign-when.is-missing{border-color:#d92d20;background:#fff5f4}'
+ +'.assign-when.is-missing label{color:#b42318}'
+ /* The case chooser the two case-less entry points open first. */
+ +'.assign-chooser{display:grid;gap:8px;max-height:56vh;overflow:auto}'
+ +'.assign-choose{display:block;width:100%;text-align:left;border:1px solid #e0e9f7;border-radius:11px;'
+ +'background:#fff;padding:10px 12px;cursor:pointer;font-family:inherit;line-height:1.45}'
+ +'.assign-choose:hover{border-color:#0b63e5;background:#f4f9ff}'
+ +'.assign-choose:focus-visible{outline:2px solid #0b63e5;outline-offset:2px}'
+ +'.assign-choose b{display:block;font-size:12.5px;color:#12356f}'
+ +'.assign-choose span{display:block;font-size:11.5px;color:#41527a;margin-top:1px}'
+ +'.assign-choose small{display:block;font-size:10.5px;color:#7385a5;margin-top:2px}'
  +'@media (max-width:640px){.work-row{flex-direction:column;align-items:stretch}.work-row-actions{justify-content:flex-start}.assign-pick{width:100%}'
  +'.assign-ctl{min-width:0;width:100%}.assign-members{grid-template-columns:1fr}'
  +'.assign-panel.is-modal .assign-members{grid-template-columns:1fr}'

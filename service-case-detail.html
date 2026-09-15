@@ -198,6 +198,14 @@ a{color:var(--imode-blue)}
 .sd-field small{display:block;font-size:10.5px;color:var(--muted);margin-top:2px}
 
 /* the status picker the ⇄ button opens */
+.sd-when{margin-top:14px;border:1px solid var(--line-2);border-radius:12px;background:#f8fbff;padding:11px 12px}
+.sd-when label{display:block;font-size:11.5px;font-weight:700;color:var(--imode-navy);margin-bottom:6px}
+.sd-when label b{color:#d92d20}
+.sd-when input{width:100%;box-sizing:border-box;border:1px solid var(--line-2);border-radius:11px;
+  background:#fff;color:var(--imode-navy);font-family:inherit;font-size:13px;padding:9px 11px;min-height:40px}
+.sd-when small{display:block;margin-top:6px;font-size:10.5px;color:var(--muted);line-height:1.5}
+.sd-when.is-missing{border-color:#d92d20;background:#fff5f4}
+.sd-when.is-missing label{color:#b42318}
 .sd-statuses{display:flex;flex-wrap:wrap;gap:9px;margin-top:10px}
 .sd-status{border:1px solid var(--line-2);background:#fff;border-radius:11px;padding:9px 14px;
   font:inherit;font-size:13px;font-weight:700;color:var(--imode-navy);cursor:pointer}
@@ -280,6 +288,23 @@ a{color:var(--imode-blue)}
 .cmp-tile:focus-visible{outline:2px solid var(--imode-blue);outline-offset:2px}
 .cmp-tile.is-video{position:relative}
 .cmp-grid .media-add{margin:0;line-height:1.3}
+/* The page's drawers are popups. #scdPanel is empty and inert until panel() fills it, so it
+   must not paint anything of its own until then — hence everything hangs off .is-open. */
+#scdPanel.is-open{position:fixed;inset:0;z-index:11000;display:grid;place-items:center;padding:18px}
+.scd-modal-back{position:absolute;inset:0;background:rgba(9,18,38,.55);backdrop-filter:blur(1px)}
+#scdPanel.is-open .scd-modal-card{position:relative;z-index:1;width:min(620px,100%);
+  max-height:88vh;display:flex;flex-direction:column;margin:0;
+  box-shadow:0 26px 70px rgba(9,26,64,.32);animation:scdPop .16s ease-out}
+#scdPanel.is-open .scd-modal-card:focus{outline:none}
+#scdPanel.is-open .card-head{flex:0 0 auto}
+.scd-modal-body{overflow:auto;padding:0 16px 16px}
+@keyframes scdPop{from{opacity:0;transform:translateY(8px) scale(.99)}to{opacity:1;transform:none}}
+body.scd-modal-open{overflow:hidden}
+@media (max-width:640px){
+  #scdPanel.is-open{padding:0;place-items:end stretch}
+  #scdPanel.is-open .scd-modal-card{width:100%;max-height:92vh;border-radius:20px 20px 0 0}
+}
+@media (prefers-reduced-motion:reduce){#scdPanel.is-open .scd-modal-card{animation:none}}
 .cmp-lightbox{position:fixed;inset:0;z-index:12000;background:rgba(9,18,38,.86);display:grid;place-items:center;padding:18px}
 .cmp-lightbox-inner{max-width:min(960px,94vw);max-height:92vh;display:flex;flex-direction:column;gap:10px}
 .cmp-lightbox img,.cmp-lightbox video{max-width:100%;max-height:80vh;border-radius:12px;background:#000;display:block;margin:0 auto}
@@ -421,6 +446,14 @@ a{color:var(--imode-blue)}
      same Supabase client the application uses; the connection details are read from the
      config the app already stored on this device. Nothing else on the page writes. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- 2026-09-15: the 24-hour date + time control. Without it this page falls back to the
+     browser's own datetime-local widget, which renders 12-hour (mm/dd/yyyy --:-- --) from the
+     browser's UI locale whatever the document says — measured in part 19, there is no
+     attribute or CSS that changes it. js/51 is a self-contained IIFE that upgrades every
+     datetime-local it finds and keeps sweeping on a MutationObserver, so markup this page
+     builds inside a popup is caught with no wiring here. The hidden native input keeps its id
+     and its value, which is what doAssign() reads. -->
+<script src="./js/51-v70Time24Script.js"></script>
 <script>
 (function(){
 'use strict';
@@ -912,7 +945,7 @@ var CaseWrite=(function(){
        js/16's imodeAssignCase() does it — and the technician's own device derives the
        "you have been given a job" notice from the case itself (part 16 §5), so nothing
        else has to be sent. */
-    setAssignees:function(id,ids,caseStatus){
+    setAssignees:function(id,ids,caseStatus,appointment){
       var crew=[],seen={};
       (ids||[]).forEach(function(v){
         var t=String(v||'').trim();
@@ -920,7 +953,13 @@ var CaseWrite=(function(){
         seen[t]=1;crew.push(t);
       });
       var changes={assignees:crew,assignee:crew[0]||''};
-      if(crew.length&&caseStatus==='เคสใหม่')changes.status='มอบหมายแล้ว';
+      var when=String(appointment||'').trim();
+      if(when)changes.appointment=when;
+      /* มอบหมาย and นัดหมาย are one press now, so a case that had not got going yet lands on
+         นัดหมายแล้ว — it has a real date on it, which is what that status means. Only the two
+         early statuses are moved: a job already in progress being re-crewed keeps its own. */
+      if(crew.length&&when&&['เคสใหม่','มอบหมายแล้ว'].indexOf(caseStatus)>=0)changes.status='นัดหมายแล้ว';
+      else if(crew.length&&caseStatus==='เคสใหม่')changes.status='มอบหมายแล้ว';
       return patch(id,changes);
     },
     configured:function(){return !!cfg()}
@@ -1117,7 +1156,7 @@ function stepDrawerHTML(m,i){
         ?'<dl class="sd-kv"><dt>นัดหมาย</dt><dd>'+esc(fmtDateTime(m.appointment.date))+'</dd>'
          +'<dt>สถานที่</dt><dd>'+esc(m.appointment.location||m.customer.address||'-')+'</dd></dl>'
         :'<p class="sd-empty">ยังไม่มีนัดหมาย</p>')
-      +'<div class="sd-acts"><button type="button" class="sd-go" data-action="schedule-service">ตั้ง / แก้นัดหมาย ›</button></div>';
+      +'<div class="sd-acts"><button type="button" class="sd-go" data-action="assign-technician">ตั้ง / แก้นัดหมาย ›</button></div>';
   }
   if(i===3){
     /* the technician's track, drawn under the main one */
@@ -1171,8 +1210,12 @@ function stepTimes(m){
    changes the status here on the page, and แก้ไขเคส is its own button that opens the form
    in the application. */
 var ACTIONS=[
-  {act:'assign-technician',icon:'👥',label:'มอบหมายงาน',cls:'primary'},
-  {act:'schedule-service', icon:'📅',label:'นัดหมายบริการ',cls:'green'},
+  /* 2026-09-15: one button, on the owner's instruction — "รวมปุ่ม มอบหมายงาน กับ นัดหมาย
+     ไว้ด้วยกัน". The old นัดหมายบริการ button did goApp('cases',intent=schedule), which left
+     this page entirely, reloaded the application and opened a popup over the case TABLE with
+     a เลือกเคส dropdown — the case you were already looking at had to be picked again. Both
+     halves are now one panel on this page. */
+  {act:'assign-technician',icon:'📅',label:'นัดหมาย',cls:'primary'},
   {act:'contact-customer', icon:'📞',label:'ติดต่อลูกค้า',cls:'green'},
   {act:'open-quotation',   icon:'📄',label:'ทำใบเสนอราคา',cls:''},
   {act:'open-field-service',icon:'🔧',label:'เริ่มงานหน้างาน',cls:''},
@@ -1391,17 +1434,25 @@ function assignPanelHTML(){
     var t=list.filter(function(x){return x.id===id})[0];
     return (t&&t.name)||id;
   });
+  /* 2026-09-15: the appointment lives in this panel now, so มอบหมายงาน and นัดหมาย are one
+     press. A plain datetime-local on a full-width row: js/51 is not loaded on this page, so
+     what the visitor gets is the browser's own picker — which is why the row is full width
+     and not a third of one, the layout that wrapped in the old popup. */
+  var when=(caseDetailModel.raw&&caseDetailModel.raw.appointment)||'';
   return body
+    +'<div class="sd-when"><label for="scdAssignWhen">วันและเวลานัดหมาย <b>*</b></label>'
+    +'<input type="datetime-local" id="scdAssignWhen" step="60" value="'+esc(when)+'">'
+    +'<small>ต้องระบุวันนัดก่อนจึงจะมอบหมายได้ · เมื่อบันทึกแล้วสถานะจะเป็น “นัดหมายแล้ว”</small></div>'
     +'<p class="sd-hint" id="scdAssignPicked">'
     +(names.length?'เลือกไว้: <b>'+esc(names.join(', '))+'</b> · หัวหน้างานคือคนแรกที่เลือก'
                  :'ยังไม่ได้เลือกช่าง')+'</p>'
     +'<div class="sd-acts"><button type="button" class="sd-go" data-action="do-assign">'
-    +(caseCrew().length?'บันทึกการเปลี่ยนช่าง':'มอบหมายงาน')+' ›</button></div>';
+    +(caseCrew().length?'บันทึกช่างและวันนัด':'บันทึกนัดหมาย')+' ›</button></div>';
 }
 function assignTechnician(){
   if(!can('case.assign')){toast('บัญชีนี้ไม่มีสิทธิ์มอบหมายงาน');return}
   assignPick=caseCrew();
-  panel('มอบหมายงานให้ช่าง',assignPanelHTML());
+  panel('นัดหมาย · มอบหมายช่าง',assignPanelHTML());
 }
 function refreshAssignPanel(){
   var host=el('scdPanel');
@@ -1424,9 +1475,26 @@ function doAssign(){
   if(!c||!c.id)return;
   if(!can('case.assign')){toast('บัญชีนี้ไม่มีสิทธิ์มอบหมายงาน');return}
   if(!assignPick.length){toast('กรุณาเลือกช่างอย่างน้อย 1 คน');return}
+  /* Both halves are required — the owner's instruction is that a job handed over without a
+     date is what used to go quiet. Read straight from the panel: this page has no form
+     submit, so nothing else validates it. */
+  var wEl=el('scdAssignWhen');
+  var when=wEl?String(wEl.value||'').trim():'';
+  if(!when){
+    toast('กรุณาระบุวันและเวลานัดหมาย');
+    if(wEl){
+      try{wEl.focus()}catch(e){}
+      var box=wEl.closest('.sd-when');
+      if(box){box.classList.add('is-missing');setTimeout(function(){box.classList.remove('is-missing')},1800)}
+    }
+    return;
+  }
   toast('กำลังบันทึก…');
-  CaseWrite.setAssignees(c.id,assignPick,c.status).then(function(r){
+  CaseWrite.setAssignees(c.id,assignPick,c.status,when).then(function(r){
     if(!r||!r.ok){toast('บันทึกไม่สำเร็จ — ลองทำจากระบบหลัก');return}
+    /* The dialog has done its job; leaving it open over the page it just changed hides the
+       progress bar that moved. renderPage() below repaints everything behind it. */
+    closePanel();
     openStep=null;
     try{CaseDetailData.refresh()}catch(e){}
     load().then(function(res){
@@ -1435,12 +1503,15 @@ function doAssign(){
         var t=CaseDetailData.allTechnicians().filter(function(x){return x.id===id})[0];
         return (t&&t.name)||id;
       });
-      toast(r.cloud?('มอบหมายให้ '+names.join(', ')+' แล้ว')
-                   :('มอบหมายให้ '+names.join(', ')+' แล้ว · ยังอยู่เฉพาะเครื่องนี้ ยังไม่ได้ส่งขึ้นระบบกลาง'));
+      var head='มอบหมายให้ '+names.join(', ')+' · นัดหมาย '+fmtDateTime(when);
+      toast(r.cloud?(head+' แล้ว')
+                   :(head+' · ยังอยู่เฉพาะเครื่องนี้ ยังไม่ได้ส่งขึ้นระบบกลาง'));
     });
   });
 }
-function scheduleService(){goApp('cases','&caseId='+encodeURIComponent(caseDetailModel.case.id)+'&intent=schedule')}
+/* scheduleService() is gone: มอบหมาย and นัดหมาย are one panel on this page now, so there is
+   nothing left to hand back to the application. It used to leave the page, reload the whole
+   app and open a popup over the case TABLE with a เลือกเคส dropdown. */
 function openQuotation(){goApp('quotation','&caseId='+encodeURIComponent(caseDetailModel.case.id))}
 function openFieldService(){goApp('field-service')}
 /* แก้ไขเคส — the full form still belongs to the application. */
@@ -1594,13 +1665,36 @@ function openContactPicker(){
      }).join('')+'</div>');
 }
 
+/* 2026-09-15: a POPUP, on the owner's instruction — "ผมบอกว่าทำเป็น POP UP". It used to be a
+   card appended in the flow of the page, below the fold, which is why the นัดหมาย panel did
+   not read as a dialog. Converting panel() itself rather than the assign caller means every
+   drawer on this page — the six step drawers, ติดต่อลูกค้า, เปลี่ยนสถานะ — becomes a popup
+   together, and there is still exactly one of them to maintain.
+   #scdPanel keeps its id and its place in the markup: close-panel and two other functions
+   address it by that name, and it is the element the overlay is painted on. */
 function panel(title,html){
   var host=el('scdPanel');
-  host.innerHTML='<section class="card"><div class="card-head"><span class="ic">▤</span><h2>'
-    +esc(title)+'</h2><span class="spacer"></span>'
-    +'<button type="button" class="scd-chip-btn" data-action="close-panel">ปิด</button></div>'+html+'</section>';
-  host.scrollIntoView({behavior:'smooth',block:'nearest'});
+  host.innerHTML='<div class="scd-modal-back" data-action="close-panel"></div>'
+    +'<section class="card scd-modal-card" role="dialog" aria-modal="true" aria-label="'+esc(title)+'">'
+    +'<div class="card-head"><span class="ic">▤</span><h2>'+esc(title)+'</h2><span class="spacer"></span>'
+    +'<button type="button" class="scd-chip-btn" data-action="close-panel" aria-label="ปิด">ปิด</button></div>'
+    +'<div class="scd-modal-body">'+html+'</div></section>';
+  host.classList.add('is-open');
+  document.body.classList.add('scd-modal-open');
+  /* Focus the dialog so Escape reaches it and a screen reader announces it. */
+  var card=host.querySelector('.scd-modal-card');
+  if(card){card.setAttribute('tabindex','-1');try{card.focus({preventScroll:true})}catch(e){}}
 }
+function closePanel(){
+  var host=el('scdPanel');
+  if(host){host.innerHTML='';host.classList.remove('is-open')}
+  document.body.classList.remove('scd-modal-open');
+}
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Escape')return;
+  var host=el('scdPanel');
+  if(host&&host.classList.contains('is-open')){e.preventDefault();closePanel()}
+});
 function customerHTML(){
   var cu=caseDetailModel.customer;
   return '<dl class="kv">'
@@ -1733,7 +1827,9 @@ function feedbackHTML(){
 var HANDLERS={
   'assign-technician':assignTechnician,
   'do-assign':doAssign,
-  'schedule-service':scheduleService,
+  /* schedule-service is kept as an alias of the merged panel: the step-3 drawer button and
+     any older markup still ask for it by that name. */
+  'schedule-service':assignTechnician,
   'contact-customer':openContactPicker,
   'open-quotation':openQuotation,
   'open-field-service':openFieldService,
@@ -1754,7 +1850,9 @@ var HANDLERS={
   'open-internal-notes':openInternalNotes,
   'open-feedback':openFeedback,
   'add-attachment':function(){toast('การแนบไฟล์เพิ่มจะทำผ่านใบตรวจ / สถานะหน้างานในระบบหลัก')},
-  'close-panel':function(){el('scdPanel').innerHTML='';},
+  /* closePanel() also drops .is-open and the body scroll lock — blanking innerHTML alone
+     would leave the fixed overlay in place over a page nobody could scroll. */
+  'close-panel':closePanel,
   /* Back to the list. history.back() when the visitor came from the app, so the browser's
      own Back and this button do the same thing and no entry is left dangling; a direct
      link (a bookmark, a pasted URL) has nothing to go back to, so it goes to the list. */

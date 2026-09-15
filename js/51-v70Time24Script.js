@@ -119,6 +119,25 @@
   hEl.addEventListener('change',push);
   mEl.addEventListener('change',push);
 
+  /* 2026-09-15: tapping anywhere in the date box opens the calendar, not only the small icon
+     at its right edge — "อยากให้กดตรงนี้และเลือกแผนที่ได้เลย … ตอนนี้มันยังต้องกด Icon อยู่".
+     A native date input only opens its picker from that icon; showPicker() is the supported
+     way to ask for it from anywhere else.
+
+     It throws rather than returning false in two cases that both matter here — no user
+     activation, and a browser that does not implement it (Safari, older Firefox) — so the
+     call is guarded and the icon still works untouched if it fails. `click` is used rather
+     than `focus` so that reaching the field by keyboard does not force a picker open over
+     the keyboard user who is about to type the date. */
+  if(dEl)dEl.addEventListener('click',function(e){
+   /* A click on the icon itself is already opening the picker; calling showPicker() on top
+      of that would open and immediately re-open it. */
+   if(e.__t24Picker)return;
+   e.__t24Picker=true;
+   if(typeof dEl.showPicker!=='function')return;
+   try{dEl.showPicker()}catch(err){}
+  });
+
   /* Something else may write the native input after we are in place — loadCaseIntoQuote(),
      openScheduleModal() filling a form it just drew. Mirror it back. */
   input.addEventListener('change',function(){

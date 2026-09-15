@@ -87,7 +87,9 @@
   var intent=intentEarly;
   setTimeout(function(){
    try{
-    if(intent==='schedule'&&typeof openScheduleModal==='function')openScheduleModal(cid);
+    /* 2026-09-15: มอบหมาย and นัดหมาย are one popup now. Kept for links already in the wild
+       carrying intent=schedule; the merged picker is what opens. */
+    if(intent==='schedule'&&typeof window.imodeOpenAssignPicker==='function')window.imodeOpenAssignPicker(cid);
     else if(intent==='status'&&typeof openCaseModal==='function')openCaseModal(cid);
     /* ลบเคส from service-case-detail.html. That page reads and never writes, so the delete
        itself — bin entry, Supabase row, re-render — happens here. imodeDeleteCase() asks

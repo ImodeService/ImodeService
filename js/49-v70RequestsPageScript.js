@@ -46,7 +46,12 @@
  }
  function isNew(r){return String(r.status||'')==='ใหม่'}
  function isDone(r){return String(r.status||'')==='เสร็จสิ้น'}
- function newCount(){return reqList().filter(isNew).length}
+ /* The sidebar badge must say the same number as the ใหม่ · รอรับเรื่อง card, so it counts
+    what this page actually LISTS — pickedUp() removed, exactly like render()'s `all`.
+    Counting the raw list instead made the badge include every request whose case had long
+    since been acted on: 23 in the sidebar beside a card reading 1. pickedUp() is a function
+    declaration further down and hoists, so calling it from here is fine. */
+ function newCount(){return reqList().filter(function(r){return isNew(r)&&!pickedUp(r)}).length}
  window.imodeNewRequestCount=newCount;
 
  /* ------------------------------------------------------ page registration ---- */

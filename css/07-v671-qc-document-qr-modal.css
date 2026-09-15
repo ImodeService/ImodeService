@@ -14,6 +14,13 @@ input,select,textarea{max-width:100%}
 
 /* Modal hardening: close button stays clickable and content cannot lock the app */
 #modal{z-index:10000;overscroll-behavior:contain}
+/* 2026-09-15: the toast has to be above the popup it is talking about. css/01 gives it 200,
+   which was above the modal's original 100 — but the line above raised the modal to 10000 and
+   nothing followed, so every message fired while a popup was open (บันทึกบัญชีแล้ว, กรุณาระบุ
+   วันนัด, …) appeared BEHIND it and read as no confirmation at all. Measured: toast z 200,
+   modal z 10000, the element at the toast's position was the account row. Below the image
+   lightbox (12000), which is a full-screen viewer and should not be covered. */
+.toast{z-index:10050}
 #modal.open{pointer-events:auto}
 #modal .modal-panel{position:relative;max-width:calc(100vw - 36px);max-height:calc(100dvh - 36px);overflow:auto;overflow-x:hidden;overscroll-behavior:contain;pointer-events:auto}
 #modal .modal-head{z-index:30;align-items:center}

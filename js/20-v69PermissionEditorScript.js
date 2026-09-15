@@ -249,13 +249,31 @@
        body would read as a broken screen. */
     var first=groupOf.indexOf(g.id);
     if(first>=0){active=first;show(cards,first)}
-    [].slice.call(groupRow.children).forEach(function(x,j){
-     x.setAttribute('aria-pressed',String(groups[j].id===activeGroup));
+    /* Only the group buttons. The row also holds the 👤 สิทธิ์รายบุคคล button, and indexing
+       every child against `groups` read groups[3] for it — undefined, so `.id` threw here,
+       paintTabs() below never ran, and the tab row kept the previous group's roles while
+       the card beneath had already changed. */
+    [].slice.call(groupRow.querySelectorAll('.permx-group:not(.permx-userbtn)')).forEach(function(x,j){
+     if(groups[j])x.setAttribute('aria-pressed',String(groups[j].id===activeGroup));
     });
     paintTabs();
    };
    groupRow.appendChild(b);
   });
+  /* 2026-09-15: สิทธิ์รายบุคคล has a view of its own inside this popup, reached from here —
+     the end of the group row, where the owner marked it. Built inside this function because
+     groupRow is cleared and rebuilt on every call; a button added from outside would be wiped
+     the next time a role is renamed or ticked. */
+  var ulist=document.getElementById('userPermissionList');
+  if(ulist){
+   var ub=document.createElement('button');
+   ub.type='button';
+   ub.className='permx-group permx-userbtn';
+   ub.innerHTML='<b>👤 '+esc2(tl('สิทธิ์รายบุคคล','Per-person'))+'</b><small>'
+     +ulist.querySelectorAll('.user-permission-card').length+' '+esc2(tl('บัญชี','accounts'))+' ›</small>';
+   ub.onclick=function(){if(typeof window.imodePermView==='function')window.imodePermView('user')};
+   groupRow.appendChild(ub);
+  }
   paintTabs();
   show(cards,active);
   return cards;
@@ -357,6 +375,48 @@
    buildUserPicker(pick,userList);
    var badge=document.querySelector('.user-permission-badge');
    if(badge)badge.textContent=userList.querySelectorAll('.user-permission-card').length+' '+tl('บัญชี','accounts');
+
+   /* 2026-09-15: สิทธิ์รายบุคคล is a second VIEW of this popup, not a second popup.
+      A second openModal() would replace this body — and saveRoles() collects the role cards
+      from the DOM, so the roles would be saved as an empty list. Both sections stay in the
+      document and only one is visible; the one save button still writes both.
+      Hidden with the `hidden` attribute: css/23's global [hidden]{display:none!important}
+      makes it win over any author display rule on these wrappers. */
+   var userSec=userList.closest('.roles-split-grid > *')||userList.parentNode;
+   var roleSec=roleList.closest('.roles-split-grid > *')||roleList.parentNode;
+   var grid=bodyEl.querySelector('.roles-split-grid');
+   if(grid)grid.classList.add('permx-single');
+   var topNote=bodyEl.querySelector('.roles-top-note');
+   var backBar=document.createElement('div');
+   backBar.className='permx-backbar';
+   backBar.innerHTML='<button type="button" class="permx-back">‹ '
+     +esc2(tl('กลับไปสิทธิ์ตามบทบาท','Back to roles'))+'</button>';
+   userSec.insertBefore(backBar,userSec.firstChild);
+   backBar.querySelector('button').onclick=function(){window.imodePermView('role')};
+   /* "+ เพิ่ม Role" means nothing on the per-person view. The role cards carry their own
+      "ลบ Role" buttons, so only the footer row is searched. */
+   function addRoleBtn(){
+    return [].filter.call(bodyEl.querySelectorAll('.button-row button'),function(b){
+     return !b.closest('.role-card')&&/Role/i.test(b.textContent)&&!/บันทึก|Save/i.test(b.textContent);
+    })[0]||null;
+   }
+   window.imodePermView=function(v){
+    var u=(v==='user');
+    userSec.hidden=!u;
+    roleSec.hidden=u;
+    if(topNote)topNote.hidden=u;
+    var add=addRoleBtn();
+    if(add)add.hidden=u;
+    try{
+     bodyEl.scrollTop=0;
+     var panel=bodyEl.closest('.modal-panel');
+     if(panel)panel.scrollTop=0;
+    }catch(e){}
+   };
+   window.imodePermView('role');
+   /* addMissingAccounts() above added cards after the group row was first drawn, so its
+      account count would read short. Redraw it now the list is complete. */
+   buildRoleTabs(tabs,roleList);
   }
 
   /* the save bar */
@@ -411,6 +471,18 @@
  +'.permx-hint{margin:10px 0 8px;padding:9px 12px;border-radius:12px;background:#f2f7ff;border:1px solid #dae7fa;color:#3d557f;font-size:12px;line-height:1.5}'
  +'.permx-tabs{margin:0 0 12px}'
  +'.permx-groups{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}'
+ /* 2026-09-15: the door to the per-person view — the same pill as a group, but dashed and in
+    the accent colour so it reads as "somewhere else", not as a fourth kind of role. */
+ +'.permx-group.permx-userbtn{border-style:dashed;border-color:#f0a44b;background:#fff8f0}'
+ +'.permx-group.permx-userbtn b{color:#b45f0c}'
+ +'.permx-group.permx-userbtn:hover{background:#fff0e0;border-color:#e07a14}'
+ /* One section at a time, so the grid never leaves an empty column beside the visible one. */
+ +'.roles-split-grid.permx-single{grid-template-columns:1fr!important}'
+ +'.permx-backbar{margin:0 0 12px}'
+ +'.permx-back{border:1px solid #d7e3f5;background:#fff;color:#0b63e5;border-radius:10px;'
+ +'padding:8px 14px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}'
+ +'.permx-back:hover{background:#eef5ff;border-color:#0b63e5}'
+ +'.permx-back:focus-visible{outline:2px solid #0b63e5;outline-offset:2px}'
  +'.permx-tabrow{display:flex;flex-wrap:wrap;gap:8px;padding:10px;border:1px solid #e2ecfb;border-radius:14px;background:#f7fbff}'
  +'.permx-group{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:140px;padding:9px 14px;border:1px solid #d7e3f5;border-radius:999px;background:#fff;cursor:pointer;text-align:left;transition:border-color .14s ease,background .14s ease}'
  +'.permx-group b{font-size:12.5px;color:#3d557f;font-weight:700}'

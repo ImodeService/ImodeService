@@ -42,9 +42,11 @@
   var base=techPerms();
   var lead=base.slice();
   LEAD_EXTRA.forEach(function(k){if(lead.indexOf(k)<0)lead.push(k)});
-  [['Technician - Technical','Technical',base],
-   ['Technician - R&D','R&D',base],
-   ['Technical Lead','Technical',lead],
+  /* 2026-09-15: 'Technician - Technical' and 'Technician - R&D' are no longer seeded — they
+     duplicated Technician ("role ซ้ำซ้อนเอาเหลือแค่ technician"). A technician's team comes
+     from their technician record, which teamScope() reads before any role, so the team
+     distinction survives without a role per team. js/47 removes copies already saved. */
+  [['Technical Lead','Technical',lead],
    ['R&D Lead','R&D',lead]].forEach(function(row){
    var found=settings.roles.filter(function(r){return r.name===row[0]})[0];
    if(found){found.teamScope=found.teamScope||row[1];return}

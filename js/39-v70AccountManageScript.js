@@ -510,6 +510,31 @@
    refresh();
   }
  }
+ /* After a save the list is redrawn, which closes the form and puts the row back looking
+    exactly as it did — so on its own a successful edit looked like nothing had happened. The
+    row that was saved flashes and carries a chip for a moment, and is scrolled into view. */
+ function flashSaved(username,label){
+  var b=document.getElementById('modalBody');
+  if(!b)return;
+  var row=[].filter.call(b.querySelectorAll('.acctmg-row'),function(r){
+   return key(r.getAttribute('data-user'))===key(username);
+  })[0];
+  if(!row)return;
+  row.classList.add('is-saved');
+  var id=row.querySelector('.acctmg-id');
+  if(id&&!id.querySelector('.acctmg-saved')){
+   var chip=document.createElement('span');
+   chip.className='acctmg-saved';
+   chip.textContent=label;
+   id.appendChild(chip);
+  }
+  try{row.scrollIntoView({block:'nearest',behavior:'smooth'})}catch(e){}
+  setTimeout(function(){
+   row.classList.remove('is-saved');
+   var c=row.querySelector('.acctmg-saved');
+   if(c)c.parentNode.removeChild(c);
+  },2800);
+ }
  function readForm(form){
   function v(n){var el=form.querySelector('[name="'+n+'"]');return el?el.value:''}
   return {username:v('username'),name:v('name'),accountType:v('accountType'),
@@ -613,8 +638,12 @@
    /* A disabled input is not read back, so the locked username is restored here. */
    if(original&&!data.username)data.username=original;
    var res=window.imodeAccountSave(original,data);
-   toast(res.ok?(original?tl('บันทึกบัญชีแล้ว','Account saved'):tl('เพิ่มบัญชีแล้ว','Account added')):res.message);
-   if(res.ok)refresh();
+   toast(res.ok?(original?tl('บันทึกบัญชี ','Saved ')+data.username+tl(' แล้ว','')
+                         :tl('เพิ่มบัญชี ','Added ')+data.username+tl(' แล้ว','')):res.message);
+   if(res.ok){
+    refresh();
+    flashSaved(data.username,original?tl('✓ บันทึกแล้ว','✓ Saved'):tl('✓ เพิ่มแล้ว','✓ Added'));
+   }
   });
  }
 
@@ -675,6 +704,13 @@
  +'.acctmg-mini.is-link{border-color:#f3c98b;color:#a8660c;background:#fffaf2}'
  +'.acctmg-mini.is-link:hover{background:#fff3e2}'
  +'.acctmg-link{margin-top:9px;padding:11px;border:1px dashed #f0cf9f;border-radius:11px;background:#fffaf3}'
+ /* The saved row flashes green and carries a chip, then settles. */
+ +'.acctmg-row.is-saved{border-color:#12a150;background:#effbf3;box-shadow:0 0 0 3px rgba(18,161,80,.18);'
+ +'animation:acctmgSaved .9s ease-out}'
+ +'@keyframes acctmgSaved{0%{box-shadow:0 0 0 0 rgba(18,161,80,.45)}100%{box-shadow:0 0 0 3px rgba(18,161,80,.18)}}'
+ +'.acctmg-saved{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:999px;'
+ +'background:#12a150;color:#fff;font-size:10.5px;font-weight:800;vertical-align:middle}'
+ +'@media (prefers-reduced-motion:reduce){.acctmg-row.is-saved{animation:none}}'
  +'.acctmg-form{margin-top:9px;padding:11px;border:1px dashed #c9dcf6;border-radius:11px;background:#f4f9ff}'
  +'.acctmg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px}'
  +'.acctmg-grid label{display:flex;flex-direction:column;gap:4px;min-width:0}'

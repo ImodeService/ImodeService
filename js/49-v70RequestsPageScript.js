@@ -146,9 +146,27 @@
  window.imodeRequestsMore=function(){state.limit=state.limit?state.limit+25:0;render()};
  window.imodeRequestsLimit=function(v){state.limit=Number(v)||0;render()};
 
+ /* กำลังดำเนินการ is not one stored status — it is everything that is neither ใหม่ nor
+    เสร็จสิ้น — so it is a filter value of its own rather than a string any request carries. */
+ var PROGRESS='__progress';
+ function kpiTile(label,n,cls,act,on,hint){
+  return '<button type="button" class="req-kpi-box'+(cls||'')+(on?' is-active':'')+'"'
+   +' aria-pressed="'+(on?'true':'false')+'" onclick="'+act+'"'
+   +(hint?' title="'+esc2(hint)+'"':'')+'>'
+   +'<small>'+esc2(label)+'</small><b>'+n+'</b>'
+   +(hint?'<i class="req-kpi-go">'+esc2(hint)+' ›</i>':'')
+   +'</button>';
+ }
+ window.imodeRequestsShowAll=function(){state.status='';state.type='';state.limit=25;render()};
+ /* goPage first: js/61 draws the page as it opens, then the filter is applied to that page. */
+ window.imodeRequestsOpenClosed=function(){
+  if(typeof goPage==='function')goPage('request-log');
+  if(typeof window.imodeReqLogSet==='function')window.imodeReqLogSet('status','เสร็จสิ้น');
+ };
  function matches(r){
   if(state.type&&String(r.type||'')!==state.type)return false;
-  if(state.status&&String(r.status||'')!==state.status)return false;
+  if(state.status===PROGRESS){if(isNew(r)||isDone(r))return false}
+  else if(state.status&&String(r.status||'')!==state.status)return false;
   var s=state.q.trim().toLowerCase();
   if(!s)return true;
   var cu=customerOf(r),m=machineOf(r);
@@ -284,12 +302,20 @@
    +'</div>'
    +'<button class="soft-btn" onclick="imodeRequestsSet(\'status\',\'ใหม่\')">'
    +esc2(tl('ดูเฉพาะคำขอใหม่','New only'))+'</button></div>'
+   /* 2026-09-15: the four tiles are buttons — "ผมอยากให้ปุ่มพวกนี้กดได้". Three of them filter
+      this list; ปิดเรื่องแล้ว cannot, because a closed request has already left this page
+      (pickedUp() drops it), so filtering here would always show nothing. That one opens
+      ประวัติคำขอ, where closed requests live, already filtered to เสร็จสิ้น. */
    +'<div class="req-kpi">'
-   +'<div class="req-kpi-box'+(newCount()?' is-new':'')+'"><small>'+esc2(tl('ใหม่ · รอรับเรื่อง','New'))+'</small><b>'+all.filter(isNew).length+'</b></div>'
-   +'<div class="req-kpi-box"><small>'+esc2(tl('กำลังดำเนินการ','In progress'))+'</small><b>'
-   +all.filter(function(r){return !isNew(r)&&!isDone(r)}).length+'</b></div>'
-   +'<div class="req-kpi-box"><small>'+esc2(tl('ปิดเรื่องแล้ว','Closed'))+'</small><b>'+everything.filter(isDone).length+'</b></div>'
-   +'<div class="req-kpi-box"><small>'+esc2(tl('ทั้งหมด','Total'))+'</small><b>'+all.length+'</b></div>'
+   +kpiTile(tl('ใหม่ · รอรับเรื่อง','New'),all.filter(isNew).length,
+            newCount()?' is-new':'',"imodeRequestsSet('status','ใหม่')",state.status==='ใหม่')
+   +kpiTile(tl('กำลังดำเนินการ','In progress'),all.filter(function(r){return !isNew(r)&&!isDone(r)}).length,
+            '',"imodeRequestsSet('status','"+PROGRESS+"')",state.status===PROGRESS)
+   +kpiTile(tl('ปิดเรื่องแล้ว','Closed'),everything.filter(isDone).length,
+            ' is-link',"imodeRequestsOpenClosed()",false,
+            tl('เปิดในประวัติคำขอ','Opens in the request history'))
+   +kpiTile(tl('ทั้งหมด','Total'),all.length,
+            '',"imodeRequestsShowAll()",!state.status&&!state.type)
    +'</div>'
    +'<div class="req-filters">'
    +'<input type="search" class="req-search" placeholder="'
@@ -302,6 +328,9 @@
      }).join('')+'</select>'
    +'<select onchange="imodeRequestsSet(\'status\',this.value)"><option value="">'
    +esc2(tl('ทุกสถานะ','Every status'))+'</option>'
+   /* The กำลังดำเนินการ tile's filter, so the dropdown shows what the tile chose. */
+   +'<option value="'+PROGRESS+'"'+(state.status===PROGRESS?' selected':'')+'>'
+   +esc2(tl('กำลังดำเนินการ (ทุกสถานะที่ยังไม่ปิด)','In progress (anything not closed)'))+'</option>'
    +statuses.map(function(s){
       return '<option value="'+esc2(s)+'"'+(state.status===s?' selected':'')+'>'+esc2(s)+'</option>';
      }).join('')+'</select>'
@@ -447,6 +476,16 @@
  +'.req-kpi-box b{font-size:17px;color:#0c225e}'
  +'.req-kpi-box.is-new{border-color:#f5c9a6;background:#fff6ee}'
  +'.req-kpi-box.is-new b{color:#b4600a}'
+ /* The tiles are buttons now. A <button> brings the UA font and centring with it, so those are
+    reset, and the tile gets the press feel the rest of the app uses. */
+ +'button.req-kpi-box{display:block;width:100%;font:inherit;text-align:left;cursor:pointer;'
+ +'color:inherit;transition:border-color .15s,background .15s,box-shadow .15s,transform .12s}'
+ +'button.req-kpi-box:hover{border-color:#b9d3f5;box-shadow:0 6px 14px rgba(16,54,128,.08)}'
+ +'button.req-kpi-box:active{transform:translateY(1px)}'
+ +'button.req-kpi-box:focus-visible{outline:2px solid #0b63e5;outline-offset:2px}'
+ +'button.req-kpi-box.is-active{border-color:#0b63e5;background:#eef5ff;box-shadow:inset 0 0 0 1px #0b63e5}'
+ +'button.req-kpi-box.is-new.is-active{border-color:#e07a14;background:#fff0e2;box-shadow:inset 0 0 0 1px #e07a14}'
+ +'.req-kpi-go{display:block;margin-top:3px;font-style:normal;font-size:10px;font-weight:700;color:#0b63e5}'
  +'.req-filters{display:flex;flex-wrap:wrap;gap:9px;padding:0 14px 12px}'
  +'.req-filters input,.req-filters select{flex:1 1 180px;min-width:0;border:1px solid #d9e6fa;'
  +'border-radius:11px;padding:9px 11px;font-size:13px;background:#fff;color:#0c225e;min-height:38px}'

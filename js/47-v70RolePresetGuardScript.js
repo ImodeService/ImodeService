@@ -74,9 +74,49 @@
   return (m&&typeof m==='object')?m:{};
  }
 
+ /* ---------- 2026-09-15: one technician role ----------
+    'Technician - Technical' and 'Technician - R&D' (seeded by js/13) duplicated Technician —
+    "role ซ้ำซ้อนเอาเหลือแค่ technician". A technician's TEAM comes from their technician
+    record, which imodeTeamScope() reads before any role, so the team split survives.
+
+    It rides this repair because it has the same problem to solve: the roles live in
+    `settings`, which syncCloud() replaces wholesale, so a one-shot removal would be undone
+    by the next sync. Run here it happens on every load and after every sync, and a change
+    is pushed back up by the wrapper below.
+
+    settings.v70TechRoleMerge records that the merge happened. Once it is on the settings
+    object, a role an admin later creates with one of these names on purpose is left alone;
+    a stale copy (device or cloud) without the flag is merged again and the flag travels
+    back up with the push. Everything that named the old roles is pointed at Technician. */
+ var DUP_TECH_ROLES=['Technician - Technical','Technician - R&D'];
+ function mergeTechRoles(){
+  if(settings.v70TechRoleMerge===1)return false;
+  var changed=false;
+  function remap(o){if(o&&DUP_TECH_ROLES.indexOf(o.role)>=0){o.role='Technician';changed=true}}
+  if(Array.isArray(settings.roles)){
+   var kept=settings.roles.filter(function(r){return !(r&&DUP_TECH_ROLES.indexOf(r.name)>=0)});
+   if(kept.length!==settings.roles.length){settings.roles=kept;changed=true}
+  }
+  (Array.isArray(settings.uatAccounts)?settings.uatAccounts:[]).forEach(remap);
+  var ed=settings.uatAccountEdits;
+  if(ed&&typeof ed==='object')Object.keys(ed).forEach(function(k){remap(ed[k])});
+  var off=settings.rolePresetOptOut;
+  if(off&&typeof off==='object')DUP_TECH_ROLES.forEach(function(n){if(off[n]){delete off[n];changed=true}});
+  /* A session signed in before this shipped still carries the old role name. currentUser is
+     a lexical global in js/03 — assigning to its properties by bare identifier is legal. */
+  try{
+   if(currentUser&&DUP_TECH_ROLES.indexOf(currentUser.permissionRole)>=0)currentUser.permissionRole='Technician';
+   if(currentUser&&DUP_TECH_ROLES.indexOf(currentUser.role)>=0)currentUser.role='Technician';
+  }catch(e){}
+  settings.v70TechRoleMerge=1;
+  return true;   /* the flag itself is new on this object, so it must be saved and pushed */
+ }
+ window.imodeMergeTechRoles=mergeTechRoles;
+
  /* ---------- the repair ---------- */
  function repair(){
   var off=optOutMap(),changed=false;
+  if(mergeTechRoles())changed=true;
   (Array.isArray(settings.roles)?settings.roles:[]).forEach(function(role){
    if(!role||!hasPreset(role.name))return;
    var want=presetFor(role.name);

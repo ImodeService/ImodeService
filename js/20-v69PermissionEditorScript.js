@@ -112,7 +112,12 @@
  function esc2(v){return typeof window.esc==='function'?window.esc(v):String(v==null?'':v)}
 
  /* ---------- accounts that can actually sign in ---------- */
+ /* js/39's list first — it is exactly what การจัดการบัญชีผู้ใช้ draws (created accounts, renamed
+    built-ins, deleted ones gone), so the per-person list and the account page cannot disagree. */
  function loginAccounts(){
+  try{
+   if(typeof window.imodeAccountList==='function')return window.imodeAccountList()||[];
+  }catch(e){}
   try{
    if(window.uatAuth&&typeof window.uatAuth.allAccounts==='function')return window.uatAuth.allAccounts()||[];
   }catch(e){}
@@ -272,7 +277,7 @@
    ub.type='button';
    ub.className='permx-group permx-userbtn';
    ub.innerHTML='<b>👤 '+esc2(tl('สิทธิ์รายบุคคล','Per-person'))+'</b><small>'
-     +ulist.querySelectorAll('.user-permission-card').length+' '+esc2(tl('บัญชี','accounts'))+' ›</small>';
+     +accountCards(ulist).length+' '+esc2(tl('บัญชี','accounts'))+' ›</small>';
    ub.onclick=function(){if(typeof window.imodePermView==='function')window.imodePermView('user')};
    groupRow.appendChild(ub);
   }
@@ -281,43 +286,90 @@
   return cards;
  }
 
- function userOptionLabel(card){
-  var n=card.querySelector('.role-card-head input[readonly]');
+ /* 2026-09-15: the per-person view lists ACCOUNTS — the same rows การจัดการบัญชีผู้ใช้ shows —
+    instead of a dropdown that also carried the eight hard-coded demo names, which have no
+    login and which the owner had already removed from the sign-in picker. A card's key is
+    'UAT-<username>', the same id a signed-in session carries, so a renamed account still
+    matches its own permissions. */
+ function accountRows(){var l=loginAccounts();return Array.isArray(l)?l:[]}
+ function accountKeyMap(){
+  var m={};
+  accountRows().forEach(function(a){
+   if(!a||!a.username)return;
+   var u=accountUser(a);
+   var k=String(u.id||u.name||'').trim();
+   if(k)m[k]={acc:a,user:u};
+  });
+  return m;
+ }
+ function accountCards(list){
+  if(!list)return [];
+  var m=accountKeyMap();
+  return [].slice.call(list.querySelectorAll('.user-permission-card')).filter(function(c){return !!m[c.dataset.userKey]});
+ }
+ function userModeLabel(card){
   var on=card.querySelectorAll('[data-user-perm]:checked').length;
   var ind=card.querySelector('[data-user-enable]');
-  var tag=(ind&&ind.checked)?tl(' · รายบุคคล '+on,' · individual '+on):tl(' · ตาม Role',' · by role');
-  return ((n&&n.value)||card.dataset.userKey)+tag;
+  return (ind&&ind.checked)
+   ? {txt:tl('รายบุคคล · ','Individual · ')+on+' '+tl('สิทธิ์','perms'),ind:true}
+   : {txt:tl('ตาม Role','By role'),ind:false};
  }
- /* Built once. Rebuilding it on every tick would reset the dropdown to the first user and
-    throw the admin out of the card they are editing; only the label is refreshed. */
+ /* Built once. Rebuilding it on every tick would throw the admin out of the card they are
+    editing; only the row that changed is redrawn. */
  function buildUserPicker(host,list){
-  var cards=[].slice.call(list.querySelectorAll('.user-permission-card'));
-  if(!cards.length)return;
-  var sel=document.createElement('select');
-  sel.className='permx-userpick';
-  cards.forEach(function(card,i){
-   var o=document.createElement('option');
-   o.value=String(i);
-   o.textContent=userOptionLabel(card);
-   /* The card's key is 'UAT-<username>' for a real login account, so this is what makes
-      typing "technician_test1" find the row labelled "สมชาย ใจดี". */
-   o.dataset.search=card.dataset.userKey||'';
-   sel.appendChild(o);
+  var m=accountKeyMap();
+  var all=[].slice.call(list.querySelectorAll('.user-permission-card'));
+  /* A card with no login account is hidden, NOT removed: saveRoles() rebuilds
+     settings.userPermissions from every card still in the page, so removing one would delete
+     its saved entry along with it. */
+  all.forEach(function(c){
+   if(!m[c.dataset.userKey]){c.style.display='none';c.dataset.noAccount='1'}
   });
-  sel.onchange=function(){show(cards,Number(sel.value)||0)};
-  host.appendChild(sel);
-  show(cards,0);
-  sel.value='0';
-  /* js/35 turns this into a type-to-filter combobox. It keeps the <select> and fires a
-     real change event, so the onchange above is still what switches the card. */
-  try{if(typeof window.imodeCombo==='function')window.imodeCombo(sel,{
-   placeholder:tl('พิมพ์ชื่อผู้ใช้งานเพื่อค้นหา','Type a name to search')
-  })}catch(e){}
+  var order=accountRows().map(function(a){return String(accountUser(a).id||'')});
+  var cards=all.filter(function(c){return !!m[c.dataset.userKey]}).sort(function(a,b){
+   return order.indexOf(a.dataset.userKey)-order.indexOf(b.dataset.userKey);
+  });
+  if(!cards.length){
+   host.insertAdjacentHTML('beforeend','<p class="permx-acc-empty">'+esc2(tl('ยังไม่มีบัญชีผู้ใช้','No accounts yet'))+'</p>');
+   return;
+  }
+  var me='';
+  try{me=String((currentUser&&currentUser.id)||'')}catch(e){}
+  var box=document.createElement('div');
+  box.className='permx-acclist';
+  box.setAttribute('role','listbox');
+  function rowHTML(card){
+   var r=m[card.dataset.userKey],a=r.acc,u=r.user,md=userModeLabel(card);
+   var team=a.team||u.team||'';
+   try{if(team&&typeof teamLabel==='function')team=teamLabel(team)}catch(e){}
+   return '<b>'+esc2(a.username)
+    +(card.dataset.userKey===me?'<i>'+esc2(tl('ใช้งานอยู่','signed in'))+'</i>':'')+'</b>'
+    +'<small>'+esc2(a.name||u.name||'-')+'</small>'
+    +'<span>'+esc2(a.role||u.role||'-')+(team?' · '+esc2(team):'')+'</span>'
+    +'<em class="'+(md.ind?'is-ind':'')+'">'+esc2(md.txt)+'</em>';
+  }
+  var btns=cards.map(function(card,i){
+   var b=document.createElement('button');
+   b.type='button';
+   b.className='permx-acc';
+   b.setAttribute('role','option');
+   b.innerHTML=rowHTML(card);
+   b.onclick=function(){pickAt(i,true)};
+   box.appendChild(b);
+   return b;
+  });
+  function pickAt(i,scroll){
+   show(cards,i);
+   btns.forEach(function(b,j){b.setAttribute('aria-selected',String(j===i));b.classList.toggle('is-on',j===i)});
+   if(scroll){try{cards[i].scrollIntoView({behavior:'smooth',block:'start'})}catch(e){}}
+  }
+  host.appendChild(box);
+  pickAt(0,false);
   list.addEventListener('change',function(e){
    var card=e.target&&e.target.closest&&e.target.closest('.user-permission-card');
    if(!card)return;
    var i=cards.indexOf(card);
-   if(i>=0&&sel.options[i])sel.options[i].textContent=userOptionLabel(card);
+   if(i>=0)btns[i].innerHTML=rowHTML(card);
   });
  }
 
@@ -372,11 +424,12 @@
    var pick=document.createElement('div');
    pick.className='permx-userpick-wrap';
    pick.setAttribute('data-no-i18n','true');
-   pick.innerHTML='<label>'+esc2(tl('เลือกผู้ใช้งาน','Choose a user'))+'</label>';
+   pick.innerHTML='<label>👤 '+esc2(tl('เลือกบัญชีผู้ใช้ที่จะกำหนดสิทธิ์','Pick the account to set permissions for'))+'</label>';
    userList.parentNode.insertBefore(pick,userList);
    buildUserPicker(pick,userList);
+   /* Counts accounts, not cards — the hidden demo-name cards are still in the list. */
    var badge=document.querySelector('.user-permission-badge');
-   if(badge)badge.textContent=userList.querySelectorAll('.user-permission-card').length+' '+tl('บัญชี','accounts');
+   if(badge)badge.textContent=accountCards(userList).length+' '+tl('บัญชี','accounts');
 
    /* 2026-09-15: สิทธิ์รายบุคคล is a second VIEW of this popup, not a second popup.
       A second openModal() would replace this body — and saveRoles() collects the role cards
@@ -500,8 +553,26 @@
  +'.permx-tab:active{transform:translateY(2px);box-shadow:0 1px 0 #dce8f9}'
  +'.permx-tab[aria-pressed="true"]{border-color:#0b63e5;background:linear-gradient(180deg,#eaf3ff,#dcebff);box-shadow:0 3px 0 #b9d5fb}'
  +'.permx-tab[aria-pressed="true"] b{color:#0b63e5}'
- +'.permx-userpick-wrap{margin:10px 0}'
- +'.permx-userpick-wrap label{display:block;font-size:11.5px;color:#5b6b88;margin-bottom:5px;font-weight:700}'
+ /* 2026-09-15: the account picker is the first thing on this view and has to read as such —
+    a framed block in the brand blue, with the accounts as rows like การจัดการบัญชีผู้ใช้. */
+ +'.permx-userpick-wrap{margin:10px 0 14px;padding:14px;border:2px solid #0b63e5;border-radius:16px;'
+ +'background:linear-gradient(180deg,#f4f9ff,#fff);box-shadow:0 8px 20px rgba(11,99,229,.10)}'
+ +'.permx-userpick-wrap label{display:block;font-size:14px;color:#0c225e;margin-bottom:10px;font-weight:800}'
+ +'.permx-acclist{display:grid;gap:8px;max-height:46vh;overflow:auto;padding:2px}'
+ +'.permx-acc{display:grid;grid-template-columns:1fr auto;grid-template-areas:"u m" "n m" "r m";gap:2px 10px;'
+ +'align-items:center;width:100%;text-align:left;font:inherit;cursor:pointer;border:1px solid #dbe6f7;'
+ +'border-radius:12px;background:#fff;padding:10px 12px;transition:border-color .14s,background .14s,box-shadow .14s}'
+ +'.permx-acc b{grid-area:u;font-size:14px;color:#0c225e}'
+ +'.permx-acc b i{font-style:normal;font-size:10px;font-weight:800;color:#0a6b3d;margin-left:6px}'
+ +'.permx-acc small{grid-area:n;font-size:11.5px;color:#7385a5}'
+ +'.permx-acc span{grid-area:r;font-size:12px;color:#41527a}'
+ +'.permx-acc em{grid-area:m;font-style:normal;font-size:11px;font-weight:800;color:#5b6b88;background:#eef2f8;'
+ +'border-radius:999px;padding:3px 10px;white-space:nowrap}'
+ +'.permx-acc em.is-ind{color:#a8660c;background:#fff3e2}'
+ +'.permx-acc:hover{border-color:#b9d3f5;background:#f6faff}'
+ +'.permx-acc.is-on{border-color:#0b63e5;background:#eef5ff;box-shadow:inset 0 0 0 1px #0b63e5}'
+ +'.permx-acc:focus-visible{outline:2px solid #0b63e5;outline-offset:2px}'
+ +'.permx-acc-empty{margin:0;font-size:12px;color:#7385a5}'
  +'.permx-userpick{width:100%;max-width:420px;padding:10px 12px;border:1px solid #d3e0f4;border-radius:12px;font-size:13px;background:#fff}'
  +'.permx-savebar{position:sticky;bottom:0;z-index:5;margin:14px -4px -4px;padding:12px 4px;background:linear-gradient(180deg,rgba(255,255,255,.72),#fff 42%);border-top:1px solid #e2ecfb}'
  +'.permx-savebar .button-row{margin:0}'

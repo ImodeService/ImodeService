@@ -43,8 +43,14 @@
  /* users.manage + settings.manage are not optional: without them an enforced Admin
     account cannot open Settings -> Users & Roles, which is the very screen that decides
     what a technician sees. */
+/* field.report (2026-09-16): an admin could already READ a ใบตรวจ from หน้ารายงาน —
+    previewServiceReport() is not gated — but openServiceReport() refuses without this key,
+    so the แก้ไขใบตรวจ button on the case page would have been a button that always said no.
+    js/47 re-applies this preset on EVERY load, so this one line reaches every device and
+    needs no SCOPE_VERSION bump; and a key that was never in the preset cannot be in
+    settings.rolePresetOptOut, so nothing blocks it. */
  var ADMIN_ADD=['quotation.view','quotation.create','onsite.view','parts.view','pettycash.view',
-                'users.manage','settings.manage'];
+                'users.manage','settings.manage','field.report'];
  /* 4 (2026-09-09): reported from a live browser — QC เครื่อง was missing from the admin
     sidebar, and on one phone the bottom nav had lost หน้าหลัก and เคส as well. On a fresh
     profile the role is correct (33 permissions, qc.view included), so this is a saved

@@ -4404,3 +4404,195 @@ Three suites, six runs at 1440×1000 and 390×844 (`Emulation.setDeviceMetricsOv
    database.
 5. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its
    serial or QR.
+
+---
+
+## Session Change Log — 2026-09-16 (part 24): the ใบตรวจ is readable, the status says who moved it, one stroke is undoable, and a sync stops eating unsent rows
+
+Four pieces of work. Three new JS files, edits to four existing ones. No storage key renamed, no
+Supabase setting changed, no schema change, version untouched.
+
+| File | What |
+|---|---|
+| `js/69-v70StatusLogScript.js` | **new** — records WHY a case status changed: a rule, or a person |
+| `js/70-v70SignatureUndoScript.js` | **new** — ↶ ย้อนกลับ on the ใบตรวจ signature pads |
+| `js/71-v70SyncMergeScript.js` | **new** — a row the cloud has not got is no longer destroyed by the next sync |
+| `service-case-detail.html` | the ใบตรวจ read view, the status-log timeline, both sets of styles |
+| `js/12-v69RoleScopeScript.js` | `field.report` added to `ADMIN_ADD` |
+| `js/28-v70CaseDetailLink.js` | two new intents: `report`, `report-edit` |
+| `index.html` | three `<script src>` tags |
+
+### 1. The admin can read the ใบตรวจ from the case page
+
+Reported against the เอกสาร & รูปภาพ drawer on `service-case-detail.html`. Two separate faults:
+
+- The card drew six summary lines. The record it is built from carries the checklist, the
+  diagnosis, the work performed, the parts, the before/after photos and the signatures, and
+  `m.reports` has held all of it since part 21 — **nothing was drawing it**.
+- The button read `เปิด / พิมพ์ใบตรวจในระบบหลัก` and did `goApp('cases', intent=status)`, which
+  opens the case EDIT popup over the case table. It never opened a ใบตรวจ at all.
+
+`reportDocsHTML()` is now a read view: the checklist as a table (NG in red, N/A grey, using the
+same six labels `inspectionResultLabel()` maps), diagnosis / work / recommendation, a parts
+table with the part number, the photos, and the signatures.
+
+**It is deliberately NOT a copy of the printed A4 sheet.** `serviceReportHTML()` in js/03 stays
+the one printable document and `🖨 พิมพ์ / PDF` and `✏ แก้ไขใบตรวจ` hand the visitor back to it
+through the two new intents in js/28, which resolve the report with js/03's own
+`reportForCase(cid)` so no extra URL parameter has to be spent. Two copies of an official form
+is how a field added to one of them silently stops appearing in the other.
+
+**The signatures are shown as images, and the ✔/✕ chips are gone.** `signatureData()` is
+`canvas.toDataURL()`, so an untouched pad still yields a valid PNG and `r.customerSignature` is
+a non-empty string on every report ever saved — a ✔ beside the word ลายเซ็น was true of all of
+them. A blank box looks blank; that is the honest answer, and it is the same fact js/68 had to
+count ink pixels to establish.
+
+**`field.report` was the reason แก้ไขใบตรวจ would have refused.** An admin could already READ a
+report from หน้ารายงาน (`previewServiceReport()` is not gated) but `openServiceReport()` checks
+that key, and it is in the technician preset only. One line in `ADMIN_ADD` fixes it everywhere:
+js/47 re-applies the preset on **every** load, so no `SCOPE_VERSION` bump is needed, and a key
+that was never in the preset cannot be in `settings.rolePresetOptOut` either.
+
+**Found while testing:** `loadAttachments()` pushes the report's before/after photos into
+`m.attachments` with no `from`, and `attachmentsHTML()`'s field block tests `from!=='customer'`
+— so once the report card drew its own photos, the same pictures appeared twice in one drawer.
+They are tagged `from:'report'` now and excluded there. `renderProblem()`'s block still tests
+`from!=='customer'`, because that one says "หน้างาน / ใบตรวจ" and means it.
+
+### 2. ประวัติการเปลี่ยนสถานะ — `js/69`
+
+A case carries its status in ONE string and has never had a history beside it; the only log in
+the project is `fieldStatusLog`, which is the technician's nine field statuses, a different
+ladder. So the previous value and its cause were gone the moment anything overwrote it, and the
+six circles on the case page have to INFER their timestamps from unrelated fields — which is why
+a case can show step 2 at 09:57 and step 4 at 09:55 and read backwards. `assignedAt` is not a
+field at all: line 649 of that page is literally `assignedAt: c.updatedAt`.
+
+The application already moved a status automatically in six places and manually in three.
+Nothing was wrong with any of them; none left a trace.
+
+- **One choke point.** Every path calls `saveLocal()`, so the diff is taken there rather than by
+  wrapping six functions, and a path added later is covered for free. It runs BEFORE the base
+  call so the entry is persisted by that same save, and it composes over js/41's wrapper.
+- **The rule that is running names itself.** Thin wrappers on `saveFieldStatus`, `fieldCheckIn`,
+  `saveServiceReport`, `imodeAssignCase` and `saveSchedule` set a hint while they run, so an
+  entry says `ระบบเปลี่ยนเอง · ช่าง Check-in ถึงหน้างาน` instead of blaming whoever is signed in.
+- **A SYNC IS NOT A TRANSITION.** `syncCloud()` replaces `cases` wholesale, so every case whose
+  status differs from this device's copy looks exactly like somebody just changed it. Recording
+  during a sync would invent transitions nobody made and attribute them to the current user. The
+  recorder is switched off for the duration and only re-reads its snapshot. A case appearing for
+  the first time is skipped for the same reason.
+- **Kept in `settings.caseStatusLog`**, because settings travel whole while
+  `cloudUpsertCase()`'s column whitelist would drop a new field on the case silently — the trap
+  that lost the customers' photos in part 18. Capped hard (12 entries per case, 150 cases) the
+  way part 17 caps the bin: a settings row that grows without limit breaks settings sync for
+  everybody, which is worse than forgetting an old transition.
+- `service-case-detail.html` cannot load js/69, so it appends its own entries to the same
+  localStorage key and merges at boot. Its entries reach other devices on the application's next
+  settings push, not instantly — stated on screen rather than pretended away.
+
+### 3. ↶ ย้อนกลับ on the signature pads — `js/70`
+
+`initSignaturePad()` draws straight onto the canvas and keeps no history, so the only repair for
+one wrong stroke was ล้างลายเซ็น — throw the whole signature away with the customer standing
+there. Both pad helpers are top-level function declarations and therefore window properties, so
+they are **wrapped, never reimplemented**: the base still builds the markup and owns every line
+of the drawing logic, and this only snapshots in front of the base's own pointerdown handler.
+
+- A snapshot is `toDataURL()`, not `getImageData()` — a 560×180 ImageData is ~400 KB and twenty
+  of them per pad is 8 MB of live memory on a phone. Restoring is therefore an image load, so a
+  second press during the first is swallowed rather than queued.
+- **ล้างลายเซ็น is undoable too**, deliberately beyond what was asked: pressing it by mistake
+  destroys a signature the customer has already given and who has probably left.
+- The two buttons are wrapped in a **`<div>`**, not a `<span>`: the ≤640px rule sets
+  `.signature-actions span{font-size:9.5px;max-width:65%}` for the hint text and would have
+  shrunk both buttons with it.
+- Styles are injected as a runtime `<style>`, because css/21 and css/23 must stay the last two
+  `<link>` tags.
+
+These are the only signature pads in the project — QC and the warranty document have none.
+
+### 4. "คำขอที่แอดมินไม่ขึ้น และรีเฟรชแล้วประวัติหาย" — measured, then `js/71`
+
+**The reported bug did not reproduce.** Driven end to end against the live project with the
+owner's permission (one row, deleted and verified gone afterwards): the request and its case both
+reached Supabase, `imodeCloudHealth()` reported `writesOk: 2, writesFailed: 0`, and both survived
+a reload. All 14 columns `cloudUpsertLineRequest()` writes exist, `media` exists on both tables,
+RLS is not refusing anything, and `system_settings` had been written at 10:59 — so that device
+could write. The likeliest explanation is that the test ran while this session was editing files
+under a live-reloading server.
+
+**"แอดมินไม่ขึ้น" is not a bug.** js/49's `pickedUp()` drops a request once its case moves off
+`เคสใหม่`, which is the owner's own instruction from part 21. The case in question had been taken
+all the way to เสร็จสิ้น, so the request had legitimately moved to the Service Cases page, and
+ประวัติคำขอ still lists it.
+
+**The flaw that would produce the other half exactly is real, and is now closed.** `syncCloud()`
+does `cases = a.data.map(…)` and `lineRequests = j.data.map(…)` — wholesale replacement, then
+`saveLocal()` writes it over storage. A customer's report is written locally BEFORE the upload is
+awaited, so a failed upload, a closed tab or a dropped connection in between left the row alive
+only until the next sync.
+
+`js/71` keeps a row the cloud has never acknowledged and **re-uploads it**, rather than merely
+preserving it.
+
+**The trap that makes the obvious fix wrong:** that wholesale replace is also how a delete made
+on another device reaches this one — js/52's `cloudDelete()` removes the cloud row, and other
+devices notice only by its absence. Blanket protection would resurrect everything anybody deleted
+while this device was offline. So every id the cloud returns is remembered in
+**`imode_v70_cloud_seen`** (device-local), and a missing row is kept only while its id has never
+appeared in a sync. On a device that has never run the file the list is empty, so the **first sync
+only seeds it** and protects nothing older than two hours.
+
+Scope is `cases` and `lineRequests`. Adding another table is one entry in `TABLES`, but each one
+is a decision about delete propagation, not a free win.
+
+### Harness notes worth keeping
+
+- **`node` is still not installed.** Part 21 is the current truth; part 15's "node v24 is
+  installed" is stale. Syntax is checked by pushing each file through `new Function()` in headless
+  Chrome, which raises a SyntaxError with a line number where a plain `<script src>` fails
+  silently.
+- **Chrome's `--dump-dom` cannot be captured into a PowerShell variable** — it comes back empty
+  from both `--headless=new` and the old `--headless`. Redirect it to a file and read the file.
+- **`w.cases` is `undefined` in a test driver.** The lexical-global trap of part 17 §5 applies to
+  the harness too: use `w.eval("…cases…")`, since indirect eval runs in the global scope where the
+  binding is reachable.
+- **A form's `onsubmit` is attached on a `setTimeout(…,20)`** by `openPortalIssueForm()`.
+  Submitting in the same tick hits a form with no handler and does nothing, silently — which one
+  driver here mistook for the product's fault for a whole round. Wait, assert
+  `typeof form.onsubmit==='function'`, then use `requestSubmit()`.
+- **The signature canvas is 560×180 but rendered 130px tall**, and `pos()` scales by
+  `canvas.height/rect.height`, so a y beyond the rendered height draws below the canvas and
+  nothing appears. A stroke at y=140 produced a false pass; the driver clamps now.
+- `--host-resolver-rules="MAP * 127.0.0.1"` is the cheap way to guarantee a suite cannot reach the
+  live database. The one test that had to reach it must **not** block `cdn.jsdelivr.net`, or
+  supabase-js never loads and `supa` stays null.
+
+### Tests
+
+Syntax clean on all six touched files. Suites, each in the session scratchpad:
+
+ใบตรวจ read view (26, incl. a permission-stripped second pass) · the two intents against a real
+app boot (12) · status log, application and case page (29) · signature undo driven with real
+pointer events and measured in ink pixels (24) · sync merge, four scenarios including that a
+remote delete still propagates (21) · regression (15, run twice) · offline reproduction of the
+customer report (12 of 13; the one failure was the driver looking for the pre-js/19 success
+wording) · the live end-to-end submit (12). **0 JS errors anywhere.**
+
+### Open / risk
+
+1. `js/71` covers `cases` and `lineRequests` only. Quotations, warranties, documents and service
+   reports are still replaced wholesale by a sync.
+2. A row that genuinely cannot upload is retried on every sync until it lands. That is intended;
+   js/24 reports the failures.
+3. `settings.caseStatusLog` starts from 2026-09-16. Nothing before that exists, and the case page
+   says so rather than implying the case never moved.
+4. The signature history lives in memory: reopening the ใบตรวจ starts a fresh one.
+5. An admin can now edit a technician's ใบตรวจ, and nothing records who edited it — reports have
+   no audit trail.
+6. Unchanged from part 15: `04-anon-uat.sql` means anyone on the internet can read and write this
+   database.
+7. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its
+   serial or QR.

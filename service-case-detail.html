@@ -230,10 +230,51 @@ a{color:var(--imode-blue)}
 .rp-sign .ok{color:var(--ok);font-weight:700}
 .rp-sign .no{color:var(--muted)}
 .rp-card .sd-go{margin-top:11px}
+/* the full read view. A screen for READING — the printed A4 sheet stays in js/03 so the
+   official document has exactly one implementation. */
+.rp-sec{margin-top:12px}
+.rp-sec>b{display:block;font-size:12px;color:var(--muted);font-weight:700;margin-bottom:5px}
+.rp-text{margin:0;font-size:13px;color:var(--imode-navy);white-space:pre-wrap;overflow-wrap:anywhere}
+.rp-table{width:100%;border-collapse:collapse;font-size:12.4px}
+.rp-table th,.rp-table td{border:1px solid var(--line-2);padding:6px 8px;text-align:left;vertical-align:top}
+.rp-table th{background:#f3f7fd;color:var(--muted);font-weight:700;white-space:nowrap}
+.rp-table td.num{width:34px;color:var(--muted)}
+.rp-res{font-weight:700}
+.rp-res.is-ng{color:#b3261e}
+.rp-res.is-na{color:var(--muted);font-weight:600}
+.rp-photos{margin-top:11px}
+.rp-photos>b{display:block;font-size:12px;color:var(--muted);font-weight:700;margin-bottom:5px}
+.rp-signs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.rp-signbox{border:1px solid var(--line-2);border-radius:10px;padding:8px;text-align:center;background:#f8fafd}
+.rp-signbox small{display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px}
+.rp-signbox img{max-width:100%;max-height:74px;object-fit:contain;background:#fff;border-radius:6px}
+.rp-signbox .rp-nosign{display:block;padding:22px 4px;font-size:12px;color:var(--muted)}
+.rp-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:13px}
+.rp-acts .sd-go{margin-top:0}
+@media (max-width:520px){.rp-signs{grid-template-columns:1fr}.rp-line{grid-template-columns:1fr}}
 
 /* ---------- 12. case age ---------- */
 .scd-age.is-warn{color:#9a6516;font-weight:700}
 .scd-age.is-late{color:#b3261e;font-weight:700}
+
+/* ---------- ประวัติการเปลี่ยนสถานะ ----------
+   These timestamps are RECORDED. The ones under the six circles are inferred from other
+   fields, which is why they can read out of order. */
+.scd-slog{margin-top:14px;border-top:1px solid var(--line);padding-top:11px}
+.scd-slog summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--imode-navy);
+  list-style:none;display:flex;align-items:center;gap:7px;min-height:34px}
+.scd-slog summary::-webkit-details-marker{display:none}
+.scd-slog summary::before{content:'\1F550';font-size:14px}
+.scd-slog summary::after{content:'\25BE';margin-left:auto;color:var(--muted);transition:transform .15s ease}
+.scd-slog[open] summary::after{transform:rotate(180deg)}
+.slog-list{list-style:none;margin:9px 0 0;padding:0;display:grid;gap:7px}
+.slog-list li{display:grid;grid-template-columns:154px 1fr;gap:2px 12px;align-items:baseline;
+  padding:8px 11px;border:1px solid var(--line-2);border-radius:10px;background:#fff;font-size:12.6px}
+.slog-list li.is-auto{background:#f5f9ff}
+.slog-when{color:var(--muted);white-space:nowrap}
+.slog-move{color:var(--imode-navy)}
+.slog-by{grid-column:2;color:var(--muted);font-size:11.8px}
+@media (max-width:520px){.slog-list li{grid-template-columns:1fr}.slog-by{grid-column:1}}
 
 /* ---------- action bar ---------- */
 .scd-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:13px;margin-top:18px}
@@ -695,10 +736,14 @@ var CaseDetailData=(function(){
           name:m.name||'',data:m.data||'',at:entry.createdAt})});
       });
       return this.loadReports(c&&c.id).then(function(reports){
+        /* from:'report' (2026-09-16) marks the ones the ใบตรวจ card draws itself, so the
+           เอกสาร & รูปภาพ panel does not list the same photos a second time underneath it.
+           renderProblem()'s field-evidence block still tests from!=='customer', so those
+           photos keep appearing there — that block says "หน้างาน / ใบตรวจ" and means it. */
         reports.forEach(function(r){
-          (r.beforePhotos||[]).forEach(function(d){out.push({type:'image',name:'before',data:d})});
-          (r.afterPhotos||[]).forEach(function(d){out.push({type:'image',name:'after',data:d})});
-          (r.videos||[]).forEach(function(v){out.push({type:'video',name:v.name||'video',data:v.data||''})});
+          (r.beforePhotos||[]).forEach(function(d){out.push({type:'image',name:'before',data:d,from:'report'})});
+          (r.afterPhotos||[]).forEach(function(d){out.push({type:'image',name:'after',data:d,from:'report'})});
+          (r.videos||[]).forEach(function(v){out.push({type:'video',name:v.name||'video',data:v.data||'',from:'report'})});
         });
         return out;
       });
@@ -909,8 +954,17 @@ var CaseWrite=(function(){
       if(list[i]&&list[i].id===caseId){hit=list[i];break}
     }
     if(!hit)return Promise.resolve({ok:false,reason:'not-found'});
+    var prevStatus=hit.status;
     for(var k in changes)if(Object.prototype.hasOwnProperty.call(changes,k))hit[k]=changes[k];
     hit.updatedAt=new Date().toISOString();
+    /* This page cannot load js/69 — it is a document of its own — so it writes its own entry.
+       A status change made here is a person pressing a circle or picking from the list, with
+       one exception: assigning also moves เคสใหม่ on to มอบหมายแล้ว, which is the rule doing
+       it, not the coordinator choosing a status. */
+    if('status' in changes&&changes.status!==prevStatus){
+      noteStatusChange(caseId,prevStatus,changes.status,
+        ('assignees' in changes||'assignee' in changes)?'มอบหมายช่าง':'');
+    }
     try{localStorage.setItem(K.cases,JSON.stringify(list))}catch(e){return Promise.resolve({ok:false,reason:'storage'})}
     /* keep the page's own model in step so the next render shows the new state */
     try{if(caseDetailModel&&caseDetailModel.case&&caseDetailModel.case.id===caseId){
@@ -1080,6 +1134,58 @@ function fmtLeft(ms){
   return h?(h+' ชม. '+m2+' นาที'):(m2+' นาที');
 }
 
+/* ---------- ประวัติการเปลี่ยนสถานะ ----------
+   Kept in settings.caseStatusLog by js/69, which is the application's file — this page reads
+   the same key out of the same localStorage and appends its own entries there, because a
+   separate document cannot share js/69's code. The entry a page writes travels on the next
+   settings push the application makes; until then it is correct on this device and absent
+   elsewhere. The timestamps here are RECORDED, unlike the ones under the six circles, which
+   are inferred from other fields (createdAt, the appointment, the last field log entry,
+   updatedAt) and can therefore read out of order. */
+var STATUS_LOG_CAP=12;
+function statusLogAll(){
+  var s=readJSON(K.settings,{})||{};
+  var m=s.caseStatusLog;
+  return (m&&typeof m==='object')?m:{};
+}
+function statusLogFor(caseId){
+  var l=statusLogAll()[caseId];
+  return Array.isArray(l)?l:[];
+}
+function noteStatusChange(caseId,from,to,why){
+  try{
+    var s=readJSON(K.settings,{})||{};
+    if(!s.caseStatusLog||typeof s.caseStatusLog!=='object')s.caseStatusLog={};
+    var list=Array.isArray(s.caseStatusLog[caseId])?s.caseStatusLog[caseId]:[];
+    var u=readJSON(K.user,null);
+    list.push({at:new Date().toISOString(),from:from||'',to:to||'',
+      by:(u&&(u.name||u.id))||'',how:why?'auto':'manual',why:why||''});
+    while(list.length>STATUS_LOG_CAP)list.shift();
+    s.caseStatusLog[caseId]=list;
+    localStorage.setItem(K.settings,JSON.stringify(s));
+  }catch(e){}
+}
+function statusLogHTML(m){
+  var list=statusLogFor(m.case.id);
+  if(!list.length){
+    return '<details class="scd-slog"><summary>ประวัติการเปลี่ยนสถานะ</summary>'
+      +'<p class="sd-empty">ยังไม่มีการเปลี่ยนสถานะที่บันทึกไว้ — ระบบเริ่มบันทึก 16 ก.ย. 2569 '
+      +'การเปลี่ยนสถานะก่อนหน้านั้นไม่ได้ถูกเก็บไว้</p></details>';
+  }
+  var rows=list.slice().reverse().map(function(e){
+    var auto=e.how==='auto';
+    return '<li class="'+(auto?'is-auto':'is-manual')+'">'
+      +'<span class="slog-when">'+esc(fmtDateTime(e.at))+'</span>'
+      +'<span class="slog-move">'+esc(e.from||'-')+' → <b>'+esc(e.to||'-')+'</b></span>'
+      +'<span class="slog-by">'+(auto?'⚙ ระบบเปลี่ยนเอง':'👤 กดเปลี่ยนเอง')
+      +(auto?(e.why?' · '+esc(e.why):''):(e.by?' · '+esc(e.by):''))+'</span></li>';
+  }).join('');
+  return '<details class="scd-slog"><summary>ประวัติการเปลี่ยนสถานะ ('+list.length+')</summary>'
+    +'<ol class="slog-list">'+rows+'</ol>'
+    +(list.length>=STATUS_LOG_CAP?'<p class="sd-hint">เก็บย้อนหลังสูงสุด '+STATUS_LOG_CAP+' ครั้งต่อเคส</p>':'')
+    +'</details>';
+}
+
 /* Which step is open underneath the track. null = none. */
 var openStep=null;
 
@@ -1120,6 +1226,7 @@ function renderProgress(m){
     +'<ol class="scd-steps">'+lis+'</ol>'
     +(openStep==null?'':'<div class="scd-stepdrawer">'+stepDrawerHTML(m,openStep)+'</div>')
     +(subs?'<div class="scd-substates">'+subs+'</div>':'')
+    +statusLogHTML(m)
     +'<div class="scd-after"><span class="mark">★</span>'
     +(closed?'<button class="scd-mod" style="box-shadow:none;padding:6px 12px" type="button" data-action="open-feedback">ประเมินความพึงพอใจ</button>'
             :'ประเมินความพึงพอใจ (หลังปิดเคส)')
@@ -1732,15 +1839,88 @@ function historyHTML(){
 /* เอกสาร = the ใบตรวจ the technician filed. The printable sheet is built in js/03 and
    belongs to the application, so what is shown here is the report's own contents — which is
    what the sheet prints — plus a way to open the real thing. */
+/* ---------- the ใบตรวจ, for reading ----------
+   Built from the record this page already loads (m.reports, section 2). It is deliberately
+   NOT a copy of the printed A4 sheet: serviceReportHTML() in js/03 stays the one printable
+   document and พิมพ์ / แก้ไข hand the visitor to it. Two copies of an official form is how a
+   field added to one of them silently stops appearing in the other. */
+var INSPECT_LABEL={OK:'ปกติ',Cleaned:'ทำความสะอาดแล้ว',Adjusted:'ปรับตั้งแล้ว',
+                   Replaced:'เปลี่ยนแล้ว',NG:'ไม่ผ่าน','N/A':'ไม่เกี่ยวข้อง'};
+function techNameById(id){
+  if(!id)return '';
+  var list=[];
+  try{list=CaseDetailData.allTechnicians()||[]}catch(e){}
+  for(var i=0;i<list.length;i++)if(list[i]&&list[i].id===id)return list[i].name||id;
+  return id;
+}
+/* A report photo is ALREADY in caseDetailModel.attachments — loadAttachments() pushes
+   beforePhotos / afterPhotos / videos into it — so a tile can point at the same index and
+   reuse the existing lightbox rather than opening a second viewer. */
+function attachmentIndexOf(data){
+  var a=caseDetailModel.attachments||[];
+  if(!data)return -1;
+  for(var i=0;i<a.length;i++)if(a[i]&&a[i].data===data)return i;
+  return -1;
+}
+function reportMediaBlock(label,list,pick){
+  var items=[];
+  (list||[]).forEach(function(x){
+    var i=attachmentIndexOf(pick?pick(x):x);
+    if(i>=0)items.push({a:caseDetailModel.attachments[i],i:i});
+  });
+  if(!items.length)return '';
+  return '<div class="rp-photos"><b>'+esc(label)+' · '+items.length+' ไฟล์</b>'
+    +'<div class="cmp-grid">'+mediaTiles(items)+'</div></div>';
+}
+function reportChecklistHTML(r){
+  /* Reports saved from 2026-09-15 carry checklist:[] — the sheet dropped it on the owner's
+     instruction (part 22). Older reports still have theirs, so the table is drawn only when
+     there is something in it instead of as an empty frame. */
+  var list=(r.checklist||[]).filter(function(x){return x&&x.label});
+  if(!list.length)return '';
+  return '<div class="rp-sec"><b>รายการตรวจเช็ก</b><table class="rp-table">'
+    +'<thead><tr><th class="num">#</th><th>จุดตรวจ</th><th>ผลตรวจ</th><th>หมายเหตุ</th></tr></thead><tbody>'
+    +list.map(function(x,i){
+      var v=String(x.result||'OK');
+      var cls=v==='NG'?' is-ng':(v==='N/A'?' is-na':'');
+      return '<tr><td class="num">'+(i+1)+'</td><td>'+esc(x.label)+'</td>'
+        +'<td class="rp-res'+cls+'">'+esc(INSPECT_LABEL[v]||v)+'</td>'
+        +'<td>'+esc(x.note||'')+'</td></tr>';
+    }).join('')+'</tbody></table></div>';
+}
+function reportPartsHTML(r){
+  var parts=(r.parts||[]).filter(function(p){return p&&(p.name||p.partNo||p.code)});
+  if(!parts.length)return '';
+  return '<div class="rp-sec"><b>อะไหล่ที่เปลี่ยน</b><table class="rp-table">'
+    +'<thead><tr><th>รหัสอะไหล่</th><th>รายละเอียด</th><th>จำนวน</th><th>หมายเหตุ</th></tr></thead><tbody>'
+    +parts.map(function(p){
+      return '<tr><td>'+esc(p.partNo||p.code||'-')+'</td><td>'+esc(p.name||'-')+'</td>'
+        +'<td>'+esc(p.qty||1)+'</td><td>'+esc(p.note||'')+'</td></tr>';
+    }).join('')+'</tbody></table></div>';
+}
+function reportSignHTML(r){
+  /* Shown as the images they are. An untouched pad still produces a valid PNG — js/03's
+     signatureData() is canvas.toDataURL() — so a ✔ beside the word "ลายเซ็น" is true of
+     every report ever saved. The picture is the honest answer: a blank box looks blank. */
+  var box=function(label,data,who){
+    return '<div class="rp-signbox"><small>'+esc(label)+'</small>'
+      +(data?'<img src="'+esc(data)+'" alt="'+esc(label)+'">'
+            :'<span class="rp-nosign">ไม่มีลายเซ็น</span>')
+      +(who?'<small style="margin:5px 0 0">'+esc(who)+'</small>':'')+'</div>';
+  };
+  return '<div class="rp-signs">'
+    +box('ลายเซ็นลูกค้า / ผู้รับมอบงาน',r.customerSignature,r.customerAccept)
+    +box('ลายเซ็นทีมช่าง',r.techSignature,techNameById(r.techId))+'</div>';
+}
 function reportDocsHTML(){
   var rs=caseDetailModel.reports||[];
   if(!rs.length){
     return '<div class="cmp-block"><small>📄 เอกสาร · ใบตรวจ</small>'
       +'<p class="scd-empty">ยังไม่มีใบตรวจสำหรับเคสนี้ — ช่างจะบันทึกจากหน้างาน</p></div>';
   }
+  var mayEdit=can('field.report');
   return '<div class="cmp-block"><small>📄 เอกสาร · ใบตรวจ '+rs.length+' ฉบับ</small>'
     +rs.map(function(r){
-      var parts=(r.parts||[]).filter(function(p){return p&&(p.name||p.code)});
       var line=function(label,v){
         return v?'<div class="rp-line"><dt>'+esc(label)+'</dt><dd>'+esc(v)+'</dd></div>':'';
       };
@@ -1749,20 +1929,26 @@ function reportDocsHTML(){
         +'<span>'+esc(fmtDateTime(r.createdAt||r.reportDate))+'</span></header>'
         +'<dl class="rp-kv">'
         +line('ประเภทงาน',r.workType)
-        +line('ช่างผู้รับผิดชอบ',r.technicianName||r.technician)
-        +line('สิ่งที่ตรวจพบ',r.diagnosis)
-        +line('งานที่ดำเนินการ',r.workPerformed)
-        +line('คำแนะนำ',r.recommendation)
+        +line('ประเภทบริการ',r.serviceType)
+        +line('ช่างผู้รับผิดชอบ',r.technicianName||r.technician||techNameById(r.techId))
         +line('PM ครั้งถัดไป',r.nextPm?fmtDay(r.nextPm):'')
         +'</dl>'
-        +(parts.length?'<div class="rp-parts"><b>อะไหล่ที่ใช้</b><ul>'
-          +parts.map(function(p){return '<li>'+esc(p.name||p.code||'-')+' × '+esc(p.qty||1)+'</li>'}).join('')
-          +'</ul></div>':'')
-        +'<div class="rp-sign">'
-        +'<span class="'+(r.customerSignature?'ok':'no')+'">'+(r.customerSignature?'✔':'✕')+' ลายเซ็นลูกค้า</span>'
-        +'<span class="'+(r.techSignature?'ok':'no')+'">'+(r.techSignature?'✔':'✕')+' ลายเซ็นช่าง</span>'
+        +reportChecklistHTML(r)
+        +(r.diagnosis?'<div class="rp-sec"><b>การวิเคราะห์ / ผลการตรวจพบ</b>'
+          +'<p class="rp-text">'+esc(r.diagnosis)+'</p></div>':'')
+        +(r.workPerformed?'<div class="rp-sec"><b>งานที่ดำเนินการ</b>'
+          +'<p class="rp-text">'+esc(r.workPerformed)+'</p></div>':'')
+        +(r.recommendation?'<div class="rp-sec"><b>คำแนะนำ / งานที่ควรทำต่อ</b>'
+          +'<p class="rp-text">'+esc(r.recommendation)+'</p></div>':'')
+        +reportPartsHTML(r)
+        +reportMediaBlock('รูปก่อนทำงาน',r.beforePhotos)
+        +reportMediaBlock('รูปหลังทำงาน',r.afterPhotos)
+        +reportMediaBlock('วิดีโอประกอบงาน',r.videos,function(v){return v&&v.data})
+        +reportSignHTML(r)
+        +'<div class="rp-acts">'
+        +'<button type="button" class="sd-go" data-action="print-report">🖨 พิมพ์ / PDF (ระบบหลัก) ›</button>'
+        +(mayEdit?'<button type="button" class="sd-go" data-action="edit-report">✏ แก้ไขใบตรวจ ›</button>':'')
         +'</div>'
-        +'<button type="button" class="sd-go" data-action="open-report-in-app">เปิด / พิมพ์ใบตรวจในระบบหลัก ›</button>'
         +'</article>';
      }).join('')+'</div>';
 }
@@ -1770,9 +1956,13 @@ function reportDocsHTML(){
 function attachmentsHTML(){
   var a=caseDetailModel.attachments||[];
   var indexed=a.map(function(x,i){return {a:x,i:i}}).slice(0,24);
+  /* The report's own photos are drawn inside the ใบตรวจ card above, so they are left out of
+     the field block here — otherwise the same picture appears twice in one panel. */
   return reportDocsHTML()
     +mediaBlock('📎 ไฟล์ที่ลูกค้าแนบมากับเคส',indexed.filter(function(x){return x.a.from==='customer'}))
-    +mediaBlock('🖼 รูปและวิดีโอจากหน้างาน',indexed.filter(function(x){return x.a.from!=='customer'}))
+    +mediaBlock('🖼 รูปและวิดีโอจากหน้างาน',indexed.filter(function(x){
+       return x.a.from!=='customer'&&x.a.from!=='report';
+     }))
     +(a.length?'':'<p class="scd-empty">ยังไม่มีรูปหรือวิดีโอในเคสนี้</p>');
 }
 
@@ -1836,9 +2026,20 @@ var HANDLERS={
   'change-status':changeCaseStatus,
   'edit-case':editCase,
   'close-step':function(){openStep=null;repaintProgress()},
-  /* The printable sheet is js/03's; this hands the visitor to the case there. */
+  /* The printable A4 sheet and the edit form are js/03's and stay there, so there is one
+     of each. js/28 turns these intents into previewServiceReport() / openServiceReport()
+     for the report that belongs to this case. The OLD name pointed at intent=status, which
+     opened the case edit popup over the case TABLE — never the ใบตรวจ the button named. */
+  'print-report':function(){
+    goApp('cases','&caseId='+encodeURIComponent(caseDetailModel.case.id)+'&intent=report');
+  },
+  'edit-report':function(){
+    if(!can('field.report')){toast('บัญชีนี้ไม่มีสิทธิ์แก้ไขใบตรวจ');return}
+    goApp('cases','&caseId='+encodeURIComponent(caseDetailModel.case.id)+'&intent=report-edit');
+  },
+  /* kept: any older markup still asking for this name gets the sheet, not the edit form. */
   'open-report-in-app':function(){
-    goApp('cases','&caseId='+encodeURIComponent(caseDetailModel.case.id)+'&intent=status');
+    goApp('cases','&caseId='+encodeURIComponent(caseDetailModel.case.id)+'&intent=report');
   },
   'delete-case':deleteCase,
   'mark-responded':markResponded,

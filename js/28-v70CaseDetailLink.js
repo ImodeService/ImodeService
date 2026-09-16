@@ -96,6 +96,18 @@
        for confirmation and checks case.edit, so an URL carrying this intent can neither
        delete silently nor delete without the permission. */
     else if(intent==='delete'&&typeof window.imodeDeleteCase==='function')window.imodeDeleteCase(cid);
+    /* 2026-09-16: the ใบตรวจ read view on service-case-detail.html shows the report but hands
+       the PRINTABLE sheet and the EDIT form back here, because both live in js/03 and there
+       must be exactly one of each. The report is found by case — reportForCase() is how js/03
+       itself resolves it, one report per case — so no extra URL parameter has to be spent.
+       previewServiceReport() is not permission-gated; openServiceReport() checks field.report
+       itself, so an admin without the key is refused here rather than silently let in. */
+    else if(intent==='report'){
+     var rp=(typeof reportForCase==='function')?reportForCase(cid):null;
+     if(rp&&typeof previewServiceReport==='function')previewServiceReport(rp.id);
+     else if(typeof toastMsg==='function')toastMsg('ยังไม่มีใบตรวจสำหรับเคสนี้');
+    }
+    else if(intent==='report-edit'&&typeof openServiceReport==='function')openServiceReport(cid);
     else if(page==='quotation'&&typeof prepareQuotation==='function')prepareQuotation(cid);
    }catch(e){}
   },260);

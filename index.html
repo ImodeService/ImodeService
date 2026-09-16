@@ -958,5 +958,20 @@
      decided before its "ยืนยันจบงาน" confirmation is raised. -->
 <script src="./js/68-v70CloseSignatureGateScript.js"></script>
 
+<!-- 2026-09-16: records WHY a case status changed — a rule, or a person. Last, so its
+     saveLocal diff sees the result of every other patch and its hint wrappers sit outside
+     js/63, js/68 and js/44. -->
+<script src="./js/69-v70StatusLogScript.js"></script>
+
+<!-- 2026-09-16: ↶ ย้อนกลับ on the ใบตรวจ signature pads, so one wrong stroke no longer costs
+     the whole signature. Wraps js/03's pad helpers; it must load after them, and nothing else
+     depends on it. -->
+<script src="./js/70-v70SignatureUndoScript.js"></script>
+
+<!-- 2026-09-16: syncCloud() replaced whole arrays, so a row that had not reached the cloud yet
+     was destroyed by the next sync. This keeps the ones the cloud has never acknowledged and
+     re-uploads them. Must load after js/69, whose syncCloud wrapper it sits outside. -->
+<script src="./js/71-v70SyncMergeScript.js"></script>
+
 </body>
 </html>

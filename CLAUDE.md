@@ -4713,3 +4713,294 @@ Syntax clean on all nine files; the 62-assertion flow audit is unchanged.
 **The 19 cases cannot be repaired automatically** — their dates were never stored anywhere, so
 they have to be re-entered by hand from each case's ตั้ง / แก้นัดหมาย. Until then the calendar is
 right to show them nowhere.
+
+---
+
+## Session Change Log — 2026-09-17 (part 26): storage ran out, and sixteen requested changes
+
+Sixteen reported items. Seven new JS files, small edits to five existing ones and to
+`service-case-detail.html`. No storage key renamed, no Supabase setting touched, no schema
+change, version untouched.
+
+| File | What |
+|---|---|
+| `js/72-v70StorageGuardScript.js` | **new** — saveLocal() stops throwing the caller down with it |
+| `js/73-v70FieldScopeScript.js` | **new** — หน้างาน is one job for every role; หน้างานทั้งหมด is its own page |
+| `js/74-v70NewJobBadgeScript.js` | **new** — a job not yet opened is highlighted in งานของฉัน |
+| `js/75-v70QuoteApprovalScript.js` | **new** — the customer signs to approve; the list is scoped and filtered |
+| `js/76-v70CaseFormScript.js` | **new** — work-type rename, two labels, the status picker leaves the form |
+| `js/77-v70InspectSheetScript.js` | **new** — ผ่าน / พอใช้ / แก้ไข checklist, PM date rule, satisfaction |
+| `js/78-v70ConfirmDialogScript.js` | **new** — the browser's grey confirm box becomes the app's dialog |
+| `js/28`, `js/32`, `js/40`, `js/63` | one intent, one setter, two dialogs, two conditions |
+| `service-case-detail.html` | the action bar, the field hand-off, its own confirm dialog |
+
+### 0. ITEMS 1 AND 5 WERE ONE BUG, AND IT WAS BREAKING SIGN-IN
+
+Reported as two things — a quota error in the login popup, and ตั้งค่า → "หน้าลูกค้า · สแกน QR"
+opening a blank page. Reproduced against the live project, and they are the same fault.
+
+`saveLocal()` — the copy in **js/04**, which overrides js/03's and writes SIXTEEN keys in a row
+with **no try/catch** — throws `QuotaExceededError` out of whatever called it:
+
+| caller | what the owner saw |
+|---|---|
+| `setSessionUser()` → `applySession()` | the error in the login popup, session never completed |
+| `ensureMasters()`, on every `renderAll()` | `goPage()` died half way through and left the page it was building empty — **that is item 5**, not a second bug |
+| the 11th of 16 `setItem` calls | `serviceReports`, `qcRecords`, `pettyCash`, `spareParts`, `purchaseOrders` were silently never written after that point |
+
+**What is full**, measured on a synced device (Chrome allows about 5 MB):
+
+```
+imode_test_v532_cases          3,580,444   of which 3,546,857 is `media`
+imode_test_v532_line_requests  1,711,385   of which 1,699,682 is `media`
+everything else together         ~234,000
+```
+
+97% is the photos and clips customers attach to แจ้งปัญหา — which since part 18 are in
+Supabase, so the local copy is a cache of something the server already holds.
+
+**js/72** catches the quota failure, sheds weight and retries, and never throws again. If even
+the last rung cannot fit it reports and returns: the in-memory data is still correct and the
+cloud push does not go through `saveLocal()`, so a full device must not be allowed to break
+sign-in or navigation.
+
+Three things about how it sheds, all of which matter if it is ever changed:
+
+1. **The in-memory arrays are NOT touched.** js/42 injects `media` into the outgoing payload
+   *from the case object*, so mutating it would upload stubs over good cloud rows. Only the
+   bytes on their way to localStorage are lighter: `cases` and `lineRequests` are swapped for
+   shallow clones around the base call and put back in a `finally` — the same technique js/63
+   uses for `checklistTemplate`.
+2. **A row the cloud has not acknowledged keeps its media whatever happens.** Two signals are
+   needed, because neither is enough: js/71's `imode_v70_cloud_seen`, **and** what came down in
+   a sync during this page view. js/71's `reconcile()` returns early for a table whose pre-sync
+   array was empty, so on a fresh device the `cases` list is never written — relying on it alone
+   shed *nothing*, which the suite caught.
+3. **A ladder, not a cliff**: budget 900 KB keeping today's work, then without that protection,
+   then 200 KB, then only the unacknowledged rows.
+
+Measured after the fix on the same device: **5.3 MB → 2.0 MB**, sign-in works, the customer-entry
+page renders, and all five keys that used to be skipped are written.
+
+New key: `imode_v70_storage_shed` (a flag, so the next load starts light instead of throwing once
+more to learn the same thing). Clearing it costs one caught exception.
+
+### 2. หน้างาน is ONE job for every role — and the queue gets its own page
+
+js/32 has shown a technician one job since part 17; its `autoPick()` returns `''` for an account
+with no `technicianId`, deliberately, so ทีมช่าง could preview a queue. That is why the admin
+still saw the old list. **js/73** makes the choice for those accounts *before* js/32 renders,
+through a one-line setter added to js/32 (`imodeSetFieldJob`) — `imodeOpenFieldJob()` could not
+be used, because it calls `goPage()` and would re-enter the wrapper calling it.
+
+- The job **sticks**: kept per ACCOUNT in `imode_v70_field_last_job_acct`, beside js/32's
+  per-technician key rather than inside it. Device-local on purpose.
+- **เริ่มหน้างาน on the case page now carries the case** — `&caseId=…&intent=field`, handled by
+  one new branch in js/28. Driven end to end: case page → the application → หน้างาน showing
+  that case.
+- **หน้างานทั้งหมด** (`field-all`) lists every open field job with a search box and a ช่าง
+  filter; a row opens that job. Gated on **`case.assign`, deliberately an existing key** — a
+  file that pushes a NEW key into `PERMISSION_CATALOG` must load before js/20, and this one
+  loads long after it (the decay bug from part 14). A plain technician cannot see it or open it.
+
+### 3. A new job says it is new, once
+
+`imode_v70_seen_jobs` — `{account: {caseId: ts}}`, device-local. Not a field on the case: that
+would need a column (`cloudUpsertCase()` writes a whitelist) and would then mean "somebody,
+somewhere has seen it", when what is wanted is per-person.
+
+**First run is the trap.** With an empty record every job a technician already holds would light
+up on the day this ships, so the first time an account is seen everything currently assigned to
+it is marked read, and only what arrives afterwards is new. The chip clears on
+`imodeOpenFieldJob` / `imodeOpenAssignedCase` / `imodeOpenCase` — opening it, not scrolling past
+it — and the row is redrawn at the moment of the tap.
+
+### 4. The customer signs the quotation
+
+**4.4 first, because it is a real leak and it was measured.** The portal is opened by scanning
+ONE machine, but js/34 listed every quotation belonging to that machine's CUSTOMER. Read off the
+live project for the machine in the report (MCH-0001):
+
+```
+QT-SRV-202609-011  ["MCH-0010"]   <- another machine
+QT-SRV-202609-006  ["MCH-0001"]   <- this one
+QT-SRV-202609-005  ["MCH-0003"]   <- another machine
+QT-SRV-202609-002  ["MCH-0002"]   <- another machine
+```
+
+Three of four. A quotation is now listed only when the scanned machine is on it; one with no
+machine list at all is still shown, because nothing attributes it elsewhere.
+
+**The other portal pages were checked and are already correct**, so nothing was changed there:
+`showPortalHistory()` filters `c.machineId===m.id`, `showPortalDocuments()` filters
+`d.machineId===m.id`, `showPortalWarranty()` reads `latestWarrantyForMachine(m.id)`, and js/53's
+case view opens only a case from that list. Quotations were the only one keyed to the customer.
+
+**4.1/4.2/4.3.** A signature pad and a name box on the opened quotation, a three-way filter
+(ทั้งหมด / อนุมัติแล้ว / ยังไม่ได้อนุมัติ) over the list, and a chip on every row. The office
+sees the same chip on ดูใบเสนอราคา — an approval nobody in the office can see is not an approval.
+
+- **Where it lives:** `settings.quoteApprovals` — `{quoteId:{at,by,name,sig}}`.
+  `cloudUpsertQuotation()` writes an explicit whitelist, so a field on the quotation would be
+  dropped silently (it is already dropping the derived breakdown — part 18 §4). `settings`
+  travels whole, so this works today with no SQL for anybody to run. The signature is downscaled
+  to 300px before storing and only the 40 most recent images are kept; the record itself is tiny
+  and is never dropped, so a quotation stays approved for ever.
+- **THE BLANK-PAD TRAP, again:** `signatureData()` is `canvas.toDataURL()` and an untouched
+  canvas still answers with a valid transparent PNG. The ink is counted on the live canvas
+  before the image is taken — asserted both ways.
+
+### 6+7+8. The case page's action bar is the process
+
+"ก่อนที่จะถึงหน้านี้เนี่ยผมอยากให้แอดมินติดต่อลูกค้าก่อน" — so the bar reads left to right as the
+job actually goes: **ติดต่อลูกค้า · ลงรายละเอียดเคส · ทำใบเสนอราคา · นัดหมาย · เริ่มหน้างาน**.
+`แก้ไขเคส` is `ลงรายละเอียดเคส` now, because that is what it is for. **เปลี่ยนสถานะ is off the
+bar** (item 8): the status is not a sixth thing you do, it is the consequence of the five, and
+the six step circles above already change it. `changeCaseStatus()` stays in `HANDLERS` for the
+step drawers.
+
+### 9–12. The case form says what the coordinator is doing
+
+- `Remote Support` → **`แก้ไขออนไลน์`**. `serviceTypes` is a SAVED setting, so editing the
+  default in js/03 would change nothing on a device that already has settings — the rename is
+  applied to the live object on load and again after every sync (which replaces `settings`
+  wholesale), and to any record carrying the old string. Checked first: of 31 live cases, none
+  does, so it moves no real data today.
+- `อาการ / รายละเอียด *` → **`อาการ / รายละเอียดเพิ่มเติมหลังติดต่อลูกค้า *`**
+- `หมายเหตุภายใน` → **`หมายเหตุภายในเพิ่มเติม`**
+- **The status picker leaves the form.** `#fStatus` is KEPT, hidden — `saveCase()` reads
+  `fStatus.value` as an id global and would throw without it, and hiding rather than removing
+  means a save from this form preserves the status the case already had. Asserted.
+
+The form markup is rewritten on its way through `openModal()` — js/63's seam — so js/03 keeps
+exactly one copy of it.
+
+### 13. The audit, and the dialog
+
+**There is no bare `alert()` left anywhere in js/** — every message goes through `toastMsg()`.
+What was still the browser's grey box is `window.confirm()`, in sixteen places. Ten are now the
+application's own dialog: the five delete paths, the bin's two permanent deletes, the Onsite →
+Quotation price copy, จบงาน, and **เปลี่ยนสถานะ / ปิดเคส on the case page — the one the report
+named**, which is a separate document and carries its own copy.
+
+**Six are deliberately left as the browser's box**, and it is worth saying so: js/03 and js/04's
+restore-from-backup and clear-all-test-data, js/17's คืนค่ารายชื่อเดิม, js/20's own-role lockout
+guard, js/39's account delete, and js/03's start-a-new-quotation. Those wipe or lock something no
+bin can bring back, they are reached from the settings screens rather than from the work, and a
+box that looks unmistakably like the browser's is the right amount of friction. Styling them is
+one entry in js/78's `WRAP` list.
+
+**How, without rewriting ten function bodies.** `window.confirm` is synchronous and a styled
+dialog cannot be. So no body is touched: a named function is wrapped, and during the call
+`window.confirm` is temporarily replaced by one that RECORDS the question and answers no — the
+function returns early having done nothing. The dialog is then shown; on yes the same function
+is called again with the same arguments and the questions already answered return true. A
+function with two questions therefore takes two rounds, which is why `imodeDeleteMachine` and
+`imodeDeleteCustomer` still ask both. **This is only safe for a function that does nothing
+irreversible before its confirm**, because that part runs once per round; every name in `WRAP`
+was read before being listed. The substitution lasts only the synchronous body and is restored
+in a `finally`.
+
+### 14+15+16. The ใบตรวจ
+
+**A checklist comes BACK**, which is worth saying plainly because part 22 took one out on the
+owner's own instruction. What went out was eleven rows of ปกติ / หมายเหตุ that stored a full pass
+whether or not anybody had looked. This is the opposite: **ผ่าน / พอใช้ / แก้ไข**, nothing
+preselected, a 📝 หมายเหตุ button per point opening a popup and toasting เพิ่มหมายเหตุแล้ว, and a
+point left unanswered stays unanswered.
+
+- It reuses **js/03's own `checklistTemplate(workType)`** for the labels — twelve points for PM,
+  eleven each for Maintenance and Service — so the rows still follow ประเภทใบตรวจ.
+- It reuses **js/03's own save path**: the buttons write into hidden `#src<i>` / `#srn<i>`, which
+  `saveServiceReport()` already reads, so the answers go into the existing `checklist` jsonb
+  column with no schema change.
+- **js/63 needed two conditions and nothing else**: do not blank the template while a live
+  editor is on screen, and do not strip the printed table when the answers are the new
+  vocabulary. An OLD report still prints without its checklist, as instructed.
+
+**Two bugs the suite caught, both of which would have re-created the exact lie part 22 removed:**
+
+1. `checklistTemplate()` returns `result:'OK'` as its default, so building the rows from it (or
+   from `reportChecklistForType()`) arrived with every point already ticked ผ่าน. Only the
+   LABELS come from the template now; an answer is carried over only from a real earlier report.
+2. js/03 line 1061 reads `document.getElementById('src'+i)?.value || 'OK'` — an empty answer
+   becomes a PASS on the way into storage. Twelve of twelve points came back answered when three
+   had been. The answers are read from the DOM before the base call and written back onto the
+   saved report afterwards, so what is stored is the three words plus an empty string.
+
+**15.** `#srNextPm` is disabled and greyed unless ประเภทใบตรวจ is PM. Disabled, not removed: it
+keeps its id and its value, so a date already on the report is preserved rather than blanked.
+
+**16.** Five faces and a comment box directly under the two signature pads. Kept in
+`settings.caseFeedback` — `{caseId:{rating,comment,at,by}}` — because `service_reports` has no
+column for it (checked: 28 columns, none of them satisfaction) and the whitelist would drop a
+field on the report. It is also what `service-case-detail.html`'s ประเมินความพึงพอใจ panel has
+been waiting for; its `feedback` was hard-coded to `null`.
+
+### THE GOTCHA THIS SESSION COST THE MOST TIME
+
+**A delegated `click` listener on `document` never fires inside a popup.** js/05 line 19 puts a
+handler on `#modalPanel` that calls `e.stopPropagation()` — the "ต้องกดกากบาทเท่านั้น" guard —
+so nothing inside `#modal` reaches the document. js/16 records this; js/77 walked straight into
+it anyway. The symptom is exact and silent: the buttons render, the clicks land, and nothing
+happens, with no error. Listeners on DESCENDANTS of the panel still fire, so the sheet is wired
+on **both** `document` (for หน้างาน, where it is rendered into the page) and `#modalBody` (for
+the two popup screens). Because the panel swallows the event, exactly one of the two ever sees a
+given click, so there is no double handling.
+
+Also worth keeping: **the inline script in `service-case-detail.html` is an IIFE**, so
+`applyStatus`, `goApp` and the rest are NOT global and cannot be called or stubbed from a test
+driver. Drive its real controls instead.
+
+### Tests
+
+Eleven runs across six suites, at 1440×1000 and 390×844
+(`Emulation.setDeviceMetricsOverride`, not `--window-size` — part 17 §7).
+**275 assertions, 0 failures, 0 page errors.**
+
+- **storage (16), against the LIVE project** — the sign-in that used to throw, shed mode
+  engaging, 5.3 MB → 2.0 MB, the five keys that used to be skipped, the settings QR-test button
+  reaching a rendered customer-entry page, and the in-memory media still carrying its data URLs.
+- **boot (17)** — cold start to the door, all 25 sidebar pages open, every new global present,
+  both version strings, no overflow.
+- **items 2/3/9–12 (27 ×2)** — the admin's single-job workspace, the job sticking across three
+  navigations, หน้างานทั้งหมด and its row click; the NEW chip appearing for exactly the new job,
+  not for existing work, and clearing on open; the rename in the list and in the dropdown, both
+  labels, the hidden status field and a save that preserves the status.
+- **items 13–16 (42 ×2)** — eleven points with three answers and nothing preselected, the three
+  answers recorded, pressing one twice clearing it, the note popup and its toast, the sheet
+  surviving underneath, PM ครั้งถัดไป following the work type in all three directions, the
+  satisfaction block below the pads, and a real submit storing 3 answered of 12 with the note and
+  the score.
+- **item 4 (27 ×2)** — the other machine's quotation gone and the draft still held back, the
+  three filters, the chip both ways, no name refused, a blank pad refused, real ink approving,
+  the receipt, and the approval landing in `settings`.
+- **items 6/7/8/13 on the case page (19 ×2)** — the five buttons in order, the sixth gone, the
+  styled dialog for เปลี่ยนสถานะ and the danger one for ปิดเคส, cancel changing nothing, confirm
+  really closing, and the whole เริ่มหน้างาน round trip ending on หน้างาน with that case.
+- **cross-checks (12)** — the office row showing อนุมัติแล้ว and not duplicating its chip, the
+  two-question delete completing through the dialog and landing in the bin, and หน้างานทั้งหมด
+  closed to a plain technician while หน้างาน still opens for them.
+
+`node --check` passes on all 84 files in `js/`, `auth/` and `pages/`, and the case page's inline
+script parses through `new Function`. **`node` IS installed (v24.19.0)** — part 24's note that it
+is not is stale.
+
+### Open / risk
+
+1. **The storage guard drops the device's CACHE of old attachments, not the attachments.** They
+   are re-fetched on the next sync. A device that is offline, has shed, and then reloads will
+   show a document glyph instead of an old photo until it is online again. Rows the cloud has
+   never acknowledged are never shed.
+2. `imode_test_v532_service_reports` is already 832 KB of before/after photos and is heading the
+   same way. It is not shed today; if it starts failing, it is one more entry in js/72.
+3. **มอบหมายงาน still cannot change a technician** (part 22) and now **หน้างาน no longer shows
+   the whole queue** — both are on purpose, but between them an admin's habits have moved twice.
+   The way to the queue is หน้างานทั้งหมด.
+4. Six confirmations are still the browser's grey box, listed above with the reason.
+5. A report saved from now on stores the three-word vocabulary in `checklist`. Anything written
+   against `OK` / `NG` / `N/A` — an export, a report — will not recognise it.
+6. Unchanged from part 15: `04-anon-uat.sql` means anyone on the internet can read and write this
+   database. `settings.quoteApprovals` and `settings.caseFeedback` go through the same open door.
+7. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its
+   serial or QR.

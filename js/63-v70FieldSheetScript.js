@@ -91,6 +91,13 @@
  var baseSaveReport=window.saveServiceReport;
  if(typeof baseSaveReport==='function'&&typeof window.checklistTemplate==='function'){
   window.saveServiceReport=function(){
+   /* 2026-09-17: a checklist is BACK on the sheet — js/77's three-answer one, which writes
+      into the same #src<i> / #srn<i> ids js/03 reads. The swap below exists only to stop a
+      HIDDEN editor storing a full pass on eleven points nobody looked at; with a real editor
+      on screen it would now throw away answers a technician actually gave. So it is skipped
+      exactly when one is present. With js/77 removed, #src0 does not exist and this behaves
+      as it did. */
+   if(document.getElementById('src0'))return baseSaveReport.apply(this,arguments);
    var keep=window.checklistTemplate;
    window.checklistTemplate=function(){return []};
    try{return baseSaveReport.apply(this,arguments)}
@@ -101,8 +108,12 @@
  /* What gets printed. Older reports still hold a checklist array; the table goes either way. */
  var baseReportHTML=window.serviceReportHTML;
  if(typeof baseReportHTML==='function'){
-  window.serviceReportHTML=function(){
+  window.serviceReportHTML=function(r){
    var html=baseReportHTML.apply(this,arguments);
+   /* 2026-09-17: a report carrying js/77's ผ่าน / พอใช้ / แก้ไข answers KEEPS its table — the
+      technician really filled it in and it belongs on the sheet the customer signs. An OLD
+      report's OK / NG / N/A table still goes, which is what part 22 asked for. */
+   try{if(typeof window.imodeIsNewChecklist==='function'&&window.imodeIsNewChecklist(r&&r.checklist))return html}catch(e){}
    try{
     var box=document.createElement('div');
     box.innerHTML=html;

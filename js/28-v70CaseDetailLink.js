@@ -108,6 +108,10 @@
      else if(typeof toastMsg==='function')toastMsg('ยังไม่มีใบตรวจสำหรับเคสนี้');
     }
     else if(intent==='report-edit'&&typeof openServiceReport==='function')openServiceReport(cid);
+    /* 2026-09-17, item 2: หน้างาน shows one job, and this is which one. imodeOpenFieldJob()
+       selects it, remembers it for next time (js/32 per technician, js/73 per account) and
+       renders — goPage('field-service') has already run above, so this only re-points it. */
+    else if(intent==='field'&&typeof window.imodeOpenFieldJob==='function')window.imodeOpenFieldJob(cid);
     else if(page==='quotation'&&typeof prepareQuotation==='function')prepareQuotation(cid);
    }catch(e){}
   },260);

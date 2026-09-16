@@ -973,5 +973,36 @@
      re-uploads them. Must load after js/69, whose syncCloud wrapper it sits outside. -->
 <script src="./js/71-v70SyncMergeScript.js"></script>
 
+<!-- 2026-09-17: saveLocal() threw QuotaExceededError out of whatever called it — sign-in and
+     goPage() both died half way through, which is reported items 1 and 5. Catches it, sheds the
+     customer attachment cache (which is in Supabase anyway) and retries. Must load last so its
+     wrapper sits outside js/69's and js/41's. -->
+<script src="./js/72-v70StorageGuardScript.js"></script>
+
+<!-- 2026-09-17: หน้างาน shows ONE job for every role (js/32 already did it for technicians),
+     and the whole queue becomes its own page for the accounts that hand work out. -->
+<script src="./js/73-v70FieldScopeScript.js"></script>
+
+<!-- 2026-09-17: a job the technician has not opened yet is highlighted in งานของฉัน, and the
+     highlight clears the moment it is opened. -->
+<script src="./js/74-v70NewJobBadgeScript.js"></script>
+
+<!-- 2026-09-17: the customer signs to approve a quotation, the list gains an approved /
+     not-approved filter, and it stops showing other machines' quotations. -->
+<script src="./js/75-v70QuoteApprovalScript.js"></script>
+
+<!-- 2026-09-17: Remote Support -> แก้ไขออนไลน์, the two case-form labels say "after contacting
+     the customer", and the status picker leaves the edit form. -->
+<script src="./js/76-v70CaseFormScript.js"></script>
+
+<!-- 2026-09-17: the ใบตรวจ gets a ผ่าน / พอใช้ / แก้ไข checklist with per-point notes, PM ครั้งถัดไป
+     is only enabled on a PM sheet, and the customer rates the visit under the signatures.
+     Must load AFTER js/63, whose two conditions it depends on. -->
+<script src="./js/77-v70InspectSheetScript.js"></script>
+
+<!-- 2026-09-17: the browser's grey confirm box becomes the application's dialog. Loads last so
+     it wraps the final version of every function it styles. -->
+<script src="./js/78-v70ConfirmDialogScript.js"></script>
+
 </body>
 </html>

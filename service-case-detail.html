@@ -164,6 +164,29 @@ a{color:var(--imode-blue)}
 .sd-kv dd{margin:0;font-weight:600;color:var(--imode-navy);overflow-wrap:anywhere}
 .sd-empty{margin:0;font-size:13px;color:var(--muted)}
 .sd-hint{margin:10px 0 0;font-size:12.5px;color:var(--muted)}
+/* 2026-09-17, item 13 — the page's own confirmation dialog (scdAsk), matching js/78's in the
+   application. This page does not load css/*, so its tokens are restated like every other
+   style here. */
+.scd-ask{position:fixed;inset:0;z-index:9500;background:rgba(9,22,54,.52);display:flex;
+  align-items:center;justify-content:center;padding:18px;animation:scdAskIn .14s ease}
+@keyframes scdAskIn{from{opacity:0}to{opacity:1}}
+.scd-ask-card{width:100%;max-width:400px;background:#fff;border-radius:20px;padding:20px 18px 16px;
+  text-align:center;box-shadow:0 26px 70px rgba(9,22,54,.34)}
+.scd-ask-icon{font-size:30px;line-height:1;margin-bottom:8px}
+.scd-ask-card h4{margin:0 0 7px;font-size:16px;font-weight:800;color:var(--imode-navy)}
+.scd-ask-body{font-size:13px;color:#4a5c7d;line-height:1.65}
+.scd-ask-body p{margin:0 0 6px}
+.scd-ask-body p:last-child{margin-bottom:0}
+.scd-ask-acts{display:flex;gap:9px;margin-top:16px}
+.scd-ask-no,.scd-ask-yes{flex:1;padding:12px 10px;border-radius:13px;font:inherit;font-size:13.5px;
+  font-weight:800;cursor:pointer}
+.scd-ask-no{border:1px solid var(--line);background:#fff;color:#3d557f}
+.scd-ask-no:hover{border-color:#94a9c8}
+.scd-ask-yes{border:0;color:#fff;background:linear-gradient(180deg,#2f7bf0,#0b63e5);box-shadow:0 4px 0 #084bb0}
+.scd-ask-card.is-danger .scd-ask-yes{background:linear-gradient(180deg,#e2574c,#cf3b30);box-shadow:0 4px 0 #a52a21}
+.scd-ask-yes:active{transform:translateY(2px);box-shadow:0 1px 0 #084bb0}
+.scd-ask-no:focus-visible,.scd-ask-yes:focus-visible{outline:2px solid var(--imode-blue);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.scd-ask{animation:none}.scd-ask-yes:active{transform:none}}
 .sd-ok{margin:10px 0 0;font-size:13px;font-weight:700;color:var(--ok)}
 .sd-wait{margin:10px 0 0;font-size:13px;font-weight:700;color:#9a6516}
 .sd-acts{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}
@@ -1302,7 +1325,7 @@ function stepDrawerHTML(m,i){
       +'<button type="button" class="sd-go" data-action="open-case-attachments">เอกสาร &amp; รูปภาพ ›</button>'
       +'<button type="button" class="sd-go" data-action="open-machine-history">ประวัติ / เอกสารเครื่อง ›</button>'
       +'</div>'
-      +'<p class="sd-hint">ตรวจรับเรียบร้อยแล้วกดวงกลมขั้นที่ 6 เพื่อปิดเคส หรือใช้ปุ่ม เปลี่ยนสถานะ ก็ได้</p>';
+      +'<p class="sd-hint">ตรวจรับเรียบร้อยแล้วกดวงกลมขั้นที่ 6 เพื่อปิดเคส</p>';
   }
   return head('6. ปิดเคส','งานนี้จบแล้ว')
     +'<dl class="sd-kv"><dt>ปิดเมื่อ</dt><dd>'+esc(fmtDateTime(c.updatedAt))+'</dd></dl>'
@@ -1325,18 +1348,33 @@ function stepTimes(m){
 /* 7. เปลี่ยนสถานะ used to open the case EDIT form, which is a different job. Now it
    changes the status here on the page, and แก้ไขเคส is its own button that opens the form
    in the application. */
+/* 2026-09-17, reported items 6, 7 and 8 — THE ORDER IS THE PROCESS.
+
+   "ก่อนที่จะถึงหน้านี้เนี่ยผมอยากให้แอดมินติดต่อลูกค้าก่อน เพื่อที่จะถามข้อมูลรายละเอียดเพิ่มเติม
+    หรือแก้ไขข้อมูลต่างๆ" — so the bar now reads left to right as the job actually goes:
+
+     1. ติดต่อลูกค้า      ring them and ask what is really wrong
+     2. ลงรายละเอียดเคส   write down what they said (this is the case EDIT form; its two
+                          labels were reworded to match — see js/76)
+     3. ทำใบเสนอราคา      quote it if it needs quoting
+     4. นัดหมาย           agree a technician and a date
+     5. เริ่มหน้างาน       hand it to the technician
+
+   Item 8 took เปลี่ยนสถานะ off the bar. The status is not a sixth thing you do; it is the
+   consequence of the five above, and the six step circles over this bar already change it —
+   a circle one step ahead moves the case on, and step 6 closes it. changeCaseStatus() is
+   kept in HANDLERS so the step drawers and any older markup can still reach it. */
 var ACTIONS=[
+  {act:'contact-customer', icon:'📞',label:'ติดต่อลูกค้า',cls:'green'},
+  {act:'edit-case',        icon:'✏',  label:'ลงรายละเอียดเคส',cls:'primary'},
+  {act:'open-quotation',   icon:'📄',label:'ทำใบเสนอราคา',cls:''},
   /* 2026-09-15: one button, on the owner's instruction — "รวมปุ่ม มอบหมายงาน กับ นัดหมาย
      ไว้ด้วยกัน". The old นัดหมายบริการ button did goApp('cases',intent=schedule), which left
      this page entirely, reloaded the application and opened a popup over the case TABLE with
      a เลือกเคส dropdown — the case you were already looking at had to be picked again. Both
      halves are now one panel on this page. */
-  {act:'assign-technician',icon:'📅',label:'นัดหมาย',cls:'primary'},
-  {act:'contact-customer', icon:'📞',label:'ติดต่อลูกค้า',cls:'green'},
-  {act:'open-quotation',   icon:'📄',label:'ทำใบเสนอราคา',cls:''},
-  {act:'open-field-service',icon:'🔧',label:'เริ่มงานหน้างาน',cls:''},
-  {act:'change-status',    icon:'⇄',  label:'เปลี่ยนสถานะ',cls:''},
-  {act:'edit-case',        icon:'✏',  label:'แก้ไขเคส',cls:''}
+  {act:'assign-technician',icon:'📅',label:'นัดหมาย',cls:''},
+  {act:'open-field-service',icon:'🔧',label:'เริ่มหน้างาน',cls:''}
 ];
 function renderActionBar(){
   return '<div class="scd-actions">'+ACTIONS.map(function(a){
@@ -1629,7 +1667,13 @@ function doAssign(){
    nothing left to hand back to the application. It used to leave the page, reload the whole
    app and open a popup over the case TABLE with a เลือกเคส dropdown. */
 function openQuotation(){goApp('quotation','&caseId='+encodeURIComponent(caseDetailModel.case.id))}
-function openFieldService(){goApp('field-service')}
+/* 2026-09-17, reported item 2: "กดดูหน้างาน เคส A จะโชว์แค่เคส A เลย". หน้างาน shows ONE job,
+   so the case travels with the hand-off and js/28 turns intent=field into
+   imodeOpenFieldJob(caseId) — which is also what records the job, so coming back to the
+   module later reopens this one. Without the caseId the module would pick a job on its own. */
+function openFieldService(){
+  goApp('field-service','&caseId='+encodeURIComponent(caseDetailModel.case.id)+'&intent=field');
+}
 /* แก้ไขเคส — the full form still belongs to the application. */
 function editCase(){goApp('cases','&caseId='+encodeURIComponent(caseDetailModel.case.id)+'&intent=status')}
 
@@ -1651,11 +1695,67 @@ function changeCaseStatus(){
 }
 
 /* One place where a status really changes, whichever control asked for it. */
+var scdAsk=(function(){
+  var open=null;
+  return function(opts){
+    return new Promise(function(resolve){
+      if(open){resolve(false);return}
+      var prev=document.activeElement;
+      var lines=String(opts.message||'').split('\n').filter(function(x){return x!==''});
+      var ovl=document.createElement('div');
+      open=ovl;
+      ovl.className='scd-ask';
+      ovl.innerHTML='<div class="scd-ask-card'+(opts.danger?' is-danger':'')+'" role="alertdialog"'
+        +' aria-modal="true" aria-label="'+esc(opts.title||'ยืนยัน')+'">'
+        +'<div class="scd-ask-icon" aria-hidden="true">'+(opts.danger?'🗑':'❓')+'</div>'
+        +'<h4>'+esc(opts.title||'ยืนยันการทำรายการ')+'</h4>'
+        +'<div class="scd-ask-body">'+lines.map(function(x){return '<p>'+esc(x)+'</p>'}).join('')+'</div>'
+        +'<div class="scd-ask-acts">'
+        +'<button type="button" class="scd-ask-no" data-ask="0">'+esc(opts.cancelText||'ยกเลิก')+'</button>'
+        +'<button type="button" class="scd-ask-yes" data-ask="1">'+esc(opts.okText||'ยืนยัน')+'</button>'
+        +'</div></div>';
+      function done(v){
+        document.removeEventListener('keydown',key,true);
+        if(ovl.parentNode)ovl.parentNode.removeChild(ovl);
+        open=null;
+        try{if(prev&&prev.focus)prev.focus()}catch(e){}
+        resolve(!!v);
+      }
+      function key(e){
+        if(e.key==='Escape'){e.preventDefault();e.stopPropagation();done(false)}
+        else if(e.key==='Enter'){e.preventDefault();e.stopPropagation();done(true)}
+      }
+      ovl.addEventListener('click',function(e){
+        var b=e.target&&e.target.closest?e.target.closest('[data-ask]'):null;
+        if(b){e.preventDefault();done(b.getAttribute('data-ask')==='1');return}
+        if(e.target===ovl){e.preventDefault();done(false)}
+      });
+      document.body.appendChild(ovl);
+      document.addEventListener('keydown',key,true);
+      var yes=ovl.querySelector('.scd-ask-yes');
+      if(yes)yes.focus();
+    });
+  };
+})();
+
 function applyStatus(next,why){
   var c=caseDetailModel.case;
   if(!c||!c.id)return;
   if(next===c.status){toast('เคสอยู่ที่สถานะนี้อยู่แล้ว');return}
-  if(!confirm((why?why+'\n\n':'')+'เปลี่ยนสถานะเคส '+(c.caseNo||c.id)+'\nจาก “'+(c.status||'-')+'” เป็น “'+next+'” ?'))return;
+  var closing=(next==='ปิดเคส');
+  scdAsk({
+    title:closing?'ปิดเคสนี้':'เปลี่ยนสถานะเคส',
+    message:(why?why+'\n':'')+'เคส '+(c.caseNo||c.id)+'\nจาก “'+(c.status||'-')+'” เป็น “'+next+'”',
+    okText:closing?'ปิดเคส':'เปลี่ยนสถานะ',
+    danger:closing
+  }).then(function(ok){
+    if(!ok)return;
+    applyStatusNow(next);
+  });
+}
+/* The write itself, once the question has been answered. */
+function applyStatusNow(next){
+  var c=caseDetailModel.case;
   toast('กำลังบันทึก…');
   CaseWrite.setStatus(c.id,next).then(function(r){
     if(!r||!r.ok){toast('บันทึกไม่สำเร็จ — ลองทำจากระบบหลัก');return}

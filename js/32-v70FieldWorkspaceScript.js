@@ -112,6 +112,11 @@
   if(typeof window.renderFieldService==='function')window.renderFieldService();
  };
  window.imodeFieldJobId=function(){return jobId};
+ /* Choose the job WITHOUT navigating or rendering. js/73 needs to make the choice for an
+    account that is not a technician before renderWorkspace() runs, and imodeOpenFieldJob()
+    cannot be used for that — it calls goPage(), which would re-enter the wrapper it is
+    being called from. */
+ window.imodeSetFieldJob=function(id){jobId=id||''};
  window.imodeClearFieldJob=function(){
   jobId='';
   if(typeof window.renderFieldService==='function')window.renderFieldService();

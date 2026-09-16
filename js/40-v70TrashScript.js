@@ -59,6 +59,15 @@
 
  function tl(th,en){try{return (settings.language==='en')?en:th}catch(e){return th}}
  function esc2(v){return typeof window.esc==='function'?window.esc(v):String(v==null?'':v)}
+ /* 2026-09-17: the styled confirmation (js/78), with the browser's own box as the fallback
+    so a missing file can never turn a permanent delete into a silent one. */
+ function ask(message,title){
+  try{
+   if(typeof window.imodeConfirm==='function')
+    return window.imodeConfirm({message:message,title:title||'',danger:true});
+  }catch(e){}
+  return Promise.resolve(window.confirm(message));
+ }
  function toast(m){if(typeof window.toastMsg==='function')window.toastMsg(m)}
  function uid2(){try{return (typeof uid==='function')?uid():'t'+Date.now()+Math.random()}catch(e){return 't'+Date.now()}}
  function meName(){try{return (currentUser&&(currentUser.name||currentUser.username))||''}catch(e){return''}}
@@ -562,11 +571,18 @@
    if(!act)return;
    var a=act.getAttribute('data-act');
    if(a==='purgeall'){
-    if(!confirm(tl('ลบทุกอย่างในถังขยะอย่างถาวร? กู้คืนไม่ได้อีก',
-                   'Permanently delete everything in the bin? This cannot be undone.')))return;
-    window.imodeTrashPurgeAll();
-    toast(tl('ล้างถังขยะแล้ว','The bin is empty'));
-    render();
+    /* 2026-09-17, item 13: the styled dialog from js/78. This one is inside a click
+       listener rather than a named function, so js/78's replay cannot reach it and the
+       call is written asynchronously here instead. ask() falls back to the browser box
+       when js/78 is not loaded, so the confirmation can never be skipped. */
+    ask(tl('ลบทุกอย่างในถังขยะอย่างถาวร? กู้คืนไม่ได้อีก',
+           'Permanently delete everything in the bin? This cannot be undone.'),
+        tl('ล้างถังขยะทั้งหมด','Empty the bin')).then(function(ok){
+     if(!ok)return;
+     window.imodeTrashPurgeAll();
+     toast(tl('ล้างถังขยะแล้ว','The bin is empty'));
+     render();
+    });
     return;
    }
    var row=act.closest('.trash-row');
@@ -577,10 +593,13 @@
     toast(res.ok?tl('กู้คืนแล้ว','Restored'):res.message);
     render();
    }else if(a==='purge'){
-    if(!confirm(tl('ลบรายการนี้อย่างถาวร? กู้คืนไม่ได้อีก','Delete this permanently? It cannot be undone.')))return;
-    window.imodeTrashPurge(id);
-    toast(tl('ลบถาวรแล้ว','Permanently deleted'));
-    render();
+    ask(tl('ลบรายการนี้อย่างถาวร? กู้คืนไม่ได้อีก','Delete this permanently? It cannot be undone.'),
+        tl('ลบถาวร','Delete permanently')).then(function(ok){
+     if(!ok)return;
+     window.imodeTrashPurge(id);
+     toast(tl('ลบถาวรแล้ว','Permanently deleted'));
+     render();
+    });
    }
   });
  }

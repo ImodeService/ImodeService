@@ -116,7 +116,11 @@
   if(!tid)return [];
   var out=[];
   caseList().forEach(function(c){
-   if(c.assignee!==tid||isClosed(c))return;
+   /* 2026-09-16: the crew, not only the lead — a second technician on the job was never told
+      they had been given it, because js/38 stores the crew in one comma-separated column. */
+   var onIt=(typeof window.imodeIsAssignedTo==='function')
+    ? window.imodeIsAssignedTo(c,tid) : c.assignee===tid;
+   if(!onIt||isClosed(c))return;
    if(['มอบหมายแล้ว','นัดหมายแล้ว'].indexOf(c.status)<0)return;
    out.push({
     key:'auto_assigned_'+c.id,
@@ -251,7 +255,11 @@
     var host=document.getElementById('fieldJobs');
     if(!host)return r;
     var tid=(typeof fieldTechId!=='undefined'&&fieldTechId)||myTechId();
-    var done=caseList().filter(function(c){return c.assignee===tid&&c.status==='ปิดเคส'});
+    var done=caseList().filter(function(c){
+     var onIt=(typeof window.imodeIsAssignedTo==='function')
+      ? window.imodeIsAssignedTo(c,tid) : c.assignee===tid;
+     return onIt&&c.status==='ปิดเคส';
+    });
     var old=document.getElementById('fieldClosedBox');
     if(old)old.remove();
     if(!done.length)return r;

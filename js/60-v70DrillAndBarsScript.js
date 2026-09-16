@@ -36,7 +36,11 @@
     });
    }else if(type==='technician'){
     (technicians||[]).forEach(function(t){
-     out.push({key:t.id,label:t.name,match:function(c){return c.assignee===t.id},all:false});
+     /* the whole crew, not only the lead (js/38 keeps them in one comma column) */
+     out.push({key:t.id,label:t.name,match:function(c){
+      return (typeof window.imodeIsAssignedTo==='function')
+       ? window.imodeIsAssignedTo(c,t.id) : c.assignee===t.id;
+     },all:false});
     });
    }else if(type==='customer'){
     (customers||[]).forEach(function(cu){

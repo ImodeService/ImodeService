@@ -4596,3 +4596,85 @@ wording) · the live end-to-end submit (12). **0 JS errors anywhere.**
    database.
 7. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its
    serial or QR.
+
+---
+
+## Session Change Log — 2026-09-16 (part 25): a job with a crew was invisible to everyone but its lead
+
+Reported: "มอบหมายช่างแล้วงานไม่ขึ้น". Measured on the live row — `SRV-20260916-005` carries
+`assignee='T001,T003,T002,T-LEAD-TECH,T-LEAD-RD'` — and then walked the whole business flow in a
+browser, from แจ้งปัญหา to ปิดเคส.
+
+### The defect
+
+js/38 (part 17 §2) keeps a multi-technician crew in the ONE `assignee` column as a comma list,
+because `service_cases` has no `assignees` column, and `assigneesOf()` splits it apart again for
+anyone who asks through `imodeIsAssignedTo`. **Nine places never asked.** They compared
+`c.assignee === <technician id>` against the whole string, which matches nobody once a job has
+more than one technician — so the work vanished for every member of the crew including the lead's
+own queue screens.
+
+| Fixed | What was invisible |
+|---|---|
+| `js/03` renderFieldService | **the หน้างาน queue and all four counters** — the reported symptom |
+| `js/03` dashboard team workload (×2) | every technician showed 0 jobs |
+| `js/03` ทีมช่าง person card | "งานเปิด" showed 0 |
+| `js/03` calendar **day** and **week** views | the job appeared only in the LEAD's row |
+| `js/03` technician detail popup | the case list was empty |
+| `js/26` assignedNotices | the derived "คุณได้รับมอบหมายงาน" |
+| `js/26` closed-jobs box on หน้างาน | |
+| `js/60` report drill-down by technician | |
+
+One helper, `caseHasTech(c,tid)`, was added beside `techById` in js/03 and the nine expressions
+now call it; it delegates to `imodeIsAssignedTo` and keeps the old comparison as the fallback for
+a build without js/38. **No function was rewritten and nothing was copied into a second place** —
+there is no seam to wrap here, the flaw is inside js/03's own expressions, so they are edited in
+place, one expression each.
+
+**Not touched, deliberately:** `techById(c.assignee)` wherever a single NAME is displayed (the
+case table, the agenda, the report header). The lead is who is responsible; showing one name is
+correct.
+
+**Not broken, checked before assuming:** งานของฉัน, js/16's `visibleTo()` audience filter,
+js/38's splitter, and `notifyChanges()` — which already loops every newly added assignee. Several
+files (js/16, js/32, js/44, js/45) already call `imodeIsAssignedTo` with the `===` only as a
+fallback; those were left alone.
+
+### Tests
+
+A new end-to-end audit in the session scratchpad drives the real controls — the portal form, the
+assign popup's checkboxes and appointment field, the หน้างาน step bar, the signature pads — and
+walks แจ้งปัญหา → คำขอ → แจ้งเตือน → มอบหมายข้ามทีม → งานของฉัน of the NON-lead → seven field
+steps → the จบงาน signature gate → ใบตรวจ → เสร็จสิ้น → งานที่สำเร็จแล้ว → ปิดเคส → the status
+history. **62 assertions, 0 failures, 0 JS errors.** Syntax clean on all nine touched files
+(js/03 is 468,886 characters); the regression suite is 15/15.
+
+### Three FALSE failures worth remembering
+
+All three were the test's fault, and each was chased to its cause rather than waved away:
+
+1. **An assertion that re-implemented the bug.** It recomputed the dashboard count with
+   `c.assignee===t.id` — the very expression under test — so it could only ever fail, fix or no
+   fix. Read what the screen actually renders.
+2. **`\b` does not work around Thai.** `/\b1\s*งาน\b/` can never match `…พร้อมรับงาน1 งาน`,
+   because JavaScript's word boundary is defined on ASCII word characters. The dashboard was
+   already correct.
+3. **Counting one notification key.** js/26's `dedupe()` drops the derived `auto_assigned_` notice
+   when a stored one for the same case exists — by design — so the crew member was being notified
+   all along, through `n_…`. Count what the user can see, not one implementation detail.
+
+Two harness notes: `new win().Event(...)` parses as `(new win()).Event` and throws, which killed a
+suite silently and left it printing `running…` for ever — put the window in a variable, and give
+every driver a `window.onerror` and a watchdog so a dead step still reports what passed.
+
+### Open / risk
+
+1. The comma-list wire format is still the underlying oddity (part 17 §2). When a real
+   `assignees jsonb` column exists, js/38's two wrappers go and `caseHasTech` stays as it is.
+2. `renderFieldService()` still shows one technician at a time; a crew job now appears in each
+   member's queue, which is the intent, but the same job is legitimately listed more than once
+   across technicians.
+3. Unchanged from part 15: `04-anon-uat.sql` means anyone on the internet can read and write this
+   database.
+4. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its
+   serial or QR.

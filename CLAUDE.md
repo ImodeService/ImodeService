@@ -4678,3 +4678,38 @@ every driver a `window.onerror` and a watchdog so a dead step still reports what
    database.
 4. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its
    serial or QR.
+
+### Follow-up (same day): the calendar was empty because the appointment never reached the cloud
+
+Reported as "หน้าปฏิทิน มันไม่เห็นซิงค์กับงานเลย". It was not a sync fault and not a calendar
+fault: **every calendar view filters on `c.appointment`**, and the live project held
+
+| | |
+|---|---|
+| assigned, open, **no appointment** | **19 cases** |
+| with a real appointment | **1** — `SRV-20260903-001`, and that one had been scheduled through js/16's popup |
+
+`CaseWrite.patch()` in `service-case-detail.html` builds an explicit payload — `updated_at`,
+`status`, `assignee` — and **`appointment` was not in it.** `doAssign()` has always required the
+date (it refuses and highlights the field without one) and `setAssignees()` has always written it
+to the case, so the date reached localStorage and was then destroyed by the next `syncCloud()`,
+which replaces `cases` wholesale. Every case assigned from the case page since that panel shipped
+lost its date, which is the whole of the 19.
+
+**One line added to the payload.** The same shape of fault as `media` in part 18 and the crew in
+part 17 §2: a field added to the object is dropped unless the payload names it. Worth checking
+before adding any further field to a case from that page.
+
+**Rescheduling needed nothing new.** The owner also asked to be able to change a date — "บางที
+ลูกค้าไม่สะดวก หรือช่างติดภารกิจ". The step-3 drawer's **ตั้ง / แก้นัดหมาย** already opens the same
+panel with the current date prefilled, and it is now the reschedule form it always looked like;
+it was broken only by the missing column.
+
+Tests: 21 assertions driving the real panel with a stubbed Supabase client, so the PAYLOAD itself
+is asserted — the empty-date refusal writes nothing and sends nothing, a saved date appears in
+both localStorage and the outgoing row, and a second pass reschedules and sends the new date.
+Syntax clean on all nine files; the 62-assertion flow audit is unchanged.
+
+**The 19 cases cannot be repaired automatically** — their dates were never stored anywhere, so
+they have to be re-entered by hand from each case's ตั้ง / แก้นัดหมาย. Until then the calendar is
+right to show them nowhere.

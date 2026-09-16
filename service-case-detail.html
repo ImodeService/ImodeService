@@ -983,6 +983,15 @@ var CaseWrite=(function(){
       var crew=changes.assignees||(changes.assignee?[changes.assignee]:[]);
       row.assignee=crew.length?crew.join(','):null;
     }
+    /* 2026-09-16: the appointment was missing from this payload, so มอบหมายและนัดหมาย wrote the
+       date to localStorage and never to Supabase — and syncCloud(), which replaces `cases`
+       wholesale, threw it away on the next sync. Measured on the live project: 19 assigned
+       cases with an empty appointment against one that still had its date, and that one had
+       been scheduled through js/16's popup instead. The calendar filters every view on
+       c.appointment, so those 19 jobs could never appear on it.
+       Same shape of fault as the media column in part 18 and the crew in part 17: a field
+       added to the object is dropped unless the payload names it. */
+    if('appointment' in changes)row.appointment=changes.appointment||null;
     try{
       return Promise.resolve(sb.from('service_cases').update(row).eq('id',caseId))
         .then(function(r){

@@ -507,6 +507,7 @@
       <button type="submit" class="rhome-login-btn">${esc(L('เข้าสู่ระบบ','Sign in'))}</button>
      </form>
      <button type="button" class="rhome-login-back" id="rhomeStaffDemo">${esc(L('ผู้ใช้ทดสอบ / เลือกผู้ใช้งาน','Demo users'))}</button>
+     ${currentUser?`<button type="button" class="rhome-login-back" id="rhomeStaffBackSettings">${esc(L('‹ กลับไปหน้าตั้งค่า','‹ Back to Settings'))}</button>`:''}
      <div class="rhome-login-note">${esc(L('ลูกค้า: กรุณาเปิดลิงก์จาก LINE OA ของ I-MODE หรือสแกน QR ที่ตัวเครื่อง','Customers: please open the link in the I-MODE LINE OA, or scan the QR on your machine.'))}</div>
     </div>
    </div>`;
@@ -514,6 +515,10 @@
   if(form)form.onsubmit=submitStaffLogin;
   const demo=document.getElementById('rhomeStaffDemo');
   if(demo)demo.onclick=()=>{if(typeof openUserLoginModal==='function')openUserLoginModal()};
+  /* Reached from ตั้งค่า → สำหรับเทสระบบ while signed in: this page hides the sidebar, so it
+     needs its own way back. A visitor with no session never sees the button. */
+  const back=document.getElementById('rhomeStaffBackSettings');
+  if(back)back.onclick=()=>goPage('settings');
   const u=document.getElementById('rhomeStaffUser');
   if(u&&!mobileQuery.matches)setTimeout(()=>u.focus(),40);
  }

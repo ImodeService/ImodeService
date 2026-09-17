@@ -86,12 +86,35 @@
    var cid='';
    try{cid=(document.getElementById('srCaseId')||{}).value||''}catch(e){}
    var saving=(doSave===undefined||doSave===true);
-   var r=baseSaveReport.apply(this,arguments);
+   /* 2026-09-17: editing the ใบตรวจ of a job that is already finished must not move the case.
+      js/03 writes c.status='รอส่งงาน' before its first await, so a closed case was reopened to
+      รอส่งงาน and then promoted to เสร็จสิ้น — an edit made a ปิดเคส job look open again. For
+      the synchronous part of the call the case's status is pinned, which also keeps the
+      intermediate value out of the saveLocal() and the cloud push that follow it. */
+   var pinned=null,keep='';
+   if(saving&&cid){
+    try{
+     pinned=caseList().filter(function(x){return x.id===cid})[0]||null;
+     keep=pinned?String(pinned.status||''):'';
+     if(pinned&&(keep==='ปิดเคส'||keep===doneStatus())){
+      Object.defineProperty(pinned,'status',{configurable:true,enumerable:true,
+       get:function(){return keep},set:function(){}});
+     }else pinned=null;
+    }catch(e){pinned=null}
+   }
+   var r;
+   try{r=baseSaveReport.apply(this,arguments)}
+   finally{
+    if(pinned){try{delete pinned.status;pinned.status=keep}catch(e){}}
+   }
    if(!saving||!cid)return r;
    var after=function(){
     try{
      var moved=promoteSubmitted(cid);
-     if(!moved)return;
+     if(!moved){
+      if(pinned)toast(tl('บันทึกการแก้ไขใบตรวจแล้ว','Inspection sheet updated'));
+      return;
+     }
      toast(tl('ส่งงานเรียบร้อย — เคสเปลี่ยนเป็น ','Submitted — the case is now ')+doneStatus());
      /* Item 7: back to งานของฉัน, which by now no longer lists this job. Only for a
         technician; an admin filling in a sheet stays where they were. */

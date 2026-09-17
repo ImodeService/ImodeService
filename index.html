@@ -641,6 +641,7 @@
       <div class="settings-section-head settings-section-accent" data-perm="settings.manage"><div><b>สำหรับเทสระบบ</b><small>เครื่องมือสำหรับทดสอบ UAT — เปิดหน้าที่ปกติเข้าได้จาก QR หรือ LINE OA เท่านั้น</small></div></div>
       <div class="settings-card-grid" data-perm="settings.manage">
         <button class="setting-action-card" onclick="goPage('customer-entry')"><span class="setting-icon">📷</span><div><b>หน้าลูกค้า · สแกน QR / กรอกซีเรียล</b><small>เปิดหน้าที่ลูกค้าเห็นตอนสแกน QR บนเครื่อง — บน PC ที่ไม่มีกล้องให้พิมพ์ซีเรียลแทน</small></div><strong>›</strong></button>
+        <button class="setting-action-card" onclick="goPage('staff-login')"><span class="setting-icon">🔐</span><div><b>หน้าเข้าสู่ระบบพนักงาน</b><small>เปิดหน้า Login ที่แอดมินและช่างเห็นตอนเปิดลิงก์ครั้งแรก — ลองเข้าด้วยบัญชีอื่นได้ หรือกดกลับตั้งค่า</small></div></button>
       </div>
     </section>
 </main>
@@ -1003,6 +1004,8 @@
 <!-- 2026-09-17: the browser's grey confirm box becomes the application's dialog. Loads last so
      it wraps the final version of every function it styles. -->
 <script src="./js/78-v70ConfirmDialogScript.js"></script>
+<script src="./js/79-v70IssueCaseTypeScript.js"></script>
+<script src="./js/80-v70QuoteHandoffScript.js"></script>
 
 </body>
 </html>

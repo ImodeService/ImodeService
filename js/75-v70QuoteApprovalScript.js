@@ -194,7 +194,7 @@
    +[['all',tl('ทั้งหมด','All'),approved+pending],
      ['yes',tl('อนุมัติแล้ว','Approved'),approved],
      ['no',tl('ยังไม่ได้อนุมัติ','Not approved'),pending]].map(function(o){
-     return '<button type="button" class="pqa-fbtn'+(filter===o[0]?' is-on':'')+'"'
+     return '<button type="button" class="pqa-fbtn pqa-f-'+o[0]+(filter===o[0]?' is-on':'')+'"'
       +' aria-pressed="'+(filter===o[0]?'true':'false')+'"'
       +' onclick="imodePortalQuoteFilter(\''+o[0]+'\')">'+esc2(o[1])+' ('+o[2]+')</button>';
     }).join('')
@@ -343,13 +343,18 @@
  +'.pqa-chip{display:inline-block;font-size:10.5px;font-weight:800;border-radius:999px;padding:3px 10px;'
  +'margin-left:6px;white-space:nowrap;border:1px solid transparent}'
  +'.pqa-chip.is-yes{background:#e9f9f1;color:#07603a;border-color:#b6e6cd}'
- +'.pqa-chip.is-no{background:#fff6e8;color:#8a5a17;border-color:#f6dcb8}'
+ +'.pqa-chip.is-no{background:#fdecec;color:#b3261e;border-color:#f5c2c0}'
  +'.pqa-filter{display:flex;gap:7px;flex-wrap:wrap;margin:2px 0 12px}'
  +'.pqa-fbtn{flex:1 1 auto;min-width:96px;padding:8px 10px;border-radius:11px;border:1px solid #d9e4f5;'
  +'background:#fff;color:#3d557f;font-size:11.5px;font-weight:700;cursor:pointer}'
  +'.pqa-fbtn:hover{border-color:#0b63e5}'
  +'.pqa-fbtn:focus-visible{outline:2px solid #0b63e5;outline-offset:2px}'
  +'.pqa-fbtn.is-on{background:#0b63e5;border-color:#0b63e5;color:#fff}'
+ /* อนุมัติแล้ว is green and ยังไม่ได้อนุมัติ is red, matching the row chips. */
+ +'.pqa-fbtn.pqa-f-yes{border-color:#b6e6cd;background:#f2fbf6;color:#07603a}'
+ +'.pqa-fbtn.pqa-f-no{border-color:#f5c2c0;background:#fff5f5;color:#b3261e}'
+ +'.pqa-fbtn.pqa-f-yes.is-on{background:#0b8a4b;border-color:#0b8a4b;color:#fff}'
+ +'.pqa-fbtn.pqa-f-no.is-on{background:#d92d20;border-color:#d92d20;color:#fff}'
  +'.pqa-panel{margin:14px 0 10px;padding:14px;border:1px solid #d9e4f5;border-radius:16px;background:#f7faff}'
  +'.pqa-panel.is-done{border-color:#b6e6cd;background:#f2fbf6}'
  +'.pqa-head{font-size:14px;font-weight:800;color:#0c225e;margin-bottom:5px}'

@@ -207,7 +207,16 @@
  +'.t24-badge{margin-left:auto;font-size:9.5px;font-weight:800;color:#5b6b88;background:#eef4ff;'
  +'border:1px solid #dbe7f9;border-radius:999px;padding:1px 7px;white-space:nowrap}'
  +'@media (max-width:640px){.t24{padding:5px 7px}.t24-badge{display:none}'
- +'.t24-date{flex:1 1 100%}}';
+ +'.t24-date{flex:1 1 100%}}'
+ // .field input/select (css/01) sets width:100% + its own box on every control, which stacked
+ // hour and minute one per line. Higher specificity puts them back on one row: date on top,
+ // 🕒 HH : MM underneath.
+ +'.t24{row-gap:6px}'
+ +'.t24 input.t24-date{flex:1 1 100%;width:auto;border:0;border-bottom:1px solid #eef3fb;'
+ +'border-radius:0;background:transparent;padding:6px 2px}'
+ +'.t24 select.t24-h,.t24 select.t24-m{flex:0 0 auto;width:auto;min-width:62px;padding:6px 8px;'
+ +'border-radius:8px;font-size:15px;text-align:center}'
+ +'.t24 .t24-colon{margin:0 -2px}';
  document.head.appendChild(style);
 
  function install(){sweep();start()}

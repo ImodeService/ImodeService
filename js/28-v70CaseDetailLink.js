@@ -112,6 +112,9 @@
        selects it, remembers it for next time (js/32 per technician, js/73 per account) and
        renders — goPage('field-service') has already run above, so this only re-points it. */
     else if(intent==='field'&&typeof window.imodeOpenFieldJob==='function')window.imodeOpenFieldJob(cid);
+    /* 2026-09-17: Workshop — ทำ QC ก่อนส่งคืน on the case page. js/81 opens a Pre-Delivery QC
+       already linked to this case and machine. */
+    else if(intent==='qc-predelivery'&&typeof window.imodeOpenCaseQc==='function')window.imodeOpenCaseQc(cid);
     else if(page==='quotation'&&typeof prepareQuotation==='function')prepareQuotation(cid);
    }catch(e){}
   },260);

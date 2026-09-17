@@ -421,6 +421,14 @@ body.scd-modal-open{overflow:hidden}
 
 /* ---------- detail panel ---------- */
 .scd-panel{margin-top:14px}
+/* งาน Workshop */
+.ws-radio{display:flex;flex-direction:column;gap:6px;font-weight:400;font-size:13px}
+.ws-radio label{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line-2);border-radius:10px;background:#fff;cursor:pointer}
+.ws-radio input{accent-color:var(--imode-blue)}
+.ws-set{flex-wrap:wrap}
+.ws-sig{display:block;max-width:260px;width:100%;margin-top:8px;border:1px solid var(--line);border-radius:10px;background:#fff;padding:4px}
+.ws-msg{width:100%;box-sizing:border-box;border:1px solid var(--line-2);border-radius:11px;padding:10px 12px;font:inherit;font-size:13.5px;line-height:1.6;background:#f8fbff;color:var(--imode-navy);resize:vertical}
+.ws-line-btn{display:block;width:100%;margin-top:12px}
 /* แก้ไขทางออนไลน์ */
 .scd-ol-toggle{display:flex;align-items:flex-start;gap:9px;padding:11px 12px;border:1px solid var(--line-2);border-radius:12px;background:#f7faff;cursor:pointer;font-size:13px;color:var(--imode-navy)}
 .scd-ol-toggle input{width:18px;height:18px;margin:1px 0 0;accent-color:var(--imode-blue);flex:0 0 auto}
@@ -1151,6 +1159,7 @@ var CaseWrite=(function(){
   return {
     setStatus:function(id,status,why){return patch(id,{status:status},why)},
     setDetails:function(id,changes){return patch(id,changes||{})},
+    patch:function(id,changes,why){return patch(id,changes||{},why)},
     /* Assigning is the one other thing this page may change. The lead is always ids[0], the
        same rule js/38 enforces, so `assignee` and `assignees` can never disagree. A case
        still sitting at เคสใหม่ moves on to มอบหมายแล้ว in the same write, exactly as
@@ -1351,7 +1360,7 @@ var openStep=null;
 function renderProgress(m){
   var idx=stepIndex(m.case.status),closed=m.case.status==='ปิดเคส';
   var times=stepTimes(m);
-  var canWork=fieldDone(m);
+  var canWork=fieldDone(m),ws=isWorkshopCase(m.raw);
   var lis=STEPS.map(function(s,i){
     var cls=i<idx?'done':i===idx?'now':'pending';
     var mark=i<idx?'✔':String(i+1);
@@ -1364,24 +1373,26 @@ function renderProgress(m){
     var role = i<=idx ? 'open' : (i===idx+1 ? 'next' : 'far');
     /* แก้ไขทางออนไลน์: the case may be closed from wherever it is, by the people allowed to. */
     if(i===5&&!closed&&onlineState(m.raw).on&&mayCloseOnline())role='online';
-    var blocked = (role==='next' && idx===3 && !canWork);
+    var gate = role==='next' ? stepGate(m,idx) : '';
+    var blocked = !!gate;
     var hint = role==='open' ? 'ดูรายละเอียดขั้นนี้'
-             : blocked ? 'รอช่างอัปเดตให้จบกระบวนการก่อน — กดเพื่อดูความคืบหน้า'
+             : blocked ? gate+' — กดเพื่อดูรายละเอียด'
              : role==='next' ? 'กดเพื่อไปขั้นนี้'
              : 'ต้องผ่านขั้นก่อนหน้าก่อน';
     return '<li class="'+cls+(openStep===i?' is-open':'')+(blocked?' is-blocked':'')+'">'
       +'<button type="button" class="scd-step-btn" data-step="'+i+'" data-role="'+role+'"'
       +(role==='far'?' disabled':'')
       +' title="'+esc(hint)+'" aria-expanded="'+(openStep===i)+'"'
-      +' aria-label="'+esc((i+1)+'. '+s.th+' — '+hint)+'">'
+      +' aria-label="'+esc((i+1)+'. '+stepLabel(m,i)+' — '+hint)+'">'
       +'<span class="mark">'+mark+'</span>'
-      +'<b>'+(i+1)+'. '+esc(s.th)+'</b>'
+      +'<b>'+(i+1)+'. '+esc(stepLabel(m,i))+'</b>'
       +(times[i]?'<small>'+esc(times[i])+'</small>':'')
-      +(role==='next'?'<em class="scd-step-cue">'+(blocked?'🔒 รอช่าง':'กดเพื่อไปต่อ ›')+'</em>':'')
+      +(role==='next'?'<em class="scd-step-cue">'+(blocked?'🔒 '+(ws?'ยังไปต่อไม่ได้':'รอช่าง'):'กดเพื่อไปต่อ ›')+'</em>':'')
       +(role==='online'?'<em class="scd-step-cue">กดปิดเคส (ออนไลน์) ›</em>':'')
       +'</button></li>';
   }).join('');
   var subs='';
+  if(ws)subs+='<span class="badge badge-sub">🏭 งาน Workshop'+(wsTrackNow(m.raw)?' · '+esc(wsTrackNow(m.raw)):'')+'</span>';
   if(HOLD_STATES[m.case.status])subs+='<span class="badge badge-sub">'+esc(HOLD_STATES[m.case.status])+'</span>';
   if(m.case.subStatus)subs+='<span class="badge badge-prio">หน้างาน: '+esc(m.case.subStatus)+'</span>';
   return '<section class="scd-progress" aria-label="ความคืบหน้าของเคส">'
@@ -1405,6 +1416,7 @@ function stepDrawerHTML(m,i){
     return '<div class="sd-head"><h4>'+esc(t)+'</h4>'+(sub?'<p>'+esc(sub)+'</p>':'')
       +'<button type="button" class="sd-close" data-action="close-step">ปิด</button></div>';
   };
+  if(isWorkshopCase(m.raw)&&(i===2||i===3||i===4))return wsDrawerHTML(m,i,head);
   if(i===0){
     return head('1. รับแจ้งปัญหา','เคสนี้เข้ามาอย่างไร')
       +'<dl class="sd-kv"><dt>รับแจ้ง</dt><dd>'+esc(fmtDateTime(c.createdAt))+'</dd>'
@@ -1516,6 +1528,7 @@ function quoteSectionHTML(){
     :f.state===3?'<p class="sd-wait">📥 ลูกค้าส่งใบเสนอราคาที่เซ็นแล้วกลับมา — ตรวจสอบแล้วกดยืนยัน</p>'
     :'<p class="sd-ok">✔ ใบเสนอราคาเสร็จสิ้น — ไปขั้นตอนนัดหมายได้เลย</p>';
   var acts='<button type="button" class="sd-go" data-action="open-quote-doc">ดูใบเสนอราคาเต็ม ›</button>';
+  if(f.state===1||f.state===2)acts+='<button type="button" class="sd-go" data-action="open-line-message">📋 ส่งลิงก์ให้ลูกค้าเซ็นทาง LINE</button>';
   if(f.state===3)acts+='<button type="button" class="sd-go is-primary" data-action="confirm-quote">✔ ยืนยันใบเสนอราคา</button>';
   if(f.state===4)acts+='<button type="button" class="sd-go is-primary" data-action="assign-technician">ไปขั้นตอนนัดหมาย ›</button>';
   return head+'<ol class="sd-field sd-qt-track">'+dots+'</ol>'+note+'<div class="sd-acts">'+acts+'</div></div>';
@@ -1762,7 +1775,8 @@ var ACTIONS=[
 function renderActionBar(){
   return '<div class="scd-actions">'+ACTIONS.map(function(a){
     return '<button type="button" class="scd-act '+a.cls+'" data-action="'+a.act+'">'
-      +'<i aria-hidden="true">'+a.icon+'</i>'+esc(a.label)+'</button>';
+      +'<i aria-hidden="true">'+a.icon+'</i>'
+      +esc(a.act==='open-field-service'&&isWorkshopCase(caseDetailModel.raw)?'งาน Workshop':a.label)+'</button>';
   }).join('')+'</div>';
 }
 
@@ -2055,6 +2069,13 @@ function openQuotation(){goApp('quotation','&caseId='+encodeURIComponent(caseDet
    imodeOpenFieldJob(caseId) — which is also what records the job, so coming back to the
    module later reopens this one. Without the caseId the module would pick a job on its own. */
 function openFieldService(){
+  if(isWorkshopCase(caseDetailModel.raw)){
+    openStep=stepIndex(caseDetailModel.case.status)>=4?4:wsLast(caseDetailModel.raw,'received')?3:2;
+    repaintProgress();
+    var pr=document.querySelector('.scd-progress');
+    if(pr&&pr.scrollIntoView)pr.scrollIntoView({behavior:'smooth',block:'start'});
+    return;
+  }
   goApp('field-service','&caseId='+encodeURIComponent(caseDetailModel.case.id)+'&intent=field');
 }
 /* ลงรายละเอียดเคส — 2026-09-17: "เวลาเปิดขึ้นมาจะไม่เด้งออกจากรายละเอียด". It used to leave for
@@ -2077,7 +2098,7 @@ var ONLINE_TYPE='แก้ไขออนไลน์';
 var ONLINE_FILE_MAX=2.5*1024*1024;      /* after an image is shrunk; a clip or recording as-is */
 var ONLINE_FILE_COUNT=4;
 var CUSTOMER_TYPE_MAP={Service:'เข้าบริการหน้างาน',Maintenance:'เข้าบริการหน้างาน',
-  PM:'PM / Preventive Maintenance',Online:ONLINE_TYPE};
+  PM:'PM / Preventive Maintenance',Online:ONLINE_TYPE,Workshop:'ลูกค้าส่งเครื่องเข้าบริษัท'};
 var onlinePending=[];
 function onlineState(raw){
   var log=(raw&&raw.fieldStatusLog)||[],last=null;
@@ -2087,7 +2108,7 @@ function onlineState(raw){
 /* What the customer chose on the portal form (js/79 writes it into the note), else the type
    the case had when the box was ticked. */
 function customerServiceType(raw,entry){
-  var m=/ลูกค้าเลือกประเภทเคส:\s*(Service|Maintenance|PM|Online)/.exec(String(raw&&raw.note||''));
+  var m=/ลูกค้าเลือกประเภทเคส:\s*(Service|Maintenance|PM|Online|Workshop)/.exec(String(raw&&raw.note||''));
   if(m&&CUSTOMER_TYPE_MAP[m[1]])return CUSTOMER_TYPE_MAP[m[1]];
   if(entry&&entry.prevServiceType)return entry.prevServiceType;
   return 'เข้าบริการหน้างาน';
@@ -2252,6 +2273,301 @@ function onlineBannerHTML(m){
     +(mayCloseOnline()?'<button type="button" class="scd-ol-close" data-action="close-online">ปิดเคส (แก้ไขทางออนไลน์)</button>'
                       :'<small>รอแอดมินหรือหัวหน้าช่างกดปิดเคส</small>')+'</div>';
 }
+/* ---------- งาน Workshop (2026-09-17) ----------
+   The machine comes to the company; usually R&D does the work. See js/81 for the decisions.
+   Everything below is kept in the case's own fieldStatusLog (a real jsonb column that travels
+   with the case) as entries tagged `workshop`:
+     logistics  {inbound:'send'|'pickup', outbound:'self'|'deliver'}   the customer's choice
+     received   {receivedDate, note (condition), accessories, media}  machine is on our bench
+     status     {label}                                               R&D progress
+     returned   {returnDate, method, receiver, sig}                   handed back
+   Each entry also carries a readable `status`, so the customer's own case view (js/53) shows
+   the machine's progress without knowing anything about Workshop.
+   The six circles keep the case statuses they already had; only the labels, the drawers and
+   the gates differ:
+     3 รับเครื่องเข้าบริษัท (นัดหมายแล้ว)   needs a `received` entry
+     4 R&D ตรวจ / ซ่อม     (กำลังดำเนินการ) leaves for 5 once the track reaches พร้อมส่งคืน
+     5 QC / ส่งคืน         (เสร็จสิ้น)      QC must pass before the hand-back is recorded
+     6 ปิดเคส                              needs a `returned` entry */
+var WS_TYPE='ลูกค้าส่งเครื่องเข้าบริษัท';
+var WS_TRACK=['รอตรวจ','กำลังตรวจ','กำลังซ่อม','รออะไหล่','ทดสอบ','พร้อมส่งคืน'];
+var WS_LABELS={2:'รับเครื่องเข้าบริษัท',3:'R&D ตรวจ / ซ่อม',4:'QC / ส่งคืนเครื่อง'};
+var wsPending=[];
+function isWorkshopCase(raw){return !!raw&&String(raw.serviceType||'')===WS_TYPE}
+function wsLast(raw,kind){
+  var log=(raw&&raw.fieldStatusLog)||[],last=null;
+  for(var i=0;i<log.length;i++)if(log[i]&&log[i].workshop===kind)last=log[i];
+  return last;
+}
+function wsTrackNow(raw){var e=wsLast(raw,'status');return e?e.label:''}
+function wsInboundText(v){return v==='pickup'?'ให้บริษัทไปรับเครื่อง (คิดค่ารับตามระยะทาง)':v==='send'?'ลูกค้าส่งเครื่องมาเอง':'ยังไม่ได้เลือก'}
+function wsOutboundText(v){return v==='deliver'?'ให้บริษัทไปส่งคืน (คิดค่าส่งตามระยะทาง)':v==='self'?'ลูกค้ามารับเครื่องคืนเอง':'ยังไม่ได้เลือก'}
+function stepLabel(m,i){return (isWorkshopCase(m&&m.raw)&&WS_LABELS[i])||STEPS[i].th}
+/* QC is its own module; the record is linked to the case by caseId (js/04 openQcModal). */
+function wsQcPass(caseId){
+  var list=readJSON('imode_v66_qc_records',[])||[];
+  return list.filter(function(q){
+    return q&&q.caseId===caseId&&q.type==='Pre-Delivery QC'&&['Pass','Conditional'].indexOf(q.status)>=0;
+  }).sort(function(a,b){return new Date(b.updatedAt||b.createdAt||0)-new Date(a.updatedAt||a.createdAt||0)})[0]||null;
+}
+function wsQcAny(caseId){
+  var list=readJSON('imode_v66_qc_records',[])||[];
+  return list.filter(function(q){return q&&q.caseId===caseId&&q.type==='Pre-Delivery QC'})[0]||null;
+}
+function wsWho(){var u=readJSON(K.user,null);return (u&&(u.name||u.username))||''}
+function wsMayWork(){return can('field.status')||can('case.assign')}
+/* Append one entry and optionally move the case status; re-render and keep the drawer open. */
+function wsWrite(entry,status,keepStep,message){
+  var c=caseDetailModel.case,raw=caseDetailModel.raw||{};
+  var log=(raw.fieldStatusLog||[]).slice();
+  entry.id=entry.id||('WS-'+Date.now().toString(36));
+  entry.createdAt=entry.createdAt||new Date().toISOString();
+  entry.by=entry.by||wsWho();
+  entry.note=entry.note||'';
+  entry.media=entry.media||[];
+  log.push(entry);
+  var changes={fieldStatusLog:log};
+  if(status&&status!==c.status)changes.status=status;
+  toast('กำลังบันทึก…');
+  return CaseWrite.patch(c.id,changes,'Workshop').then(function(r){
+    if(!r||!r.ok){toast(r&&r.reason==='storage'?'บันทึกไม่สำเร็จ — พื้นที่ในเครื่องเต็ม':'บันทึกไม่สำเร็จ');return false}
+    closePanel();
+    openStep=keepStep;
+    try{CaseDetailData.refresh()}catch(e){}
+    return load().then(function(res){
+      if(res&&!res.error)renderPage(res);
+      toast(r.cloud?message:(message+' · ยังอยู่เฉพาะเครื่องนี้ ยังไม่ได้ส่งขึ้นระบบกลาง'));
+      return true;
+    });
+  });
+}
+function wsDrawerHTML(m,i,head){
+  var raw=m.raw||{},c=m.case,l=wsLast(raw,'logistics')||{};
+  var may=wsMayWork();
+  if(i===2){
+    var rc=wsLast(raw,'received');
+    return head('3. รับเครื่องเข้าบริษัท','งาน Workshop · เครื่องเข้ามาที่บริษัท')
+      +'<dl class="sd-kv"><dt>นำเครื่องเข้า</dt><dd>'+esc(wsInboundText(l.inbound))+'</dd>'
+      +'<dt>รับเครื่องคืน</dt><dd>'+esc(wsOutboundText(l.outbound))+'</dd>'
+      +(m.appointment.date?'<dt>นัดรับเครื่อง</dt><dd>'+esc(fmtDateTime(m.appointment.date))+'</dd>':'')
+      +(rc?'<dt>รับเครื่องเมื่อ</dt><dd>'+esc(fmtDay(rc.receivedDate)||fmtDateTime(rc.createdAt))+(rc.by?' · '+esc(rc.by):'')+'</dd>'
+          +'<dt>สภาพเครื่อง</dt><dd>'+esc(rc.note||'-')+'</dd>'
+          +'<dt>อุปกรณ์ที่มากับเครื่อง</dt><dd>'+esc(rc.accessories||'-')+'</dd>'
+          +(rc.media&&rc.media.length?'<dt>รูปตอนรับ</dt><dd>'+rc.media.length+' ไฟล์ (ดูใน เอกสาร &amp; รูปภาพ)</dd>':''):'')
+      +'</dl>'
+      +(rc?'<p class="sd-ok">✔ รับเครื่องเข้าบริษัทแล้ว</p>':'<p class="sd-wait">⏳ ยังไม่ได้บันทึกรับเครื่องเข้า</p>')
+      +'<div class="sd-acts">'
+      +(may?'<button type="button" class="sd-go is-primary" data-action="ws-receive">'+(rc?'แก้ไขบันทึกรับเครื่อง ›':'บันทึกรับเครื่องเข้า ›')+'</button>':'')
+      +(l.inbound==='pickup'?'<button type="button" class="sd-go" data-action="assign-technician">ตั้งวันไปรับเครื่อง / มอบหมาย ›</button>':'')
+      +'</div>';
+  }
+  if(i===3){
+    var now=wsTrackNow(raw),at={};
+    ((raw.fieldStatusLog)||[]).forEach(function(e){if(e&&e.workshop==='status')at[e.label]=e.createdAt});
+    var nowIdx=WS_TRACK.indexOf(now);
+    var dots=WS_TRACK.map(function(label,k){
+      var done=nowIdx>=0&&k<=nowIdx&&label!=='รออะไหล่'||label===now;
+      return '<li class="'+(done?'done':'pending')+(label===now?' now':'')+'">'
+        +'<span class="fdot">'+(done?'✔':String(k+1))+'</span><b>'+esc(label)+'</b>'
+        +(at[label]?'<small>'+esc(fmtDateTime(at[label]))+'</small>':'')+'</li>';
+    }).join('');
+    return head('4. R&D ตรวจ / ซ่อม','สถานะงานในบริษัท — เริ่มได้ก่อนลูกค้าเซ็นใบเสนอราคา')
+      +'<ol class="sd-field">'+dots+'</ol>'
+      +(now==='พร้อมส่งคืน'?'<p class="sd-ok">✔ พร้อมส่งคืน — กดวงกลมขั้นที่ 5 เพื่อไปทำ QC และส่งคืน</p>'
+        :'<p class="sd-wait">⏳ '+(now?'ตอนนี้: '+esc(now):'ยังไม่ได้เริ่มงาน')+' — ไปขั้นที่ 5 ได้เมื่อถึง “พร้อมส่งคืน”</p>')
+      +(may?'<div class="sd-acts ws-set">'+WS_TRACK.map(function(label){
+          return '<button type="button" class="sd-go'+(label===now?' is-primary':'')+'" data-ws-status="'+esc(label)+'">'+esc(label)+'</button>';
+        }).join('')+'</div>':'');
+  }
+  if(i===4){
+    var qc=wsQcPass(c.id),anyQc=wsQcAny(c.id),rt=wsLast(raw,'returned');
+    return head('5. QC / ส่งคืนเครื่อง','ต้องผ่าน QC ก่อนส่งคืนทุกครั้ง')
+      +'<dl class="sd-kv"><dt>QC ก่อนส่งคืน</dt><dd>'
+      +(qc?'✔ '+esc(qc.status)+' · '+esc(qc.qcNo||qc.id)
+         :anyQc?'✕ ยังไม่ผ่าน ('+esc(anyQc.status||'-')+')':'ยังไม่ได้ทำ QC')+'</dd>'
+      +'<dt>รับเครื่องคืน</dt><dd>'+esc(wsOutboundText(l.outbound))+'</dd>'
+      +(rt?'<dt>ส่งคืนเมื่อ</dt><dd>'+esc(fmtDay(rt.returnDate)||fmtDateTime(rt.createdAt))+'</dd>'
+          +'<dt>ผู้รับเครื่อง</dt><dd>'+esc(rt.receiver||'-')+'</dd>':'')
+      +'</dl>'
+      +(rt&&rt.sig?'<img class="ws-sig" src="'+esc(rt.sig)+'" alt="ลายเซ็นผู้รับเครื่อง">':'')
+      +(rt?'<p class="sd-ok">✔ ส่งคืนเครื่องแล้ว — กดวงกลมขั้นที่ 6 เพื่อปิดเคส</p>'
+          :qc?'<p class="sd-wait">QC ผ่านแล้ว — บันทึกการส่งคืนเครื่องได้เลย</p>'
+          :'<p class="sd-wait">🔒 ต้องทำ QC ก่อนส่งคืน (Pre-Delivery QC) ให้ผ่านก่อน</p>')
+      +'<div class="sd-acts">'
+      +(qc?'':'<button type="button" class="sd-go is-primary" data-action="ws-qc">ทำ QC ก่อนส่งคืน ›</button>')
+      +(may&&qc&&!rt?'<button type="button" class="sd-go is-primary" data-action="ws-return">บันทึกส่งคืนเครื่อง ›</button>':'')
+      +'<button type="button" class="sd-go" data-action="open-case-attachments">เอกสาร &amp; รูปภาพ ›</button>'
+      +'</div>';
+  }
+  return '';
+}
+/* ---- receiving the machine ---- */
+function wsReceive(){
+  if(!wsMayWork()){toast('บัญชีนี้ไม่มีสิทธิ์บันทึกงาน Workshop');return}
+  var rc=wsLast(caseDetailModel.raw,'received')||{};
+  wsPending=[];
+  panel('บันทึกรับเครื่องเข้าบริษัท',
+    '<form id="wsReceiveForm" class="scd-ce" novalidate>'
+    +'<label class="scd-ce-f"><span>วันที่รับเครื่อง <b>*</b></span><input type="date" id="wsRecvDate" value="'+esc(rc.receivedDate||new Date().toISOString().slice(0,10))+'"></label>'
+    +'<label class="scd-ce-f"><span>สภาพเครื่องตอนรับ <b>*</b></span><textarea id="wsRecvNote" rows="3" placeholder="เช่น ฝาครอบมีรอยขีดข่วนด้านซ้าย เปิดเครื่องไม่ติด">'+esc(rc.note||'')+'</textarea></label>'
+    +'<label class="scd-ce-f"><span>อุปกรณ์ที่มากับเครื่อง</span><input id="wsRecvAcc" placeholder="เช่น สายไฟ 1 เส้น, รีโมท, คู่มือ" value="'+esc(rc.accessories||'')+'"></label>'
+    +'<div class="scd-ol-files"><label class="scd-chip-btn scd-ol-add">📷 แนบรูปเครื่องตอนรับ'
+    +'<input type="file" id="wsRecvFiles" accept="image/*,video/*" multiple hidden></label><small>ถ่ายไว้เป็นหลักฐานสภาพเครื่อง</small></div>'
+    +'<ul class="scd-ol-list" id="wsRecvList"></ul>'
+    +'<div class="scd-ce-actions"><button type="button" class="scd-chip-btn" data-action="close-panel">ยกเลิก</button>'
+    +'<button type="submit" class="scd-ce-save">บันทึกรับเครื่อง</button></div></form>');
+  var inp=el('wsRecvFiles');
+  if(inp)inp.addEventListener('change',function(){wsAddFiles(inp.files);inp.value=''});
+  var ul=el('wsRecvList');
+  if(ul)ul.addEventListener('click',function(e){
+    var b=e.target.closest&&e.target.closest('[data-ws-rm]');
+    if(!b)return;wsPending.splice(Number(b.getAttribute('data-ws-rm')),1);wsRedraw();
+  });
+  el('wsReceiveForm').addEventListener('submit',function(e){
+    e.preventDefault();
+    var note=el('wsRecvNote').value.trim(),day=el('wsRecvDate').value;
+    if(!day||!note){toast(!day?'กรุณาระบุวันที่รับเครื่อง':'กรุณาบันทึกสภาพเครื่องตอนรับ');var f=el(!day?'wsRecvDate':'wsRecvNote');if(f)f.focus();return}
+    var idx=stepIndex(caseDetailModel.case.status);
+    wsWrite({workshop:'received',status:'Workshop · รับเครื่องเข้าบริษัทแล้ว',receivedDate:day,note:note,
+      accessories:el('wsRecvAcc').value.trim(),
+      media:wsPending.map(function(f){return {name:f.name,type:f.type,size:f.size,data:f.data}})},
+      idx<2?'นัดหมายแล้ว':'',2,'บันทึกรับเครื่องเข้าบริษัทแล้ว');
+  });
+}
+function wsRedraw(){
+  var ul=el('wsRecvList');
+  if(ul)ul.innerHTML=wsPending.map(function(f,i){
+    return '<li>'+onlineFileIcon(f.type)+' '+esc(f.name)+' <small>'+Math.max(1,Math.round(f.size/1024))+' KB</small>'
+      +'<button type="button" class="scd-ol-rm" data-ws-rm="'+i+'" aria-label="เอาไฟล์นี้ออก">✕</button></li>';
+  }).join('');
+}
+function wsAddFiles(list){
+  [].slice.call(list||[]).reduce(function(p,file){
+    return p.then(function(){
+      if(wsPending.length>=ONLINE_FILE_COUNT){toast('แนบได้สูงสุด '+ONLINE_FILE_COUNT+' ไฟล์');return}
+      var t=String(file.type||'');
+      if(!/^(image|video)\//.test(t)){toast(file.name+' — แนบได้เฉพาะรูปหรือวิดีโอ');return}
+      var job=/^image\//.test(t)?shrinkImageFile(file).then(function(d){return {data:d,type:'image/jpeg'}})
+                               :readFileData(file).then(function(d){return {data:d,type:t}});
+      return job.then(function(o){
+        var size=Math.round((o.data.length-o.data.indexOf(',')-1)*0.75);
+        if(size>ONLINE_FILE_MAX){toast(file.name+' ใหญ่เกิน 2.5 MB');return}
+        wsPending.push({name:file.name,type:o.type,size:size,data:o.data});
+      },function(){toast('อ่านไฟล์ '+file.name+' ไม่ได้')});
+    });
+  },Promise.resolve()).then(wsRedraw);
+}
+/* ---- the R&D track ---- */
+function wsSetStatus(label){
+  if(!wsMayWork()){toast('บัญชีนี้ไม่มีสิทธิ์อัปเดตสถานะงาน');return}
+  var raw=caseDetailModel.raw||{},c=caseDetailModel.case;
+  if(!wsLast(raw,'received')){toast('ยังไม่ได้บันทึกรับเครื่องเข้าบริษัท — บันทึกที่ขั้นที่ 3 ก่อน');openStep=2;repaintProgress();return}
+  if(wsTrackNow(raw)===label){toast('สถานะเป็น “'+label+'” อยู่แล้ว');return}
+  var idx=stepIndex(c.status),next='';
+  /* The case follows the bench: waiting for parts is the case's own hold state, anything else
+     is work in progress. A case already past step 4 is left where it is. */
+  if(idx<=3)next=label==='รออะไหล่'?'รออะไหล่':'กำลังดำเนินการ';
+  wsWrite({workshop:'status',label:label,status:'Workshop · '+label},next,3,'อัปเดตสถานะเป็น “'+label+'” แล้ว');
+}
+/* ---- QC, in the application's own QC module ---- */
+function wsQc(){
+  goApp('qc','&caseId='+encodeURIComponent(caseDetailModel.case.id)+'&intent=qc-predelivery');
+}
+/* ---- handing the machine back ---- */
+function wsReturn(){
+  if(!wsMayWork()){toast('บัญชีนี้ไม่มีสิทธิ์บันทึกการส่งคืน');return}
+  var c=caseDetailModel.case,raw=caseDetailModel.raw||{};
+  if(!wsQcPass(c.id)){toast('ต้องทำ QC ก่อนส่งคืนให้ผ่านก่อน');return}
+  var l=wsLast(raw,'logistics')||{};
+  panel('บันทึกส่งคืนเครื่อง',
+    '<form id="wsReturnForm" class="scd-ce" novalidate>'
+    +'<label class="scd-ce-f"><span>วันที่ส่งคืน <b>*</b></span><input type="date" id="wsRetDate" value="'+new Date().toISOString().slice(0,10)+'"></label>'
+    +'<div class="scd-ce-f"><span>วิธีส่งคืน</span><div class="ws-radio">'
+    +'<label><input type="radio" name="wsRetMethod" value="self"'+(l.outbound!=='deliver'?' checked':'')+'> ลูกค้ามารับเอง (ไม่มีค่าส่ง)</label>'
+    +'<label><input type="radio" name="wsRetMethod" value="deliver"'+(l.outbound==='deliver'?' checked':'')+'> บริษัทไปส่ง (คิดค่าส่งตามระยะทาง)</label></div></div>'
+    +'<label class="scd-ce-f"><span>ชื่อผู้รับเครื่อง <b>*</b></span><input id="wsRetName" placeholder="ชื่อ-นามสกุล"></label>'
+    +'<div class="scd-ce-f"><span>ลายเซ็นผู้รับเครื่อง <b>*</b></span><div class="qs-pad"><canvas id="wsRetPad" width="560" height="180" aria-label="ช่องเซ็นรับเครื่อง"></canvas></div></div>'
+    +'<div class="qs-acts"><button type="button" class="scd-chip-btn" data-ws-clear="1">ล้างลายเซ็น</button></div>'
+    +'<div class="scd-ce-actions"><button type="button" class="scd-chip-btn" data-action="close-panel">ยกเลิก</button>'
+    +'<button type="submit" class="scd-ce-save">บันทึกส่งคืน</button></div></form>');
+  qsInitPad('wsRetPad');
+  el('wsReturnForm').addEventListener('click',function(e){
+    if(!(e.target.closest&&e.target.closest('[data-ws-clear]')))return;
+    var cv=el('wsRetPad');cv.getContext('2d').clearRect(0,0,cv.width,cv.height);cv.dataset.ink='';
+  });
+  el('wsReturnForm').addEventListener('submit',function(e){
+    e.preventDefault();
+    var day=el('wsRetDate').value,name=el('wsRetName').value.trim(),pad=el('wsRetPad');
+    if(!day){toast('กรุณาระบุวันที่ส่งคืน');return}
+    if(!name){toast('กรุณาพิมพ์ชื่อผู้รับเครื่อง');el('wsRetName').focus();return}
+    if(!qsHasInk(pad)){toast('กรุณาให้ผู้รับเครื่องเซ็นชื่อ');return}
+    var m=document.querySelector('input[name="wsRetMethod"]:checked');
+    var method=m?m.value:'self';
+    wsWrite({workshop:'returned',status:'Workshop · ส่งคืนเครื่องแล้ว',returnDate:day,method:method,
+      receiver:name,sig:qsShrink(pad),note:method==='deliver'?'บริษัทไปส่งคืน':'ลูกค้ามารับเครื่องคืน'},
+      '',4,'บันทึกส่งคืนเครื่องแล้ว');
+  });
+}
+/* The form section: shown when ประเภทงาน is the Workshop type, so a field job can be turned into
+   a Workshop job in the same case. */
+function wsFormHTML(raw){
+  var l=wsLast(raw,'logistics')||{},on=isWorkshopCase(raw);
+  var radio=function(name,v,text,cur){
+    return '<label><input type="radio" name="'+name+'" value="'+v+'"'+(cur===v?' checked':'')+'> '+esc(text)+'</label>';
+  };
+  return '<div id="ceWorkshop" class="scd-ol-box"'+(on?'':' hidden')+'>'
+    +'<div class="scd-ce-sec" style="border:0;padding:0;margin:0">งาน Workshop · ส่งซ่อมที่บริษัท</div>'
+    +'<div class="scd-ce-f"><span>การนำเครื่องเข้าบริษัท</span><div class="ws-radio">'
+    +radio('ceWsIn','send','ลูกค้าส่งเครื่องมาเอง',l.inbound)+radio('ceWsIn','pickup','บริษัทไปรับ (คิดค่ารับตามระยะทาง)',l.inbound)+'</div></div>'
+    +'<div class="scd-ce-f"><span>การรับเครื่องคืน</span><div class="ws-radio">'
+    +radio('ceWsOut','self','ลูกค้ามารับเอง',l.outbound)+radio('ceWsOut','deliver','บริษัทไปส่งคืน (คิดค่าส่งตามระยะทาง)',l.outbound)+'</div></div>'
+    +'</div>';
+}
+function wireWorkshopForm(){
+  var type=el('ceType'),box=el('ceWorkshop');
+  if(!type||!box)return;
+  type.addEventListener('change',function(){box.hidden=type.value!==WS_TYPE});
+}
+function workshopChanges(raw,serviceType){
+  if(serviceType!==WS_TYPE)return null;
+  var i=document.querySelector('input[name="ceWsIn"]:checked'),o=document.querySelector('input[name="ceWsOut"]:checked');
+  var inbound=i?i.value:'',outbound=o?o.value:'';
+  var l=wsLast(raw,'logistics')||{};
+  if(!inbound&&!outbound)return null;
+  if(inbound===(l.inbound||'')&&outbound===(l.outbound||''))return null;
+  return {workshop:'logistics',inbound:inbound,outbound:outbound,
+    status:'Workshop · นำเข้า: '+wsInboundText(inbound)+' / คืน: '+wsOutboundText(outbound),
+    note:'',media:[],createdAt:new Date().toISOString(),by:wsWho(),id:'WS-'+Date.now().toString(36)};
+}
+/* ---------- ข้อความส่งลูกค้าทาง LINE ----------
+   While the machine is at the company the customer cannot scan its QR. The page opens by serial
+   (js/21, ?serial=) with no login, so the admin sends that link in LINE. */
+function customerLinkMessage(){
+  var m=caseDetailModel,ma=m.machine||{},cu=m.customer||{};
+  var raw=m.raw||{};
+  var serial=ma.serialNumber||raw.serial||'';
+  var url=new URL(APP.replace(/^\.\//,''),location.href);
+  if(serial)url.searchParams.set('serial',serial);
+  return 'เรียน '+(cu.contactName||cu.name||'ลูกค้า')+'\n'
+    +'เคส '+(m.case.caseNo||m.case.id)+' · เครื่อง '+(ma.name||'-')+(serial?' (S/N '+serial+')':'')+'\n'
+    +'กรุณากดลิงก์เพื่อดูสถานะงาน ใบเสนอราคา และเซ็นอนุมัติ:\n'+url.href+'\n'
+    +(serial?'หรือเปิดหน้าลูกค้าแล้วกรอกซีเรียล '+serial+'\n':'')
+    +'ขอบคุณค่ะ · I-MODE Plus Service';
+}
+function openLineMessage(){
+  var text=customerLinkMessage();
+  panel('ข้อความส่งลูกค้าทาง LINE','<p class="scd-ce-hint" style="margin:0 0 8px">คัดลอกแล้วนำไปวางในแชท LINE ของลูกค้า · ลิงก์นี้เปิดหน้าลูกค้าของเครื่องนี้ได้โดยไม่ต้องสแกน QR — ส่งเฉพาะลูกค้ารายนี้ ไม่ควรโพสต์ในที่สาธารณะ</p>'
+    +'<textarea id="lineMsgText" class="ws-msg" rows="7" readonly>'+esc(text)+'</textarea>'
+    +'<div class="scd-ce-actions"><button type="button" class="scd-ce-save" data-action="copy-line-message">📋 คัดลอกข้อความ</button></div>');
+}
+function copyLineMessage(){
+  var ta=el('lineMsgText');if(!ta)return;
+  var done=function(){toast('คัดลอกข้อความแล้ว')};
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(ta.value).then(done,function(){ta.select();document.execCommand('copy');done()});return}
+  }catch(e){}
+  ta.select();try{document.execCommand('copy');done()}catch(e){toast('คัดลอกไม่ได้ — กดค้างที่ข้อความเพื่อคัดลอกเอง')}
+}
 var CE_CHANNELS=['LINE OA','โทรศัพท์','อีเมล','ฝ่ายขาย'];
 var CE_TYPES=['เข้าบริการหน้างาน','ลูกค้าส่งเครื่องเข้าบริษัท','แก้ไขออนไลน์','PM / Preventive Maintenance','ติดตั้งเครื่อง'];
 var CE_PRIORITIES=['ด่วนมาก','สูง','ปกติ','ต่ำ'];
@@ -2306,6 +2622,7 @@ function editCase(){
     +'</div>'
     +'<label class="scd-ce-f"><span>อาการ / รายละเอียดเพิ่มเติมหลังติดต่อลูกค้า <b>*</b></span><textarea id="ceIssue" rows="3">'+esc(c.issue||'')+'</textarea></label>'
     +'<label class="scd-ce-f">หมายเหตุภายในเพิ่มเติม<textarea id="ceNote" rows="3">'+esc(c.note||'')+'</textarea></label>'
+    +wsFormHTML(c)
     +onlineSectionHTML(c)
     +'<p class="scd-ce-hint">ช่างและวันนัดหมายเปลี่ยนได้จากปุ่ม <b>นัดหมาย</b> · สถานะเปลี่ยนจากวงกลมขั้นตอนด้านบน</p>'
     +'<div class="scd-ce-actions"><button type="button" class="scd-chip-btn" data-action="close-panel">ยกเลิก</button>'
@@ -2323,6 +2640,7 @@ function editCase(){
     }
   });
   wireOnlineSection(c);
+  wireWorkshopForm();
   form.addEventListener('submit',function(e){e.preventDefault();saveCaseDetails(customers)});
 }
 function saveCaseDetails(customers){
@@ -2354,6 +2672,8 @@ function saveCaseDetails(customers){
     changes.location=cu.address||cu.location||'';changes.branch=cu.branch||'';
   }
   if(online){changes.fieldStatusLog=online.fieldStatusLog;changes.serviceType=online.serviceType}
+  var wsEntry=workshopChanges(c,changes.serviceType);
+  if(wsEntry)changes.fieldStatusLog=(changes.fieldStatusLog||(c.fieldStatusLog||[]).slice()).concat([wsEntry]);
   if(mid!==c.machineId){
     changes.machineId=mid;changes.machine=ceMachineName(m);changes.model=m.model||'';
     changes.serial=m.serial||'';changes.machineSize=m.size||'';changes.warranty=m.warranty||'ไม่ทราบ';
@@ -2466,6 +2786,16 @@ function applyStatusNow(next){
   });
 }
 
+/* Why the circle one step ahead cannot be pressed yet, or '' when it can. */
+function stepGate(m,idx){
+  if(isWorkshopCase(m.raw)){
+    if(idx===2&&!wsLast(m.raw,'received'))return 'ยังไม่ได้บันทึกรับเครื่องเข้าบริษัท';
+    if(idx===3&&wsTrackNow(m.raw)!=='พร้อมส่งคืน')return 'รอ R&D อัปเดตให้ถึง “พร้อมส่งคืน”';
+    if(idx===4&&!wsLast(m.raw,'returned'))return 'ต้องผ่าน QC และบันทึกส่งคืนเครื่องก่อน';
+    return '';
+  }
+  return (idx===3&&!fieldDone(m))?'รอช่างอัปเดตให้จบกระบวนการก่อน':'';
+}
 /* A circle was pressed. */
 function stepPressed(i,role){
   var m=caseDetailModel,idx=stepIndex(m.case.status);
@@ -2476,13 +2806,17 @@ function stepPressed(i,role){
     return;
   }
   /* role === 'next' */
-  if(idx===3&&!fieldDone(m)){
-    openStep=3;                       /* show the technician's track and why it is blocked */
+  /* Workshop step 3 IS the receiving form: pressing it opens the form, and saving it moves
+     the case on. */
+  if(isWorkshopCase(m.raw)&&idx===1&&i===2&&!wsLast(m.raw,'received')){wsReceive();return}
+  var gate=stepGate(m,idx);
+  if(gate){
+    openStep=idx;                     /* show the step that is holding it up, and why */
     repaintProgress();
-    toast('ยังข้ามไปขั้นถัดไปไม่ได้ — รอช่างอัปเดตให้ถึง “จบงาน” หรือบันทึกใบตรวจก่อน');
+    toast('ยังข้ามไปขั้นถัดไปไม่ได้ — '+gate);
     return;
   }
-  applyStatus(STEPS[i].statuses[0],'ขั้นถัดไปคือ “'+STEPS[i].th+'”');
+  applyStatus(STEPS[i].statuses[0],'ขั้นถัดไปคือ “'+stepLabel(m,i)+'”');
 }
 
 /* Redraws only the progress block, so the rest of the page keeps its scroll and panels. */
@@ -2584,7 +2918,8 @@ function openContactPicker(){
       return '<button type="button" class="scd-contact'+(p[3]?'':' is-missing')+'" data-contact="'+p[0]+'">'
         +'<span class="scd-contact-ic">'+CONTACT_ICON[p[0]]+'</span>'
         +'<b>'+esc(p[1])+'</b><small>'+esc(p[2])+'</small></button>';
-     }).join('')+'</div>');
+     }).join('')+'</div>'
+   +'<button type="button" class="sd-go ws-line-btn" data-action="open-line-message">📋 ข้อความส่งลูกค้าทาง LINE (ลิงก์เปิดหน้าลูกค้าด้วย S/N)</button>');
 }
 
 /* 2026-09-15: a POPUP, on the owner's instruction — "ผมบอกว่าทำเป็น POP UP". It used to be a
@@ -2860,6 +3195,11 @@ var HANDLERS={
   'open-quotation':openQuotation,
   'open-quote-doc':openQuoteDoc,
   'close-online':closeOnline,
+  'ws-receive':wsReceive,
+  'ws-qc':wsQc,
+  'ws-return':wsReturn,
+  'open-line-message':openLineMessage,
+  'copy-line-message':copyLineMessage,
   'confirm-quote':confirmQuote,
   'open-field-service':openFieldService,
   'change-status':changeCaseStatus,
@@ -2927,6 +3267,8 @@ document.addEventListener('click',function(e){
     stepPressed(Number(step.getAttribute('data-step'))||0,step.getAttribute('data-role')||'open');
     return;
   }
+  var wsst=e.target.closest('[data-ws-status]');
+  if(wsst){e.preventDefault();wsSetStatus(wsst.getAttribute('data-ws-status'));return}
   var setst=e.target.closest('[data-set-status]');
   if(setst){e.preventDefault();applyStatus(setst.getAttribute('data-set-status'),'');return}
   var btn=e.target.closest('[data-action]');

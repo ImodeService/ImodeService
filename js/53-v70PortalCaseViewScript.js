@@ -147,7 +147,9 @@
    +(c.appointment?'<dt>นัดหมาย</dt><dd>'+esc2(fmtAt(c.appointment))+'</dd>':'')
    +'</dl>';
 
-  var log=(c.fieldStatusLog||[]).slice().sort(function(a,b){
+  /* js/82's หมวดหมู่งาน entry is an internal classification, not a step the customer is
+     waiting on, so it never reaches this list. */
+  var log=(c.fieldStatusLog||[]).filter(function(e){return e&&!e.caseCat}).sort(function(a,b){
    return new Date(a.createdAt||0)-new Date(b.createdAt||0);
   });
   var logHtml=log.length?'<ul class="pcv-log">'+log.map(function(e){

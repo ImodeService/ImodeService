@@ -425,6 +425,13 @@ body.scd-modal-open{overflow:hidden}
 .ws-radio{display:flex;flex-direction:column;gap:6px;font-weight:400;font-size:13px}
 .ws-radio label{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line-2);border-radius:10px;background:#fff;cursor:pointer}
 .ws-radio input{accent-color:var(--imode-blue)}
+/* .scd-ce-f input sits further down this sheet at the SAME specificity, so it wins and gives
+   a radio width:100% plus a padded, bordered box — the dot then floats in the middle of the
+   row and the label is squeezed to the right. Reported 2026-09-18 with a screenshot of the
+   Workshop options doing exactly that; the บันทึกส่งคืนเครื่อง form had it too. */
+.scd-ce-f .ws-radio input[type=radio]{width:auto;min-width:0;flex:0 0 auto;padding:0;margin:0;
+  background:none;border:0;border-radius:0}
+.scd-ce-f .ws-radio label{font-size:13px;font-weight:400;color:var(--imode-navy)}
 .ws-set{flex-wrap:wrap}
 .ws-sig{display:block;max-width:260px;width:100%;margin-top:8px;border:1px solid var(--line);border-radius:10px;background:#fff;padding:4px}
 .ws-msg{width:100%;box-sizing:border-box;border:1px solid var(--line-2);border-radius:11px;padding:10px 12px;font:inherit;font-size:13.5px;line-height:1.6;background:#f8fbff;color:var(--imode-navy);resize:vertical}
@@ -2289,6 +2296,115 @@ function onlineBannerHTML(m){
      4 R&D ตรวจ / ซ่อม     (กำลังดำเนินการ) leaves for 5 once the track reaches พร้อมส่งคืน
      5 QC / ส่งคืน         (เสร็จสิ้น)      QC must pass before the hand-back is recorded
      6 ปิดเคส                              needs a `returned` entry */
+/* ---------- หมวดหมู่งาน · ประเภทงาน (2026-09-18) ----------
+   The two-level model js/82 owns in the application. This page loads none of js/, so the table
+   is restated here exactly as WS_TYPE, ONLINE_TYPE and CUSTOMER_TYPE_MAP already are. Keep the
+   two in step: js/82 is the reference copy.
+
+     service_type      carries the CATEGORY, as one of the five strings the system already
+                       stores, so isWorkshopCase() and the online section keep working unchanged
+     field_status_log  carries the exact pair, {caseCat:'set', category, workType} — a real jsonb
+                       column, so it travels. The newest entry carrying `caseCat` wins. */
+var CC_FIELD='field',CC_WORKSHOP='workshop',CC_ONLINE='online';
+var CC_INSTALL='ติดตั้งเครื่อง',CC_PM_TYPE='PM / Preventive Maintenance',CC_FIELD_TYPE='เข้าบริการหน้างาน';
+var CC_CATS=[
+  {v:CC_FIELD,label:'Field Service',th:'Field Service · ช่างไปหน้างานลูกค้า',works:['Service','Maintenance','PM',CC_INSTALL]},
+  {v:CC_WORKSHOP,label:'Workshop',th:'Workshop · ลูกค้าส่งเครื่องเข้าบริษัท',works:['Service','Maintenance','PM']},
+  {v:CC_ONLINE,label:'Online',th:'Online · แก้ไขทางออนไลน์',works:['Service','Maintenance']}
+];
+var CC_WORK_TH={'Service':'Service · ซ่อม / แก้ไขอาการเสีย',
+  'Maintenance':'Maintenance · บำรุงรักษา / ปรับตั้ง','PM':'PM · บำรุงรักษาตามรอบ'};
+CC_WORK_TH[CC_INSTALL]='ติดตั้งเครื่อง · ติดตั้ง / ส่งมอบใหม่';
+function ccCat(v){for(var i=0;i<CC_CATS.length;i++)if(CC_CATS[i].v===v)return CC_CATS[i];return CC_CATS[0]}
+function ccServiceTypeFor(cat,work){
+  if(cat===CC_ONLINE)return ONLINE_TYPE;
+  if(cat===CC_WORKSHOP)return WS_TYPE;
+  if(work==='PM')return CC_PM_TYPE;
+  if(work===CC_INSTALL)return CC_INSTALL;
+  return CC_FIELD_TYPE;
+}
+function ccCategoryOf(st){
+  st=String(st||'');
+  if(st===WS_TYPE)return CC_WORKSHOP;
+  if(st===ONLINE_TYPE||st==='Remote Support')return CC_ONLINE;
+  return CC_FIELD;
+}
+function ccEntryOf(raw){
+  var log=(raw&&raw.fieldStatusLog)||[],hit=null;
+  for(var i=0;i<log.length;i++){if(log[i]&&log[i].caseCat==='set')hit=log[i]}
+  return hit;
+}
+/* A case written before this file: the category from its type, the work from its type, else from
+   the marker js/79 leaves in the note, else Service. Nothing is migrated in bulk — a case takes
+   the new shape the first time somebody saves it here. */
+function ccRead(raw){
+  raw=raw||{};
+  var e=ccEntryOf(raw);
+  if(e&&e.category&&e.workType)return {category:e.category,workType:e.workType,fromLog:true};
+  var cat=ccCategoryOf(raw.serviceType),st=String(raw.serviceType||''),work;
+  if(st===CC_PM_TYPE)work='PM';
+  else if(st===CC_INSTALL)work=CC_INSTALL;
+  else{
+    var m=/ลูกค้าเลือกประเภทเคส:\s*(Service|Maintenance|PM|Online|Workshop)/.exec(String(raw.note||''));
+    work=m?(m[1]==='PM'?'PM':(m[1]==='Maintenance'?'Maintenance':'Service')):'Service';
+  }
+  if(ccCat(cat).works.indexOf(work)<0)work=ccCat(cat).works[0];
+  return {category:cat,workType:work,fromLog:false};
+}
+function ccLabel(raw){var p=ccRead(raw);return ccCat(p.category).label+' · '+p.workType}
+/* The log entry. Its `status` never matches one of the technician's nine field-status words, so
+   the field track ignores it the way it already ignores the online and Workshop entries. */
+function ccChanges(raw,cat,work){
+  var cur=ccRead(raw);
+  if(cur.fromLog&&cur.category===cat&&cur.workType===work)return null;
+  return {serviceType:ccServiceTypeFor(cat,work),
+    entry:{id:'CT-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+      caseCat:'set',category:cat,workType:work,
+      status:'หมวดงาน: '+ccCat(cat).label+' · '+work,
+      note:'',media:[],createdAt:new Date().toISOString(),by:wsWho()}};
+}
+function ccWorkOptions(cat,keep){
+  var works=ccCat(cat).works,want=works.indexOf(keep)>=0?keep:works[0];
+  return works.map(function(w){
+    return '<option value="'+esc(w)+'"'+(w===want?' selected':'')+'>'+esc(CC_WORK_TH[w]||w)+'</option>';
+  }).join('');
+}
+/* The two visible selects write into #ceType, which is KEPT (hidden, with its id and its full
+   option list) because wireOnlineSection(), wireWorkshopForm() and saveCaseDetails() all read it.
+   The resync the other way matters too: ticking แก้ไขทางออนไลน์ sets #ceType itself, and the
+   category must follow it. A flag stops the two listeners driving each other. */
+function wireCaseCategory(){
+  var cat=el('ceCat'),work=el('ceWork'),type=el('ceType');
+  if(!cat||!work||!type)return;
+  var self=false;
+  function push(){
+    var want=ccServiceTypeFor(cat.value,work.value);
+    if(type.value===want)return;
+    self=true;
+    var ok=false;
+    for(var i=0;i<type.options.length;i++){
+      if(type.options[i].value===want){type.selectedIndex=i;ok=true;break}
+    }
+    if(!ok)type.value=want;
+    type.dispatchEvent(new Event('change',{bubbles:true}));
+    self=false;
+  }
+  function pull(){
+    var c=ccCategoryOf(type.value);
+    if(c===cat.value)return;
+    cat.value=c;
+    work.innerHTML=ccWorkOptions(c,work.value);
+  }
+  cat.addEventListener('change',function(){work.innerHTML=ccWorkOptions(cat.value,work.value);push()});
+  work.addEventListener('change',push);
+  type.addEventListener('change',function(){if(!self)pull()});
+  /* wireOnlineSection() ASSIGNS type.value, and assigning fires no change event, so listening on
+     #ceType alone never sees the online tick. This listener is registered after that one on the
+     same element, so by the time it runs type.value already holds แก้ไขออนไลน์. */
+  var onlineBox=el('ceOnline');
+  if(onlineBox)onlineBox.addEventListener('change',function(){pull();setTimeout(pull,0)});
+}
+
 var WS_TYPE='ลูกค้าส่งเครื่องเข้าบริษัท';
 var WS_TRACK=['รอตรวจ','กำลังตรวจ','กำลังซ่อม','รออะไหล่','ทดสอบ','พร้อมส่งคืน'];
 var WS_LABELS={2:'รับเครื่องเข้าบริษัท',3:'R&D ตรวจ / ซ่อม',4:'QC / ส่งคืนเครื่อง'};
@@ -2605,6 +2721,7 @@ function editCase(){
   var custOpts='<option value="">— เลือกลูกค้า —</option>'+customers.map(function(cu){
     return '<option value="'+esc(cu.id)+'"'+(cu.id===c.customerId?' selected':'')+'>'+esc(cu.name||cu.id)+'</option>';
   }).join('');
+  var ccPair=ccRead(c);
   panel('ลงรายละเอียดเคส · '+(c.ticket||c.id),
     '<form id="scdEditForm" class="scd-ce" novalidate>'
     +'<div class="scd-ce-sec">1. ลูกค้าและเครื่องจักร</div>'
@@ -2615,11 +2732,19 @@ function editCase(){
     +'<label class="scd-ce-f">โทรศัพท์<input id="cePhone" inputmode="tel" value="'+esc(c.phone||'')+'"></label>'
     +'</div>'
     +'<div class="scd-ce-sec">2. รายละเอียดเคส</div>'
-    +'<div class="scd-ce-grid is-3">'
+    +'<div class="scd-ce-grid">'
     +'<label class="scd-ce-f">ช่องทางรับแจ้ง<select id="ceChannel">'+ceOptions(CE_CHANNELS,c.channel)+'</select></label>'
-    +'<label class="scd-ce-f">ประเภทงาน<select id="ceType">'+ceOptions(ceList('serviceTypes',CE_TYPES),c.serviceType)+'</select></label>'
     +'<label class="scd-ce-f">ระดับความเร่งด่วน<select id="cePriority">'+ceOptions(ceList('priorities',CE_PRIORITIES),c.priority)+'</select></label>'
+    +'<label class="scd-ce-f">หมวดหมู่งาน<select id="ceCat">'+CC_CATS.map(function(x){
+        return '<option value="'+x.v+'"'+(x.v===ccPair.category?' selected':'')+'>'+esc(x.th)+'</option>';
+      }).join('')+'</select></label>'
+    +'<label class="scd-ce-f">ประเภทงาน<select id="ceWork">'+ccWorkOptions(ccPair.category,ccPair.workType)+'</select></label>'
     +'</div>'
+    /* #ceType IS KEPT, with its id and its full option list. wireOnlineSection(),
+       wireWorkshopForm() and saveCaseDetails() all read it, and the online tick writes to it.
+       display:none inline rather than [hidden], because .scd-ce-f has an author display rule
+       that beats the UA [hidden] rule and this page does not load css/23's !important reset. */
+    +'<label class="scd-ce-f" style="display:none" aria-hidden="true">ประเภทงาน (ระบบ)<select id="ceType" tabindex="-1">'+ceOptions(ceList('serviceTypes',CE_TYPES),c.serviceType)+'</select></label>'
     +'<label class="scd-ce-f"><span>อาการ / รายละเอียดเพิ่มเติมหลังติดต่อลูกค้า <b>*</b></span><textarea id="ceIssue" rows="3">'+esc(c.issue||'')+'</textarea></label>'
     +'<label class="scd-ce-f">หมายเหตุภายในเพิ่มเติม<textarea id="ceNote" rows="3">'+esc(c.note||'')+'</textarea></label>'
     +wsFormHTML(c)
@@ -2641,6 +2766,7 @@ function editCase(){
   });
   wireOnlineSection(c);
   wireWorkshopForm();
+  wireCaseCategory();
   form.addEventListener('submit',function(e){e.preventDefault();saveCaseDetails(customers)});
 }
 function saveCaseDetails(customers){
@@ -2674,6 +2800,16 @@ function saveCaseDetails(customers){
   if(online){changes.fieldStatusLog=online.fieldStatusLog;changes.serviceType=online.serviceType}
   var wsEntry=workshopChanges(c,changes.serviceType);
   if(wsEntry)changes.fieldStatusLog=(changes.fieldStatusLog||(c.fieldStatusLog||[]).slice()).concat([wsEntry]);
+  /* หมวดหมู่ · ประเภทงาน (2026-09-18), last so it settles serviceType after the online tick and
+     the Workshop section have had their say. The picker is already resynced to both, so this
+     agrees with them rather than overriding them. */
+  if(el('ceCat')&&el('ceWork')){
+    var catCh=ccChanges(c,el('ceCat').value,el('ceWork').value);
+    if(catCh){
+      changes.serviceType=catCh.serviceType;
+      changes.fieldStatusLog=(changes.fieldStatusLog||(c.fieldStatusLog||[]).slice()).concat([catCh.entry]);
+    }
+  }
   if(mid!==c.machineId){
     changes.machineId=mid;changes.machine=ceMachineName(m);changes.model=m.model||'';
     changes.serial=m.serial||'';changes.machineSize=m.size||'';changes.warranty=m.warranty||'ไม่ทราบ';

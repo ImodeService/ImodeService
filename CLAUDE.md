@@ -5004,3 +5004,185 @@ is not is stale.
    database. `settings.quoteApprovals` and `settings.caseFeedback` go through the same open door.
 7. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its
    serial or QR.
+
+---
+
+## Session Change Log — 2026-09-18 (part 27): งานบริการมีสองชั้น, and a radio stretched to full width
+
+### First, a gap in this file
+
+Five commits from 2026-09-17 — `5c8ceee`, `78cd7bb`, `8425799`, `9890ce0`, `228fc62` — were
+pushed from another machine and **have no entry here**. They carry the quotation sign-off, the
+technician Back-to-Home history rule, and the whole Workshop flow (`js/79`, `js/80`, `js/81`, and
+a large addition to `service-case-detail.html`). Read their commit messages until this is written
+up. `228fc62` says of itself: *tested end to end at 1440 only; the phone width and the earlier
+suites were not re-run.*
+
+### 1. THE RADIO BUG: `.scd-ce-f input` was stretching every radio to `width:100%`
+
+Reported with a screenshot of the Workshop options inside ลงรายละเอียดเคส: the dot floating in
+the middle of the row, the label squeezed to the right and wrapping.
+
+Two rules in `service-case-detail.html`, **the same specificity (0,1,1)**, and the later one wins:
+
+| line | rule |
+|---|---|
+| 427 | `.ws-radio input{accent-color:var(--imode-blue)}` |
+| 511 | `.scd-ce-f input,…{width:100%;padding:10px 11px;background;border;border-radius}` |
+
+A radio given `width:100%` still draws its dot centred inside that now-full-width box, which is
+exactly what the screenshot showed. One rule at (0,3,1) fixes it, and it also repairs the
+**บันทึกส่งคืนเครื่อง** form, which had the same fault and had not been reported yet.
+
+Measured after the fix with real geometry rather than by eye: the radio is 13 px wide and sits
+10 px from its label's left edge.
+
+### 2. หมวดหมู่งาน — the two-level model
+
+Asked for: *"ปกติแล้วเราจะมี Service, maintenance, PM, online, workshop ใช่มั้ย แต่ทีนี้มันจะมี
+หมวดหมู่อยู่ คือ 1. field service 2. workshop 3. online"*. The owner chose **two levels** (pick the
+category, then the work type within it), **in the ลงรายละเอียดเคส form only**, and **no schema
+change**.
+
+```
+Field Service  ช่างไปหน้างานลูกค้า      → Service · Maintenance · PM · ติดตั้งเครื่อง
+Workshop       ลูกค้าส่งเครื่องเข้าบริษัท  → Service · Maintenance · PM
+Online         แก้ไขทางออนไลน์         → Service · Maintenance
+```
+
+Online and Workshop stop being work types and become categories. `ติดตั้งเครื่อง` is kept under
+Field Service because `settings.serviceTypes` still holds it and no existing case may become
+unrepresentable.
+
+| File | What |
+|---|---|
+| `js/82-v70CaseCategoryScript.js` | **new** — the model, and the picker in the application's case form |
+| `service-case-detail.html` | the same picker in its own ลงรายละเอียดเคส, plus the radio fix |
+| `index.html` | one `<script src>` after js/81 |
+| `js/03-app-core.js`, `js/53-v70PortalCaseViewScript.js` | one expression each — see §5 |
+
+### 3. Where the pair lives, and the field that was already being thrown away
+
+**`js/79` writes `c.caseType` and NOTHING reads it.** `cloudUpsertCase()` builds an explicit
+column list and has no `case_type`, so that value never leaves the device and the next
+`syncCloud()` — which replaces `cases` wholesale — wipes it. A second field of that kind would
+have died the same way, silently. Checked before designing anything else.
+
+So two columns that already exist carry the pair:
+
+- **`service_type` holds the CATEGORY**, still as one of the five strings the system already
+  stores, so every existing reader keeps working untouched — in particular `WS_TYPE`
+  (`ลูกค้าส่งเครื่องเข้าบริษัท`) in `js/81` and `isWorkshopCase()`, and `ONLINE_TYPE`
+  (`แก้ไขออนไลน์`) in the case page's online section. The category decides it; `PM` and
+  `ติดตั้งเครื่อง` keep their own string while the category is Field Service, because that is what
+  those two strings have always meant.
+- **`field_status_log` holds the exact pair**, as `{caseCat:'set', category, workType}`. A real
+  jsonb column, so it travels; the newest entry carrying `caseCat` wins. It is the same shape the
+  online tick and the Workshop logistics already use, and its `status` never matches one of the
+  technician's nine field-status words, so the field track ignores it.
+
+**Nothing is migrated in bulk.** A case written before this reads its category from its
+`service_type`, and its work type from `service_type` (PM, ติดตั้งเครื่อง), else from the marker
+js/79 leaves in the note (`ลูกค้าเลือกประเภทเคส: X`), else Service — and it takes the new shape the
+first time somebody saves it. A pair the category does not offer (Online + PM) falls back to the
+first one it does, so the picker can never open on an impossible combination.
+
+### 4. Both forms keep their old control, hidden
+
+`#fServiceType` and `#ceType` are **kept, with their ids and their full option lists**, and the
+two visible selects only ever write into them:
+
+- `saveCase()` reads `fServiceType.value` as an id global and would throw without it — the same
+  reason js/76 keeps `#fStatus` and js/03 keeps `#fieldQueue`.
+- On the case page, `wireOnlineSection()`, `wireWorkshopForm()` and `saveCaseDetails()` all read
+  `#ceType`, and the online tick writes to it.
+
+On the case page the hidden one uses **inline `display:none`, not `[hidden]`** — `.scd-ce-f` has
+an author `display` rule that beats the UA `[hidden]` rule, and that page does not load css/23's
+`!important` reset. Fourth time this trap has come up.
+
+### 5. The entry had to be kept out of two progress timelines
+
+Putting the pair on `fieldStatusLog` has a cost that only shows up in a browser: **two places
+render every entry in that array.** Found by grepping the seven files that read the log, then
+checked on screen.
+
+| where | what it is | decision |
+|---|---|---|
+| `js/53` ความคืบหน้างาน | **the CUSTOMER's** progress list on the portal | filtered out |
+| `js/03` ใบตรวจ status timeline | the technician's progress track | filtered out |
+| `service-case-detail.html:912` | the case page's internal activity timeline | **kept** — it is an audit view, and the online and Workshop entries already show there |
+| `service-case-detail.html:1205` `fieldReached()` | matches the nine field-status words | ignores it already |
+| `service-case-detail.html:887` | attachments; needs `media` | the entry carries `media:[]` |
+
+One filtered expression in each of the two, in place, because neither has a seam to wrap. A
+หมวดงาน line is a classification, not a step anybody is waiting on — least of all the customer.
+
+### Two bugs the browser found that reading did not
+
+- **Ticking แก้ไขทางออนไลน์ did not move the category.** `wireOnlineSection()` ASSIGNS
+  `type.value`, and assigning fires no `change` event, so a listener on `#ceType` alone never sees
+  it. The resync now also hangs off the `#ceOnline` checkbox, registered after that handler on the
+  same element, so `type.value` already holds แก้ไขออนไลน์ by the time it runs.
+- **`applyLanguageTo()` translated "Field Service" into "หน้างานช่าง".** `data-no-i18n="true"` is
+  NOT the answer here: that attribute only guards the text-node walker, and `<option>` elements are
+  translated by a **separate pass that does not check it** (js/03:320). The option *value* is safe —
+  that pass restores it from `dataset.i18nValue` — so only the visible text had to be put back,
+  which `js/82` does in a wrapper on `applyLanguageTo`. The case page has no i18n at all, so
+  without this the two documents would have disagreed on the name of the same category.
+
+### Tests
+
+Two new suites in the session scratchpad, run at 1440×1000 and 390×844
+(`Emulation.setDeviceMetricsOverride`, not `--window-size`): **57 assertions, 0 failures,
+0 page errors**, at each width, plus a 9-assertion timeline suite.
+
+- **the model (17)** — three categories, the work list per category, every category →
+  service_type mapping including that the category beats PM for a Workshop job, reading a legacy
+  case from its type, from js/79's note marker and from the log, the impossible-pair fallback,
+  `Remote Support` still reading as Online, and a repeat save writing no duplicate log entry.
+- **the application's form (18)** — both selects, `#fServiceType` present and hidden, the work
+  list shrinking with the category, the hidden type following, the i18n pass not eating the
+  labels, a REAL submit (dispatched as an event; js/03 binds `onsubmit` on a `setTimeout(…,20)`),
+  the pair landing in localStorage, and the popup reopening on what was saved.
+- **regression (4)** — both version strings, 17 pages still open, no horizontal overflow.
+- **the case page (18)** — the picker, the radio measured in pixels, the Workshop box appearing,
+  the online tick dragging the category with it, a save writing the pair AND keeping the Workshop
+  inbound/outbound entry, no horizontal overflow.
+- **the timelines (9)** — a case seeded with a real field status on either side of a
+  หมวดงาน entry: the ใบตรวจ timeline shows the two real ones and not the classification, and a
+  real customer walk (`?serial=` → ประวัติ Service → open the case) shows the same two and never the
+  word หมวดงาน anywhere in the page body.
+
+`node --check` passes on all **87** files in `js/`, `auth/` and `pages/`; the case page's inline
+script parses through `new Function`.
+
+### Harness notes worth keeping
+
+- **Chrome builds `webSocketDebuggerUrl` from the request's Host header.** Asking `/json/list`
+  with `Host: localhost` hands back `ws://localhost/devtools/page/…` with **no port**; the driver
+  then connects to port 80 and dies with a bare "websocket error" after a long hang. Build the URL
+  from the target id and the real port instead.
+- Node's stdout is block-buffered when redirected or piped, so a hung suite prints **nothing** and
+  looks exactly like a boot failure. Write every line with `fs.appendFileSync` to a log file.
+- Give every CDP call a timeout. Without one, a single unresolved `Runtime.evaluate` hangs the
+  whole run with no error and no output.
+- A bash heredoc silently truncated a ~9 KB file mid-line, twice. Check the byte count after
+  writing, or use a real file-writing tool for anything large.
+
+### Open / risk
+
+1. The pair lives on the case's `fieldStatusLog`, so **any NEW renderer of that array has to skip
+   `caseCat` entries**, the way the two in §5 now do. Two of the five existing consumers needed it.
+2. A Workshop PM job stores `service_type = ลูกค้าส่งเครื่องเข้าบริษัท`, so SQL read directly cannot
+   tell it from a Workshop repair; the work type is in the log. The same trade as the crew
+   comma-list in part 17 §2.
+3. `js/79`'s customer form still asks the old five-item ประเภทเคส question. It was deliberately
+   not changed — the owner scoped this to the ลงรายละเอียดเคส form — and its answer still feeds
+   the picker's default through the note marker.
+4. `c.caseType` is still written by js/79 and still read by nothing. Left alone rather than
+   removed; it is harmless, but it is not a field to build on.
+5. Unchanged from part 15: `04-anon-uat.sql` means anyone on the internet can read and write this
+   database.
+6. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its
+   serial or QR.

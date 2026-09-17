@@ -152,13 +152,7 @@
      active by default. The hub is Home, whether or not the role may also open the Dashboard
      (on the live project Technician holds dashboard.view, which is why a permission test here
      did nothing there). The Dashboard stays one tap away on the Home profile card. */
-  try{
-   if(techHub()&&activePage()==='dashboard'&&typeof baseGoPage==='function'){
-    baseGoPage.call(window,'home');
-    sync();
-    history.replaceState(snapshot(),'',location.href);
-   }
-  }catch(e){}
+  techToHome();          /* again, in case something routed to the Dashboard during load */
   /* A technician who arrives straight in a module (a reload, or coming back from the case
      page) has no Home entry underneath; put one there so Back still reaches the hub. */
   try{
@@ -169,9 +163,22 @@
    }
   }catch(e){}
  }
+ /* Done in start() — a DOMContentLoaded listener, the same dispatch in which js/11 releases
+    the boot splash — so no frame is painted with the Dashboard. Doing it only in settle(),
+    half a second after load, showed the Dashboard for that half second. */
+ function techToHome(){
+  try{
+   if(techHub()&&activePage()==='dashboard'&&typeof baseGoPage==='function'){
+    baseGoPage.call(window,'home');
+    sync();
+    history.replaceState(snapshot(),'',location.href);
+   }
+  }catch(e){}
+ }
  function start(){
   watchPortalShell();
   wrapPortalBack();
+  techToHome();
   sync();
   try{history.replaceState(snapshot(),'',location.href)}catch(e){}
   /* initPortalFromUrl() is awaited inside the window load handler, so the page is only

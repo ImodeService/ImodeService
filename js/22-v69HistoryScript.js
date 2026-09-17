@@ -149,10 +149,11 @@
   sync();
   try{history.replaceState(snapshot(),'',location.href)}catch(e){}
   /* A signed-in technician who reloads lands on the Dashboard — the page index.html marks
-     active by default — which the role cannot even open. The hub is Home. */
+     active by default. The hub is Home, whether or not the role may also open the Dashboard
+     (on the live project Technician holds dashboard.view, which is why a permission test here
+     did nothing there). The Dashboard stays one tap away on the Home profile card. */
   try{
-   if(techHub()&&activePage()==='dashboard'&&typeof canPermission==='function'&&!canPermission('dashboard.view')
-      &&typeof baseGoPage==='function'){
+   if(techHub()&&activePage()==='dashboard'&&typeof baseGoPage==='function'){
     baseGoPage.call(window,'home');
     sync();
     history.replaceState(snapshot(),'',location.href);

@@ -43,6 +43,21 @@
  function snapshot(){return {imodePage:activePage(),imodeDetail:inDetail()}}
  function sync(){lastPage=activePage();lastDetail=inDetail()}
 
+ /* 2026-09-17 — "เวลากดออกจากทุกโมดูล ช่างจะกลับมาที่หน้า Home page". For a TECHNICIAN
+    (an account linked to a technician record) the Home board is the hub: Back from any module
+    returns to it, not to the module visited before. A popup still closes first and a nested
+    popup still steps down a level — js/29 owns those entries and they sit above this one.
+    Done by shape, not by intercepting Back: moving module → module REPLACES the entry instead
+    of pushing one, so the history under a module is always [..., home, module]. Admin and
+    other staff keep the ordinary one-entry-per-screen history. */
+ var NOT_MODULE={'home':1,'staff-login':1,'customer-home':1,'customer-login':1,'customer-portal':1,'customer-entry':1};
+ function techHub(){
+  try{return !!(currentUser&&currentUser.technicianId)}catch(e){return false}
+ }
+ function isModule(p){return !!p&&!NOT_MODULE[p]}
+ /* A popup entry whose popup has already been closed (a button that closed it and navigated)
+    is spent, and is replaced like any other module entry. */
+ function modalOpen(){var m=document.getElementById('modal');return !!(m&&m.classList.contains('open'))}
  function record(){
   /* During boot the app routes itself several times — the QR guard, bootRoute() sending a
      visitor with no session to the staff door, initPortalFromUrl() opening a scanned
@@ -50,6 +65,8 @@
      until the page has settled every navigation replaces the single initial entry. */
   try{
    if(booting)history.replaceState(snapshot(),'',location.href);
+   else if(techHub()&&isModule(lastPage)&&isModule(activePage())&&!(history.state&&history.state.imodeModal&&modalOpen()))
+    history.replaceState(snapshot(),'',location.href);
    else history.pushState(snapshot(),'',location.href);
   }catch(e){}
   sync();
@@ -112,6 +129,9 @@
    /* Leave a detail view first: it is drawn inside the page, not instead of it. */
    wrapPortalBack();
    if(inDetail()&&!wantDetail&&typeof basePortalBack==='function')basePortalBack.call(window);
+   /* A spent popup entry can leave an older module under the current one (a button inside a
+      popup that navigated). For a technician, module → module on Back still means Home. */
+   if(techHub()&&isModule(wantPage)&&isModule(activePage())&&wantPage!==activePage())wantPage='home';
    if(wantPage&&wantPage!==activePage()&&typeof baseGoPage==='function')baseGoPage.call(window,wantPage);
    /* Going forward into a detail view is not restored: its content came from a function
       call and a half-filled form cannot be rebuilt. The visitor lands on the Home page,
@@ -128,6 +148,25 @@
   booting=false;
   sync();
   try{history.replaceState(snapshot(),'',location.href)}catch(e){}
+  /* A signed-in technician who reloads lands on the Dashboard — the page index.html marks
+     active by default — which the role cannot even open. The hub is Home. */
+  try{
+   if(techHub()&&activePage()==='dashboard'&&typeof canPermission==='function'&&!canPermission('dashboard.view')
+      &&typeof baseGoPage==='function'){
+    baseGoPage.call(window,'home');
+    sync();
+    history.replaceState(snapshot(),'',location.href);
+   }
+  }catch(e){}
+  /* A technician who arrives straight in a module (a reload, or coming back from the case
+     page) has no Home entry underneath; put one there so Back still reaches the hub. */
+  try{
+   if(techHub()&&isModule(activePage())){
+    var here=snapshot();
+    history.replaceState({imodePage:'home',imodeDetail:false},'',location.href);
+    history.pushState(here,'',location.href);
+   }
+  }catch(e){}
  }
  function start(){
   watchPortalShell();

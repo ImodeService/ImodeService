@@ -193,12 +193,12 @@
  try{PAGE_PERMISSION[PAGE]='quotation.view'}catch(e){}
  try{
   if(typeof PAGE_INFO!=='undefined'){
-   PAGE_INFO.th[PAGE]=['ดูใบเสนอราคา','ใบเสนอราคาทั้งหมด สถานะ และการส่งให้ลูกค้า'];
-   PAGE_INFO.en[PAGE]=['Quotations','Every quotation, its status, and sending it to the customer'];
+   PAGE_INFO.th[PAGE]=['ประวัติใบเสนอราคา','ใบเสนอราคาทั้งหมดที่เคยทำ สถานะ และการส่งให้ลูกค้า'];
+   PAGE_INFO.en[PAGE]=['Quotation history','Every quotation, its status, and sending it to the customer'];
   }
  }catch(e){}
  if(typeof window.imodeRegisterHomeModule==='function'){
-  window.imodeRegisterHomeModule({page:PAGE,icon:'📑',th:'ดูใบเสนอราคา',en:'Quotations',
+  window.imodeRegisterHomeModule({page:PAGE,icon:'📑',th:'ประวัติใบเสนอราคา',en:'Quotation history',
    perm:'quotation.view'},'after:quotation');
  }
  /* js/36 sorts the sidebar into named groups from a fixed page list; the new page has to be
@@ -206,11 +206,8 @@
  try{
   var groups=(window.imodeNavGroups&&window.imodeNavGroups.groups)||[];
   for(var gi=0;gi<groups.length;gi++){
-   if(groups[gi].id!=='money')continue;
-   if(groups[gi].pages.indexOf(PAGE)<0){
-    var at=groups[gi].pages.indexOf('quotation');
-    groups[gi].pages.splice(at<0?groups[gi].pages.length:at+1,0,PAGE);
-   }
+   if(groups[gi].id!=='history')continue;   /* 2026-09-18: moved out of ราคาและค่าใช้จ่าย */
+   if(groups[gi].pages.indexOf(PAGE)<0)groups[gi].pages.push(PAGE);
   }
  }catch(e){}
 
@@ -228,13 +225,34 @@
   var b=document.createElement('button');
   b.className='nav-item';
   b.setAttribute('data-page',PAGE);
-  b.innerHTML='<span>📑</span><b>'+esc2(tl('ดูใบเสนอราคา','Quotations'))+'</b>';
+  b.innerHTML='<span>📑</span><b>'+esc2(tl('ประวัติใบเสนอราคา','Quotation history'))+'</b>';
   b.onclick=function(){goPage(PAGE)};
   var ref=nav.querySelector('.nav-item[data-page="quotation"]');
   if(ref&&ref.nextSibling)nav.insertBefore(b,ref.nextSibling);
   else nav.appendChild(b);
   try{if(typeof applyRoleVisibility==='function')applyRoleVisibility()}catch(e){}
   try{if(window.imodeNavGroups&&window.imodeNavGroups.layout)window.imodeNavGroups.layout()}catch(e){}
+ }
+
+ /* 2026-09-18: the long list of every quotation ever made used to sit at the bottom of the
+    ทำใบเสนอราคา page — "อันนี้ดูเหมือนจะเป็นประวัติใบเสนอราคานะ อยากให้แยกเป็นอีกโมดุลนึงขึ้นมา". It is
+    this module's job now, so the builder page keeps only the calculator and gets a link.
+
+    The panel is HIDDEN, never removed: renderQuotations() in js/03 fills #quotationTotalCount,
+    #quotationCards, #quotationPagination and the table body as id globals on every render and
+    would throw without them — the same reason #fieldQueue and #portalLineIdentity are still in
+    the document. css/23's [hidden] rule is what actually hides it. */
+ function tidyBuilderPage(){
+  var panel=document.querySelector('#page-quotation .quote-history-panel');
+  if(!panel||panel.dataset.qvMoved)return;
+  panel.dataset.qvMoved='1';
+  panel.hidden=true;
+  var link=document.createElement('div');
+  link.className='panel qv-history-link';
+  link.innerHTML='<button type="button" class="soft-btn" data-qv-open="1">📑 '
+   +esc2(tl('ดูประวัติใบเสนอราคาทั้งหมด','Open the quotation history'))+' ›</button>';
+  link.querySelector('button').onclick=function(){goPage(PAGE)};
+  panel.parentNode.insertBefore(link,panel);
  }
 
  /* ------------------------------------------------------------- 4. filters ---- */
@@ -324,7 +342,7 @@
   host.innerHTML='<div class="panel">'
    +'<div class="panel-head toolbar-head"><div>'
    +'<h3>'+esc2(tl('ใบเสนอราคาทั้งหมด','All quotations'))+'</h3>'
-   +'<p class="subtext">'+esc2(tl('ดูใบเสนอราคา ตรวจสถานะ และส่งให้ลูกค้า',
+   +'<p class="subtext">'+esc2(tl('ใบเสนอราคาทั้งหมดที่เคยทำ ตรวจสถานะ และส่งให้ลูกค้า',
                                   'Read a quotation, check its status, and send it to the customer'))+'</p></div>'
    +(can('quotation.create')
      ?'<button class="primary-btn action-3d-orange" onclick="goPage(\'quotation\')">＋ '
@@ -497,6 +515,7 @@
  function install(){
   ensurePage();
   ensureNav();
+  try{tidyBuilderPage()}catch(e){}
   try{if((document.querySelector('.page.active')||{}).id==='page-'+PAGE)render()}catch(e){}
  }
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});

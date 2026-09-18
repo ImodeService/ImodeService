@@ -131,6 +131,22 @@
   try{if(typeof cloudUpsertQuotation==='function')cloudUpsertQuotation(q)}catch(e){}
   return true;
  }
+ /* A quotation signed BEFORE this file existed kept its 'ส่งแล้ว' while the approval record
+    said otherwise — measured on the live project: QT-SRV-202609-015 was exactly that. The two
+    disagreed on screen, so the status is brought into line once, quietly, on load and after
+    every sync. Only ever ส่งแล้ว/รออนุมัติ → อนุมัติ; a draft and a refusal are left alone. */
+ function repairApprovedStatuses(){
+  var moved=0;
+  quoteList().forEach(function(q){
+   if(!q||!q.id||!approved(q.id))return;
+   var s=String(q.status||'');
+   if(s===approvedStatus()||s===''||s==='ร่าง'||s==='ไม่อนุมัติ'||s==='หมดอายุ')return;
+   if(markApprovedStatus(q.id))moved++;
+  });
+  return moved;
+ }
+ window.imodeRepairApprovedStatuses=repairApprovedStatuses;
+
  var baseApprove=window.imodePortalApproveQuote;
  if(typeof baseApprove==='function'){
   window.imodePortalApproveQuote=function(id){
@@ -331,6 +347,16 @@
   if(mb&&!mb.__qacWired){mb.__qacWired=1;mb.addEventListener('click',onClick)}
  }
 
+ /* Same reason as js/75: the ดูใบเสนอราคา rows are rebuilt by js/43 after renderAll() has
+    already run, so the รับใบเสนอราคา button has to be put back by that render too. */
+ var baseQuoteView=window.imodeRenderQuoteView;
+ if(typeof baseQuoteView==='function'){
+  window.imodeRenderQuoteView=function(){
+   var r=baseQuoteView.apply(this,arguments);
+   try{decorate()}catch(e){}
+   return r;
+  };
+ }
  var baseRenderAll=window.renderAll;
  if(typeof baseRenderAll==='function'){
   window.renderAll=function(){
@@ -347,7 +373,22 @@
    return r;
   };
  }
- function start(){wireModal();try{decorate()}catch(e){}}
+ /* After a sync as well as at start-up: the approval arrives in settings.quoteApprovals, and
+    the quotation row it belongs to may come down in the same pass. */
+ var baseSync=window.syncCloud;
+ if(typeof baseSync==='function'){
+  window.syncCloud=function(){
+   var r=baseSync.apply(this,arguments);
+   var after=function(){try{repairApprovedStatuses();decorate()}catch(e){}};
+   if(r&&typeof r.then==='function')r.then(after,after);else setTimeout(after,0);
+   return r;
+  };
+ }
+ function start(){
+  wireModal();
+  try{repairApprovedStatuses()}catch(e){}
+  try{decorate()}catch(e){}
+ }
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);
  else start();
  window.addEventListener('load',start);

@@ -81,6 +81,100 @@
     return (c.ticket||c.id)+(c.status?' → '+c.status:'');
    }
   },
+  /* 2026-09-18: "ลูกค้าเซ็นใบเสนอราคาแล้ว ส่งแล้วแต่สถานะไม่อัพเดต ... อยากให้สถานะอัพเดตเรียลไทม์
+     ทุกอันเลย". Measured on the live project first: QT-SRV-202609-016 really was 'อนุมัติ' in the
+     database with its signature recorded — the customer's side had worked and reached the
+     cloud. What had not happened was the office SCREEN, because this file listened to two
+     tables. So every table that carries a state somebody waits on is here now. */
+  {
+   name:'quotations',
+   list:function(){try{return Array.isArray(quotations)?quotations:null}catch(e){return null}},
+   map:function(row){
+    try{return (typeof window.fromQuotationDb==='function')?window.fromQuotationDb(row):null}
+    catch(e){return null}
+   },
+   newer:function(incoming,local){
+    var a=String(incoming&&incoming.updatedAt||''),b=String(local&&local.updatedAt||'');
+    return !b||(a&&a>b);
+   },
+   describe:function(q){return (q.id||'')+(q.status?' → '+q.status:'')}
+  },
+  {
+   name:'service_reports',
+   list:function(){try{return Array.isArray(serviceReports)?serviceReports:null}catch(e){return null}},
+   map:function(row){
+    try{return (typeof window.fromServiceReportDb==='function')?window.fromServiceReportDb(row):null}
+    catch(e){return null}
+   },
+   newer:function(incoming,local){
+    try{return JSON.stringify(incoming)!==JSON.stringify(local)}catch(e){return true}
+   },
+   describe:function(){return tl('มีใบตรวจใหม่จากหน้างาน','A new inspection sheet arrived')}
+  },
+  {
+   name:'machines',
+   list:function(){try{return Array.isArray(machines)?machines:null}catch(e){return null}},
+   /* js/03 pushes this table as the raw object, so there is no fromMachineDb to mirror. */
+   map:function(row){
+    try{var m={photo:''};Object.keys(row||{}).forEach(function(k){m[k]=row[k]});return m}
+    catch(e){return null}
+   },
+   newer:function(incoming,local){
+    try{return JSON.stringify(incoming)!==JSON.stringify(local)}catch(e){return true}
+   },
+   describe:function(m){return tl('อัปเดตเครื่องจักร ','Machine updated ')+(m.name||m.id||'')}
+  },
+  {
+   name:'customers',
+   list:function(){try{return Array.isArray(customers)?customers:null}catch(e){return null}},
+   map:function(row){
+    try{return (typeof window.fromCustomerDb==='function')?window.fromCustomerDb(row):null}
+    catch(e){return null}
+   },
+   newer:function(incoming,local){
+    try{return JSON.stringify(incoming)!==JSON.stringify(local)}catch(e){return true}
+   },
+   describe:function(c){return tl('อัปเดตลูกค้า ','Customer updated ')+(c.name||c.id||'')}
+  },
+  {
+   name:'machine_warranties',
+   list:function(){try{return Array.isArray(warranties)?warranties:null}catch(e){return null}},
+   map:function(row){
+    try{return (typeof window.fromWarrantyDb==='function')?window.fromWarrantyDb(row):null}
+    catch(e){return null}
+   },
+   newer:function(incoming,local){
+    try{return JSON.stringify(incoming)!==JSON.stringify(local)}catch(e){return true}
+   },
+   describe:function(){return tl('อัปเดตข้อมูลประกัน','Warranty updated')}
+  },
+  {
+   name:'machine_documents',
+   list:function(){try{return Array.isArray(machineDocuments)?machineDocuments:null}catch(e){return null}},
+   map:function(row){
+    try{return (typeof window.fromMachineDocumentDb==='function')?window.fromMachineDocumentDb(row):null}
+    catch(e){return null}
+   },
+   newer:function(incoming,local){
+    try{return JSON.stringify(incoming)!==JSON.stringify(local)}catch(e){return true}
+   },
+   describe:function(){return tl('อัปเดตเอกสารเครื่องจักร','Machine document updated')}
+  },
+  {
+   name:'technicians',
+   list:function(){try{return Array.isArray(technicians)?technicians:null}catch(e){return null}},
+   map:function(row){
+    try{
+     var t={photo:'',status:'พร้อมรับงาน',skills:'',team:'Technical'};
+     Object.keys(row||{}).forEach(function(k){t[k]=row[k]});
+     return t;
+    }catch(e){return null}
+   },
+   newer:function(incoming,local){
+    try{return JSON.stringify(incoming)!==JSON.stringify(local)}catch(e){return true}
+   },
+   describe:function(t){return tl('อัปเดตทีมช่าง ','Technician updated ')+(t.name||t.id||'')}
+  },
   {
    name:'line_customer_requests',
    list:function(){try{return Array.isArray(lineRequests)?lineRequests:null}catch(e){return null}},
@@ -159,6 +253,41 @@
   if(lastNote){toast('🔄 '+lastNote);lastNote=''}
  }
 
+ /* ------------------------------------------------ system_settings, carefully ----
+    The customer's signature is not on the quotation — js/75 keeps it in
+    settings.quoteApprovals, because cloudUpsertQuotation() writes a column whitelist and
+    would drop a new field. So the approval only reaches the office through system_settings,
+    which is why "ลูกค้าเซ็นแล้วแต่สถานะไม่อัพเดต" could happen with the quotation row itself
+    already correct in the database.
+
+    ONLY THESE KEYS ARE TAKEN. syncCloud() replaces `settings` wholesale, which is right at
+    boot and wrong in the middle of a session: an admin with the roles editor open would have
+    their work replaced under them, and every repair in js/12, js/20, js/29 and js/47 would
+    re-run against someone else's copy. These are the shared operational records — things one
+    device writes for the others to see — and nothing about configuration. */
+ var SETTING_KEYS=['quoteApprovals','quoteAccepts','quoteRequestLink','caseStatusLog',
+                   'caseFeedback','trash','portalNews','uatAccounts','uatAccountEdits'];
+ function applySettings(payload){
+  state.events++;
+  var data=payload&&payload.new&&payload.new.data;
+  if(!data||typeof data!=='object')return;
+  var moved=[];
+  SETTING_KEYS.forEach(function(k){
+   if(!(k in data))return;
+   var incoming='',local='';
+   try{incoming=JSON.stringify(data[k])}catch(e){return}
+   try{local=JSON.stringify(settings[k])}catch(e){local=''}
+   if(incoming===local)return;              /* our own echo, or nothing new */
+   try{settings[k]=data[k];moved.push(k)}catch(e){}
+  });
+  if(!moved.length)return;
+  /* The quotation list and the case page read the approval through js/75's helpers, so the
+     re-render below is all that is needed for the chip and the track to catch up. */
+  mark(moved.indexOf('quoteApprovals')>=0
+    ? tl('ลูกค้าเซ็นอนุมัติใบเสนอราคาแล้ว','A customer approved a quotation')
+    : tl('ข้อมูลอัปเดตจากอีกเครื่อง','Updated from another device'));
+ }
+
  /* ------------------------------------------------------------------ the channel ---- */
  var channel=null;
 
@@ -184,6 +313,10 @@
     });
     state.tables.push(cfg.name);
    });
+   channel.on('postgres_changes',{event:'*',schema:'public',table:'system_settings'},function(p){
+    try{applySettings(p)}catch(e){}
+   });
+   state.tables.push('system_settings');
    channel.subscribe(function(status){
     state.status=String(status||'');
     if(status==='SUBSCRIBED'){

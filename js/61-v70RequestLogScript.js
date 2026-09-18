@@ -68,11 +68,8 @@
  try{
   var groups=(window.imodeNavGroups&&window.imodeNavGroups.groups)||[];
   for(var gi=0;gi<groups.length;gi++){
-   if(groups[gi].id!=='alert')continue;
-   if(groups[gi].pages.indexOf(PAGE)<0){
-    var at=groups[gi].pages.indexOf('requests');
-    groups[gi].pages.splice(at<0?groups[gi].pages.length:at+1,0,PAGE);
-   }
+   if(groups[gi].id!=='history')continue;   /* 2026-09-18: moved out of การแจ้งเตือน */
+   if(groups[gi].pages.indexOf(PAGE)<0)groups[gi].pages.push(PAGE);
   }
  }catch(e){}
 

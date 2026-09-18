@@ -61,6 +61,12 @@
    pages:['customers','machines','qc','warranty','documents']},
   {id:'stock',    th:'ทีมงาน',               en:'Team',
    pages:['technicians']},
+  /* 2026-09-18, on the owner's instruction: "เพิ่มหมวดหมู่ใหม่ใน slide bar คือ ประวัติ และย้าย
+     โมดุลประวัติไปไว้ในนั้น". The three modules that are a record of what already happened, rather
+     than work in front of somebody, put themselves in here by id — ประวัติคำขอ (js/61),
+     ประวัติใบเสนอราคา (js/43) and งานที่สำเร็จแล้ว (js/45). It sits next to รายงาน because both are
+     places people go to look something up, not to do the day's work. */
+  {id:'history',  th:'ประวัติ',               en:'History', pages:[]},
   {id:'report',   th:'รายงาน',               en:'Reports',
    pages:['reports','spare-parts']},
   {id:'system',   th:'ระบบ',                 en:'System',

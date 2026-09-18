@@ -314,11 +314,31 @@
      status pill, so the chip goes there and the row keeps its own layout. */
   [].slice.call(host.querySelectorAll('.qv-row[data-quote]')).forEach(function(el){
    var id=el.getAttribute('data-quote')||'';
-   if(!id||el.querySelector('.pqa-chip'))return;
+   if(!id)return;
    if(!quoteList().some(function(x){return x&&x.id===id}))return;
+   var want=chipHTML(id),old=el.querySelector('.pqa-chip');
+   /* 2026-09-18: REPLACED, not skipped when present. The chip was drawn once and never
+      looked at again, so a signature arriving while the page was open — which is exactly
+      what realtime now delivers — left ยังไม่ได้อนุมัติ sitting there next to a quotation the
+      customer had already approved. */
+   if(old){
+    if(old.outerHTML!==want)old.outerHTML=want;
+    return;
+   }
    var top=el.querySelector('.qv-row-top')||el.querySelector('.qv-row-main')||el;
-   top.insertAdjacentHTML('beforeend',chipHTML(id));
+   top.insertAdjacentHTML('beforeend',want);
   });
+ }
+ /* js/43 rebuilds the rows with innerHTML whenever its page is drawn — a filter, a page
+    change, or a realtime update — which throws the chips away. renderAll() and goPage() are
+    not enough on their own, because the page render runs AFTER them. */
+ var baseQuoteView=window.imodeRenderQuoteView;
+ if(typeof baseQuoteView==='function'){
+  window.imodeRenderQuoteView=function(){
+   var r=baseQuoteView.apply(this,arguments);
+   try{decorateStaff()}catch(e){}
+   return r;
+  };
  }
  var baseRenderAll=window.renderAll;
  if(typeof baseRenderAll==='function'){

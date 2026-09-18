@@ -424,13 +424,27 @@ body.scd-modal-open{overflow:hidden}
 /* งาน Workshop */
 .ws-radio{display:flex;flex-direction:column;gap:6px;font-weight:400;font-size:13px}
 .ws-radio label{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line-2);border-radius:10px;background:#fff;cursor:pointer}
-.ws-radio input{accent-color:var(--imode-blue)}
-/* .scd-ce-f input sits further down this sheet at the SAME specificity, so it wins and gives
-   a radio width:100% plus a padded, bordered box — the dot then floats in the middle of the
-   row and the label is squeezed to the right. Reported 2026-09-18 with a screenshot of the
-   Workshop options doing exactly that; the บันทึกส่งคืนเครื่อง form had it too. */
-.scd-ce-f .ws-radio input[type=radio]{width:auto;min-width:0;flex:0 0 auto;padding:0;margin:0;
-  background:none;border:0;border-radius:0}
+/* The control is drawn here rather than left to the browser, for two reasons reported on
+   2026-09-18: clicking a native radio leaves Chrome's square focus ring sitting around it, and
+   a dot does not read as "chosen" beside the ✓ of the แก้ไขทางออนไลน์ tick right underneath.
+   appearance:none replaces it with a rounded box that fills blue and draws a check mark, and the
+   whole row lights up with it. The ring is kept for :focus-visible ONLY — a keyboard user still
+   has to see where they are; a mouse click no longer leaves a frame behind.
+   Specificity matters here: .scd-ce-f input further down this sheet is (0,1,1) and would
+   otherwise give the radio width:100% with a padded box, floating the dot in the middle of the
+   row (part 27). This selector is (0,2,1), so it wins wherever .ws-radio is used. */
+.ws-radio input[type=radio]{appearance:none;-webkit-appearance:none;position:relative;
+  width:20px;height:20px;min-width:0;flex:0 0 auto;margin:0;padding:0;cursor:pointer;
+  border:1.5px solid #c3d4ef;border-radius:7px;background:#fff;outline:none;
+  transition:background .14s ease,border-color .14s ease,box-shadow .14s ease}
+.ws-radio input[type=radio]::after{content:"";position:absolute;left:6px;top:2.5px;width:5px;height:10px;
+  border:solid #fff;border-width:0 2.5px 2.5px 0;transform:rotate(45deg) scale(.35);opacity:0;
+  transition:opacity .12s ease,transform .12s ease}
+.ws-radio input[type=radio]:hover{border-color:#8fb4e8}
+.ws-radio input[type=radio]:checked{background:var(--imode-blue);border-color:var(--imode-blue)}
+.ws-radio input[type=radio]:checked::after{opacity:1;transform:rotate(45deg) scale(1)}
+.ws-radio input[type=radio]:focus-visible{box-shadow:0 0 0 3px rgba(11,99,229,.24)}
+.ws-radio label:has(input:checked){border-color:#9dc2f4;background:#f3f8ff}
 .scd-ce-f .ws-radio label{font-size:13px;font-weight:400;color:var(--imode-navy)}
 .ws-set{flex-wrap:wrap}
 .ws-sig{display:block;max-width:260px;width:100%;margin-top:8px;border:1px solid var(--line);border-radius:10px;background:#fff;padding:4px}
@@ -2643,13 +2657,33 @@ function wireWorkshopForm(){
   var type=el('ceType'),box=el('ceWorkshop');
   if(!type||!box)return;
   type.addEventListener('change',function(){box.hidden=type.value!==WS_TYPE});
+  wireRadioToggle(box);
+}
+/* A radio cannot normally be unticked. These two questions are optional — the answer is often not
+   known yet — so clicking the chosen option again clears it. The group's value is tracked here
+   rather than read off the input, because by the time `click` fires the browser has already
+   ticked it; a click forwarded from the <label> bubbles up with the input as its target too. */
+function wireRadioToggle(box){
+  if(!box)return;
+  var cur={},list=box.querySelectorAll('input[type=radio]'),i;
+  for(i=0;i<list.length;i++)if(list[i].checked)cur[list[i].name]=list[i].value;
+  box.addEventListener('click',function(e){
+    var r=e.target;
+    if(!r||r.tagName!=='INPUT'||r.type!=='radio')return;
+    if(cur[r.name]===r.value){
+      r.checked=false;cur[r.name]='';
+      r.dispatchEvent(new Event('change',{bubbles:true}));
+    }else cur[r.name]=r.value;
+  });
 }
 function workshopChanges(raw,serviceType){
   if(serviceType!==WS_TYPE)return null;
   var i=document.querySelector('input[name="ceWsIn"]:checked'),o=document.querySelector('input[name="ceWsOut"]:checked');
   var inbound=i?i.value:'',outbound=o?o.value:'';
   var l=wsLast(raw,'logistics')||{};
-  if(!inbound&&!outbound)return null;
+  /* Nothing picked and nothing picked before — a Workshop case saved without touching these must
+     not write a log entry. Clearing an answer that WAS saved is a real change and is recorded. */
+  if(!inbound&&!outbound&&!l.inbound&&!l.outbound)return null;
   if(inbound===(l.inbound||'')&&outbound===(l.outbound||''))return null;
   return {workshop:'logistics',inbound:inbound,outbound:outbound,
     status:'Workshop · นำเข้า: '+wsInboundText(inbound)+' / คืน: '+wsOutboundText(outbound),

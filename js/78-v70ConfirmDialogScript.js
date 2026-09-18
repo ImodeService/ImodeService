@@ -16,6 +16,14 @@
        js/61  imodeDeleteRequestLog      ลบประวัติคำขอ
        js/06  deleteRelatedEmployee      ลบพนักงานที่เกี่ยวข้อง
        js/06  v68ApplyPricingToQuotation นำราคา S/M/L ไปใช้ใน Quotation
+       js/03  prepareQuotation           เริ่มใบเสนอราคาใหม่ทับฟอร์มที่ยังไม่บันทึก — added
+                                         2026-09-18 on the owner's instruction, with a
+                                         screenshot of the grey box. It was on the list below
+                                         because it can lose unsaved typing; it is off it
+                                         because it is met while doing the daily job, not in
+                                         the settings screens. Nothing irreversible happens
+                                         before its confirm — a permission check and a
+                                         case-exists lookup — so the replay below is safe.
        js/63  จบงาน                       styled in place — see below
        service-case-detail.html          เปลี่ยนสถานะ / ปิดเคส — the one the report named.
                                          That page is a separate document and loads no js/*,
@@ -26,7 +34,6 @@
        js/17         คืนค่ารายชื่อเดิม in the login picker
        js/20         unticking settings.manage on your own role
        js/39         deleting a login account
-       js/03         starting a new quotation over an unsaved one
      These wipe or lock something that no bin can bring back, they are reached from the
      settings screens rather than from the work, and a box that looks unmistakably like the
      browser's is the right amount of friction for them. Said out loud so the owner can
@@ -152,7 +159,8 @@
   ['imodeDeleteCustomer',    {danger:true,title:'ลบลูกค้า'}],
   ['imodeDeleteRequestLog',  {danger:true,title:'ลบประวัติคำขอ'}],
   ['deleteRelatedEmployee',  {danger:true,title:'ลบพนักงาน'}],
-  ['v68ApplyPricingToQuotation',{title:'ใช้ราคานี้ใน Quotation',okText:'นำไปใช้'}]
+  ['v68ApplyPricingToQuotation',{title:'ใช้ราคานี้ใน Quotation',okText:'นำไปใช้'}],
+  ['prepareQuotation',       {title:'เริ่มใบเสนอราคาใหม่',okText:'เริ่มใหม่'}]
  ];
  function applyAll(){
   WRAP.forEach(function(w){

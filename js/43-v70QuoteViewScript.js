@@ -127,6 +127,80 @@
  /* One place does the sending, so the row button, the document popup and the prompt after
     saving all behave identically — including the push, which is what actually puts it in
     front of the customer. */
+ /* ------------------------------------------------- what happens when it is sent ----
+    2026-09-18, three things the owner reported together:
+
+      "แอดมินกดส่งใบเสนอราคาไปแล้วแต่อัพเดตสถานะหลังลูกค้าส่ง และมันทำให้สถานะของลูกค้ากับใบเสนอราคา
+       ไม่อัพเดต ... อยากให้หลังกดส่งใบเสนอราคา จากหน้าของเคส อัพเดตสถานะเคสนั้นเป็น นัดหมาย/มอบหมาย"
+      "เวลากดทำใบเสนอราคาจากหน้าเคส พอทำเสร็จและกดส่งให้เด้งกลับไปที่เคสนั้นๆเลย แต่ถ้าไม่มี … ก็ให้อยู่
+       ในโมดุลนั้นที่เดิม"
+      "เพิ่มแจ้งเตือนเป็น pop up ด้วย ว่า ส่งใบเสนอราคาสำเร็จ หรือไม่สำเร็จ"
+
+    The case is moved only out of เคสใหม่, and only to มอบหมายแล้ว — never straight to
+    นัดหมายแล้ว. That status means a real date is on the case, the calendar filters on it, and
+    a case put there without one disappears from the calendar; that is the repair part 25 had
+    to do by hand for 19 cases. A case that already has an appointment, or that is further
+    along, is left exactly where it is. */
+ var EARLY_CASE='เคสใหม่',ASSIGNED='มอบหมายแล้ว';
+ function advanceCaseForQuote(q){
+  try{
+   if(!q||!q.caseId||!Array.isArray(cases))return null;
+   var c=cases.filter(function(x){return x&&x.id===q.caseId})[0];
+   if(!c||String(c.status||'')!==EARLY_CASE)return null;
+   if((settings.statuses||[]).indexOf(ASSIGNED)<0)return null;
+   c.status=ASSIGNED;
+   c.updatedAt=new Date().toISOString();
+   try{if(typeof saveLocal==='function')saveLocal()}catch(e){}
+   try{if(typeof cloudUpsertCase==='function')cloudUpsertCase(c)}catch(e){}
+   return c;
+  }catch(e){return null}
+ }
+ /* cloudUpsertQuotation() builds the payload in js/03 and returns nothing, so the outcome is
+    captured by standing in front of cloudUpsert for the duration of that one call — the same
+    technique js/42 uses for the media column. JavaScript is single threaded and the base
+    awaits inside this window, so no unrelated write can be mistaken for this one. */
+ function pushQuote(q){
+  var base=window.cloudUpsert,seen=null;
+  if(typeof window.cloudUpsertQuotation!=='function')return Promise.resolve({ok:true,offline:true});
+  if(typeof base!=='function')return Promise.resolve({ok:true,offline:true});
+  window.cloudUpsert=function(table,obj){
+   var r=base.apply(this,arguments);
+   if(table==='quotations'){
+    if(r&&typeof r.then==='function')return r.then(function(v){seen=v||{ok:true};return v});
+    seen=r||{ok:true};
+   }
+   return r;
+  };
+  var done=function(){window.cloudUpsert=base;return seen||{ok:true,offline:true}};
+  var out;
+  try{out=window.cloudUpsertQuotation(q)}
+  catch(e){window.cloudUpsert=base;return Promise.resolve({ok:false,error:e})}
+  if(out&&typeof out.then==='function')return out.then(done,function(e){window.cloudUpsert=base;return {ok:false,error:e}});
+  return Promise.resolve(done());
+ }
+ function sentPopup(q,res,thenGo){
+  var offline=!!(res&&res.offline),ok=!res||res.ok!==false;
+  var go=function(){try{thenGo&&thenGo()}catch(e){}};
+  var msg=ok
+   ? q.id+' · '+(q.customer||'-')+'\n'
+     +(offline?tl('บันทึกแล้วในเครื่องนี้ · ยังไม่ได้ส่งขึ้นระบบกลาง จะส่งอัตโนมัติเมื่อเชื่อมต่อ',
+                  'Saved on this device — it will go up on the next sync')
+             :tl('ลูกค้าเห็นใบนี้ในหน้าหลักลูกค้าแล้ว','The customer can see it on their home page now'))
+   : q.id+'\n'+tl('ส่งขึ้นระบบกลางไม่สำเร็จ ใบนี้ยังอยู่ในเครื่องนี้ กรุณาลองใหม่หรือตรวจการเชื่อมต่อ',
+                  'Could not reach the server — the quotation is still on this device');
+  if(typeof window.imodeNotice==='function'){
+   window.imodeNotice({
+    danger:!ok,
+    title:ok?tl('ส่งใบเสนอราคาสำเร็จ','Quotation sent'):tl('ส่งใบเสนอราคาไม่สำเร็จ','Could not send'),
+    message:msg,
+    okText:ok?tl('ตกลง','OK'):tl('ปิด','Close')
+   }).then(go,go);
+   return;
+  }
+  toast(ok?tl('ส่งใบเสนอราคาแล้ว','Quotation sent'):tl('ส่งไม่สำเร็จ','Could not send'));
+  go();
+ }
+
  window.imodeSendQuoteToCustomer=function(id,quiet){
   var q=quoteList().filter(function(x){return x.id===id})[0];
   if(!q){toast(tl('ไม่พบใบเสนอราคา','Quotation not found'));return}
@@ -135,10 +209,27 @@
    render();
    return;
   }
+  /* Where the visitor is standing when they press it decides where they end up: from the
+     builder, back to the case the quotation belongs to; from this module, stay here. */
+  var fromBuilder=false;
+  try{fromBuilder=((document.querySelector('.page.active')||{}).id||'')==='page-quotation'}catch(e){}
   q.status=sendStatus();
   q.updatedAt=new Date().toISOString();
   try{if(typeof saveLocal==='function')saveLocal()}catch(e){}
-  try{if(typeof cloudUpsertQuotation==='function')cloudUpsertQuotation(q)}catch(e){}
+  var movedCase=advanceCaseForQuote(q);
+  pushQuote(q).then(function(res){
+   try{if(typeof renderAll==='function')renderAll()}catch(e){}
+   render();
+   sentPopup(q,res,function(){
+    if(fromBuilder&&q.caseId&&typeof window.imodeOpenCase==='function'){
+     /* No closeModal() before leaving: js/29 rewinds the history on the next macrotask
+        unless the active PAGE changed, and that cancels a cross-document navigation
+        (part 19, and measured again in js/88). */
+     window.imodeOpenCase(q.caseId);
+    }
+   });
+  });
+  if(movedCase)toast(tl('อัปเดตสถานะเคสเป็น ','Case moved to ')+ASSIGNED);
   try{
    if(Array.isArray(notifications)){
     notifications.unshift({id:(typeof uid==='function'?uid():String(Date.now())),icon:'฿',
@@ -150,8 +241,8 @@
   try{if(typeof renderQuotationList==='function')renderQuotationList()}catch(e){}
   try{if(typeof renderNotifications==='function')renderNotifications()}catch(e){}
   render();
-  toast(tl('ส่ง ','Sent ')+q.id+tl(' ให้ลูกค้าแล้ว — ลูกค้าเห็นในหน้าหลักลูกค้า',
-                                   ' — it now shows on the customer home page'));
+  /* The old toast said "ส่งแล้ว" here, before the push had even been attempted. The popup
+     above says it instead, once the answer is known. */
  };
 
  /* The prompt at the moment the coordinator finishes. saveQuotation() is a top-level

@@ -116,6 +116,43 @@
   });
  };
 
+ /* ------------------------------------------------------------ the result box ----
+    2026-09-18: "เพิ่มแจ้งเตือนเป็น pop up ด้วย ว่า ส่งใบเสนอราคาสำเร็จ หรือไม่สำเร็จ ส่งมาเป็น pop up
+    ที่ดูดีเป็นสไตล์เดียวกับเว็บ". Same card, same animation, one button — a toast says it and is
+    gone, and whether a quotation reached the customer is worth a moment of somebody's
+    attention. It resolves when the box closes, so a caller can navigate afterwards. */
+ window.imodeNotice=function(opts){
+  var o=opts||{};
+  if(typeof o==='string')o={message:o};
+  return new Promise(function(resolve){
+   if(box){resolve(false);return}
+   lastFocus=document.activeElement;
+   var lines=String(o.message||'').split('\n').filter(function(s){return s!==''});
+   var bad=!!o.danger;
+   box=document.createElement('div');
+   box.className='icf-ovl';
+   box.innerHTML='<div class="icf-card icf-notice'+(bad?' is-bad':' is-good')+'" role="alertdialog"'
+    +' aria-modal="true" aria-label="'+esc2(o.title||'')+'">'
+    +'<div class="icf-icon" aria-hidden="true">'+(o.icon||(bad?'⚠':'✅'))+'</div>'
+    +'<h4 class="icf-title">'+esc2(o.title||(bad?tl('ไม่สำเร็จ','Something went wrong')
+                                                 :tl('สำเร็จ','Done')))+'</h4>'
+    +'<div class="icf-body">'+lines.map(function(s){return '<p>'+esc2(s)+'</p>'}).join('')+'</div>'
+    +'<div class="icf-acts"><button type="button" class="icf-yes" data-icf="1">'
+    +esc2(o.okText||tl('ตกลง','OK'))+'</button></div></div>';
+   document.body.appendChild(box);
+   var yes=box.querySelector('.icf-yes');
+   if(yes)yes.focus();
+   box.addEventListener('click',function(e){
+    var b=e.target&&e.target.closest?e.target.closest('[data-icf]'):null;
+    if(b||e.target===box){e.preventDefault();close(true,resolve)}
+   });
+   onKey=function(e){
+    if(e.key==='Escape'||e.key==='Enter'){e.preventDefault();e.stopPropagation();close(true,resolve)}
+   };
+   document.addEventListener('keydown',onKey,true);
+  });
+ };
+
  /* ------------------------------------------------ the no-rewrite conversion ---- */
  function style(name,opts){
   var base=window[name];
@@ -238,6 +275,13 @@
  +'.icf-yes:active{transform:translateY(2px);box-shadow:0 1px 0 #084bb0}'
  +'.icf-card.is-danger .icf-yes:active{box-shadow:0 1px 0 #a52a21}'
  +'.icf-no:focus-visible,.icf-yes:focus-visible{outline:2px solid #0b63e5;outline-offset:2px}'
+ /* the one-button result box */
+ +'.icf-notice .icf-acts{justify-content:center}'
+ +'.icf-notice .icf-yes{flex:0 1 190px}'
+ +'.icf-notice.is-good .icf-yes{background:linear-gradient(180deg,#14a35c,#0b8a4b);box-shadow:0 4px 0 #077038}'
+ +'.icf-notice.is-good .icf-yes:active{box-shadow:0 1px 0 #077038}'
+ +'.icf-notice.is-bad .icf-yes{background:linear-gradient(180deg,#e2574c,#cf3b30);box-shadow:0 4px 0 #a52a21}'
+ +'.icf-notice.is-bad .icf-yes:active{box-shadow:0 1px 0 #a52a21}'
  +'@media (prefers-reduced-motion:reduce){.icf-ovl,.icf-card{animation:none}.icf-yes:active{transform:none}}';
  document.head.appendChild(st);
 })();

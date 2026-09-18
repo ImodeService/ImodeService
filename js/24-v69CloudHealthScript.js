@@ -87,14 +87,21 @@
  if (typeof baseUpsert === 'function') {
   /* Reimplemented rather than delegated: the original catches internally, so wrapping it
      can never see whether the write actually landed. This is the same single statement. */
+  /* 2026-09-18: it also RETURNS the outcome now. Nothing that called it before reads the
+     value, so nothing changes for them; it is there so a caller that wants to tell somebody
+     whether the write landed — the ส่งใบเสนอราคา popup in js/43 — can say something true
+     instead of guessing. `offline` is not a failure: the record is saved locally and the
+     next sync carries it. */
   window.cloudUpsert = async function (table, obj) {
-   if (typeof supa === 'undefined' || !supa) return;
+   if (typeof supa === 'undefined' || !supa) return { ok: true, offline: true, error: null };
    try {
     var res = await supa.from(table).upsert(obj);
     if (res.error) throw res.error;
     record(table, null);
+    return { ok: true, offline: false, error: null };
    } catch (e) {
     record(table, e);
+    return { ok: false, offline: false, error: e };
    }
   };
  }

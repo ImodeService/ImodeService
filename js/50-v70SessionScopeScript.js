@@ -86,7 +86,17 @@
    try{
     if(o.intent==='schedule'&&typeof window.imodeOpenAssignPicker==='function')window.imodeOpenAssignPicker(o.caseId);
     else if(o.intent==='status'&&typeof openCaseModal==='function')openCaseModal(o.caseId);
-    else if(o.intent==='delete'&&typeof window.imodeDeleteCase==='function')window.imodeDeleteCase(o.caseId);
+    /* 2026-09-18: the same one-shot marker js/28 reads — service-case-detail.html asks on its
+       own page now, so a visitor who went through the login door on the way here is not asked
+       a second time. Without a marker this is still the asking path. */
+    else if(o.intent==='delete'&&typeof window.imodeDeleteCase==='function'){
+     var okMark='';
+     try{okMark=sessionStorage.getItem('imode_v70_delete_ok')||''}catch(e){}
+     try{sessionStorage.removeItem('imode_v70_delete_ok')}catch(e){}
+     if(okMark&&okMark===o.caseId&&typeof window.imodeDeleteCaseConfirmed==='function')
+      window.imodeDeleteCaseConfirmed(o.caseId);
+     else window.imodeDeleteCase(o.caseId);
+    }
     else if(o.page==='quotation'&&typeof prepareQuotation==='function')prepareQuotation(o.caseId);
    }catch(e){}
   },280);

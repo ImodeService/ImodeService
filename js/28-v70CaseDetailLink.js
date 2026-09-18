@@ -91,11 +91,22 @@
        carrying intent=schedule; the merged picker is what opens. */
     if(intent==='schedule'&&typeof window.imodeOpenAssignPicker==='function')window.imodeOpenAssignPicker(cid);
     else if(intent==='status'&&typeof openCaseModal==='function')openCaseModal(cid);
-    /* ลบเคส from service-case-detail.html. That page reads and never writes, so the delete
-       itself — bin entry, Supabase row, re-render — happens here. imodeDeleteCase() asks
-       for confirmation and checks case.edit, so an URL carrying this intent can neither
-       delete silently nor delete without the permission. */
-    else if(intent==='delete'&&typeof window.imodeDeleteCase==='function')window.imodeDeleteCase(cid);
+    /* ลบเคส from service-case-detail.html. The delete itself — bin entry, Supabase row,
+       re-render — happens here, because only the application owns settings.trash.
+
+       2026-09-18: that page now asks on its own screen ("กดลบหน้าไหน popup ขึ้นหน้านั้น") and
+       leaves a one-shot marker in sessionStorage, so this side does not ask a second time.
+       Everything else still goes through imodeDeleteCase(), which asks and checks case.edit —
+       a hand-made URL cannot write sessionStorage, so it can still neither delete silently
+       nor delete without the permission. The marker is spent whether or not it matched. */
+    else if(intent==='delete'&&typeof window.imodeDeleteCase==='function'){
+     var okMark='';
+     try{okMark=sessionStorage.getItem('imode_v70_delete_ok')||''}catch(e){}
+     try{sessionStorage.removeItem('imode_v70_delete_ok')}catch(e){}
+     if(okMark&&okMark===cid&&typeof window.imodeDeleteCaseConfirmed==='function')
+      window.imodeDeleteCaseConfirmed(cid);
+     else window.imodeDeleteCase(cid);
+    }
     /* 2026-09-16: the ใบตรวจ read view on service-case-detail.html shows the report but hands
        the PRINTABLE sheet and the EDIT form back here, because both live in js/03 and there
        must be exactly one of each. The report is found by case — reportForCase() is how js/03

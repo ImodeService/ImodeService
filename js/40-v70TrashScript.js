@@ -112,18 +112,38 @@
   }catch(e){return Promise.resolve({error:e})}
  }
 
+ /* The key the customer's requests ride under inside a binned case's payload. Reserved:
+    a real case never carries it, and it is stripped again on restore. */
+ var REQ_KEY='__imodeRequests';
+
  /* ------------------------------------------------------------------- the types -- */
  /* Each type knows how to describe itself, how to put its record back, and which cloud
     table the row lived in. Adding a new deletable thing later means one entry here. */
  var TYPES={
   'case':{
    th:'เคสงานบริการ', en:'Service cases', icon:'📋', table:'service_cases',
+   /* 2026-09-18: a case is binned together with the customer request that opened it —
+      "พอกดแล้ว ให้หายไปจากทุกหน้า จะไปอยู่แค่ที่เดียวคือถังขยะ". They travel as ONE entry, under
+      REQ_KEY on a copy of the case, so restoring brings both back in one press. An entry
+      binned before this exists has no such key and restores exactly as it always did. */
    restore:function(p){
     try{
      if(!Array.isArray(cases))return false;
-     if(cases.some(function(c){return c.id===p.id}))return true;
-     cases.unshift(p);
-     if(typeof cloudUpsertCase==='function'){try{cloudUpsertCase(p)}catch(e){}}
+     var reqs=(p&&Array.isArray(p[REQ_KEY]))?p[REQ_KEY]:[];
+     var c={};
+     Object.keys(p||{}).forEach(function(k){if(k!==REQ_KEY)c[k]=p[k]});
+     if(!cases.some(function(x){return x.id===c.id})){
+      cases.unshift(c);
+      if(typeof cloudUpsertCase==='function'){try{cloudUpsertCase(c)}catch(e){}}
+     }
+     if(reqs.length&&Array.isArray(lineRequests)){
+      reqs.forEach(function(r){
+       if(!r||!r.id)return;
+       if(lineRequests.some(function(x){return x.id===r.id}))return;
+       lineRequests.unshift(r);
+       if(typeof cloudUpsertLineRequest==='function'){try{cloudUpsertLineRequest(r)}catch(e){}}
+      });
+     }
      return true;
     }catch(e){return false}
    }
@@ -399,25 +419,54 @@
     so it can be removed by deleting this file, and it is safe to offer precisely because it
     is recoverable. The cloud row goes too — without that, syncCloud() would replace the
     local array from the server and the case would be back within seconds. */
- window.imodeDeleteCase=function(cid){
+ /* The customer's own report is what opened the case, so it goes with it — otherwise the row
+    stays on หน้าคำขอ pointing at a case that no longer exists, which is what was reported. */
+ function requestsOfCase(cid){
+  try{
+   if(!Array.isArray(lineRequests))return [];
+   return lineRequests.filter(function(r){return r&&r.caseId===cid});
+  }catch(e){return []}
+ }
+ /* `silent` is used by the hand-off from service-case-detail.html, which has already asked on
+    its own page — see js/28. Nothing else may pass it. */
+ function deleteCase(cid,silent){
   var c=null;
   try{c=(cases||[]).filter(function(x){return x.id===cid})[0]||null}catch(e){}
   if(!c)return {ok:false};
   if(typeof requirePermission==='function'&&!requirePermission('case.edit'))return {ok:false};
-  if(!confirm(tl('ย้ายเคส ','Move case ')+(c.ticket||c.id)+tl(' ไปถังขยะ? กู้คืนได้ภายใน ',' to the bin? It can be restored within ')
+  var reqs=requestsOfCase(cid);
+  if(!silent&&!confirm(tl('ย้ายเคส ','Move case ')+(c.ticket||c.id)
+    +(reqs.length?tl(' และคำขอจากลูกค้า '+reqs.length+' รายการ',' and '+reqs.length+' customer request(s)'):'')
+    +tl(' ไปถังขยะ? กู้คืนได้ภายใน ',' to the bin? It can be restored within ')
     +retentionDays()+tl(' วัน',' days')))return {ok:false};
-  window.imodeTrashPut('case',c,{
+  var payload={};
+  Object.keys(c).forEach(function(k){payload[k]=c[k]});
+  if(reqs.length)payload[REQ_KEY]=reqs.map(function(r){return r});
+  window.imodeTrashPut('case',payload,{
    title:c.ticket||c.id,
    sub:[c.customer,c.machine,c.status].filter(Boolean).join(' · ')
+     +(reqs.length?tl(' · +คำขอ '+reqs.length,' · +'+reqs.length+' request(s)'):'')
   });
   try{cases=cases.filter(function(x){return x.id!==cid})}catch(e){}
   cloudDelete('service_cases',cid);
+  if(reqs.length){
+   try{lineRequests=lineRequests.filter(function(r){return r.caseId!==cid})}catch(e){}
+   reqs.forEach(function(r){cloudDelete('line_customer_requests',r.id)});
+  }
   try{if(typeof saveLocal==='function')saveLocal()}catch(e){}
   try{if(typeof closeModal==='function')closeModal()}catch(e){}
   try{if(typeof renderAll==='function')renderAll()}catch(e){}
-  toast(tl('ย้ายเคสไปถังขยะแล้ว','Case moved to the bin'));
+  /* The pages that draw themselves outside renderAll(), so the row really leaves every screen. */
+  ['imodeRenderRequests','imodeRenderMyWork','imodeRenderAssign','imodeRenderDoneJobs',
+   'imodeRenderReqLog','imodeRenderFieldAll'].forEach(function(fn){
+   try{if(typeof window[fn]==='function')window[fn]()}catch(e){}
+  });
+  toast(reqs.length?tl('ย้ายเคสและคำขอไปถังขยะแล้ว','Case and its request moved to the bin')
+                   :tl('ย้ายเคสไปถังขยะแล้ว','Case moved to the bin'));
   return {ok:true};
- };
+ }
+ window.imodeDeleteCase=function(cid){return deleteCase(cid,false)};
+ window.imodeDeleteCaseConfirmed=function(cid){return deleteCase(cid,true)};
  /* The edit form is where a record is managed, so that is where its delete lives. Only for
     a case that already exists — there is nothing to bin while creating one. */
  var baseCaseModal=window.openCaseModal;
@@ -516,7 +565,9 @@
   var rows=shown.map(function(e){
    var t=typeOf(e.type),left=daysLeft(e);
    var cls=left<=3?' is-soon':(left<=7?' is-warn':'');
-   return '<div class="trash-row'+cls+'" data-entry="'+esc2(e.id)+'">'
+   return '<div class="trash-row'+cls+'" data-entry="'+esc2(e.id)+'" data-act="open"'
+    +' role="button" tabindex="0"'
+    +' aria-label="'+esc2(tl('ดูรายละเอียด ','View details ')+(e.title||e.id))+'">'
     +'<div class="trash-ico">'+t.icon+'</div>'
     +'<div class="trash-main"><b>'+esc2(e.title||e.id)+'</b>'
     +'<small>'+esc2(tl(t.th,t.en))+(e.sub?' · '+esc2(e.sub):'')+'</small>'
@@ -561,9 +612,105 @@
    +'</div>';
   wire(host);
  }
+ /* ------------------------------------------------- the read-only detail view ----
+    "ในถังขยะสามารถเปิดดูรายละเอียดได้แต่จะไม่สามารถแก้ไขอะไรได้ แต่จะมีปุ่มกู้คืนอยู่ข้างล่าง มาแทนปุ่มลบ"
+
+    READ ONLY IS A PROPERTY OF THE CODE, not a promise: this renders <dl> and nothing else —
+    no form, no input, no save path — and it never writes to the payload it is handed. The
+    only two things it can do are the two buttons at the bottom, which are the same
+    imodeTrashRestore / imodeTrashPurge the row already had. */
+ var SKIP_FIELDS={photo:1,sig:1,signature:1,media:1,customerSignature:1,technicianSignature:1,
+                  fieldStatusLog:1,checklist:1,password:1,passwordHash:1};
+ function readable(v){
+  if(v==null||v==='')return '';
+  if(Array.isArray(v))return v.length?tl(v.length+' รายการ',v.length+' item(s)'):'';
+  if(typeof v==='object')return tl('(ข้อมูลย่อย)','(nested data)');
+  var s=String(v);
+  if(s.indexOf('data:')===0)return tl('(ไฟล์แนบ)','(attachment)');
+  if(/^\d{4}-\d{2}-\d{2}T/.test(s)){try{return fmtWhen(s)}catch(e){return s}}
+  return s.length>400?s.slice(0,400)+'…':s;
+ }
+ function detailRows(payload){
+  var out='',n=0;
+  Object.keys(payload||{}).forEach(function(k){
+   if(k===REQ_KEY||SKIP_FIELDS[k])return;
+   var v=readable(payload[k]);
+   if(v===''||v==null)return;
+   n++;
+   out+='<dt>'+esc2(k)+'</dt><dd>'+esc2(v)+'</dd>';
+  });
+  return n?'<dl class="trash-kv">'+out+'</dl>'
+          :'<p class="empty">'+esc2(tl('ไม่มีรายละเอียดที่แสดงได้','Nothing further to show'))+'</p>';
+ }
+ function openEntry(id){
+  var e=bin().filter(function(x){return x.id===id})[0];
+  if(!e){toast(tl('ไม่พบรายการนี้','Entry not found'));return}
+  if(typeof openModal!=='function')return;
+  var t=typeOf(e.type),payload=e.big?getBlob(e.id):e.payload;
+  var head='<div class="trash-detail-head"><span class="trash-detail-ico">'+t.icon+'</span>'
+   +'<div><b>'+esc2(e.title||e.id)+'</b><small>'+esc2(tl(t.th,t.en))
+   +(e.sub?' · '+esc2(e.sub):'')+'</small></div></div>'
+   +'<dl class="trash-kv is-meta">'
+   +'<dt>'+esc2(tl('ลบเมื่อ','Deleted'))+'</dt><dd>'+esc2(fmtWhen(e.deletedAt))+'</dd>'
+   +(e.deletedBy?'<dt>'+esc2(tl('ลบโดย','Deleted by'))+'</dt><dd>'+esc2(e.deletedBy)+'</dd>':'')
+   +'<dt>'+esc2(tl('เหลือเวลา','Time left'))+'</dt><dd>'+daysLeft(e)+' '+esc2(tl('วัน','days'))+'</dd>'
+   +'</dl>';
+  var reqs=(payload&&Array.isArray(payload[REQ_KEY]))?payload[REQ_KEY]:[];
+  var body=payload
+   ? detailRows(payload)
+     +(reqs.length?'<div class="trash-detail-sub">'+esc2(tl('คำขอจากลูกค้าที่ลบไปพร้อมกัน ('+reqs.length+')',
+        'Customer requests binned with it ('+reqs.length+')'))+'</div>'
+        +reqs.map(function(r){return detailRows(r)}).join(''):'')
+   : '<p class="empty">'+esc2(tl('ข้อมูลของรายการนี้อยู่บนเครื่องที่กดลบเท่านั้น',
+                                 'This entry\'s data is only on the device it was deleted from'))+'</p>';
+  openModal(tl('รายละเอียดในถังขยะ','In the bin'),
+    tl('ดูได้อย่างเดียว แก้ไขไม่ได้ · กู้คืนเพื่อนำกลับมาใช้งาน',
+       'View only — restore it to use it again'),
+    head+body
+    +'<div class="button-row" style="margin-top:14px">'
+    +'<button type="button" class="soft-btn" data-trash-detail="purge" data-id="'+esc2(e.id)+'">'
+    +esc2(tl('ลบถาวร','Delete forever'))+'</button>'
+    +'<button type="button" class="primary-btn" data-trash-detail="restore" data-id="'+esc2(e.id)+'">'
+    +esc2(tl('↩ กู้คืน','↩ Restore'))+'</button></div>');
+  /* js/05 stops propagation at #modalPanel, so a listener on document never sees a click
+     inside a popup (part 26). It goes on #modalBody, which is a descendant. */
+  var mb=document.getElementById('modalBody');
+  if(mb&&!mb.__trashDetailWired){
+   mb.__trashDetailWired=1;
+   mb.addEventListener('click',function(ev){
+    var b=ev.target&&ev.target.closest?ev.target.closest('[data-trash-detail]'):null;
+    if(!b)return;
+    ev.preventDefault();
+    var what=b.getAttribute('data-trash-detail'),eid=b.getAttribute('data-id');
+    if(what==='restore'){
+     var res=window.imodeTrashRestore(eid);
+     toast(res.ok?tl('กู้คืนแล้ว','Restored'):res.message);
+     if(typeof closeModal==='function')closeModal();
+     render();
+     return;
+    }
+    ask(tl('ลบรายการนี้อย่างถาวร? กู้คืนไม่ได้อีก','Delete this permanently? It cannot be undone.'),
+        tl('ลบถาวร','Delete permanently')).then(function(ok){
+     if(!ok)return;
+     window.imodeTrashPurge(eid);
+     toast(tl('ลบถาวรแล้ว','Permanently deleted'));
+     if(typeof closeModal==='function')closeModal();
+     render();
+    });
+   });
+  }
+ }
+
  function wire(host){
   if(host.__trashWired)return;
   host.__trashWired=true;
+  host.addEventListener('keydown',function(e){
+   if(e.key!=='Enter'&&e.key!==' '&&e.key!=='Spacebar')return;
+   var row=e.target&&e.target.closest?e.target.closest('.trash-row'):null;
+   if(!row||e.target.closest('button'))return;
+   e.preventDefault();
+   openEntry(row.getAttribute('data-entry'));
+  });
   host.addEventListener('click',function(e){
    var t=e.target;
    if(!t||!t.closest)return;
@@ -588,6 +735,7 @@
    var row=act.closest('.trash-row');
    if(!row)return;
    var id=row.getAttribute('data-entry');
+   if(a==='open'){openEntry(id);return}
    if(a==='restore'){
     var res=window.imodeTrashRestore(id);
     toast(res.ok?tl('กู้คืนแล้ว','Restored'):res.message);
@@ -662,6 +810,18 @@
  +'.trash-del-btn{color:#c02626;border-color:#f3cdcd}'
  +'@media (max-width:640px){'
  +'.trash-row{grid-template-columns:28px minmax(0,1fr) 52px;row-gap:8px}'
+ +'.trash-row[role="button"]{cursor:pointer}'
+ +'.trash-row[role="button"]:hover{border-color:#b9d2f4}'
+ +'.trash-row:focus-visible{outline:2px solid #0b63e5;outline-offset:2px}'
+ +'.trash-detail-head{display:flex;align-items:center;gap:11px;margin-bottom:10px}'
+ +'.trash-detail-ico{font-size:22px;width:40px;height:40px;border-radius:12px;background:#eef4ff;display:grid;place-items:center;flex:none}'
+ +'.trash-detail-head b{display:block;font-size:15px;color:#0c225e}'
+ +'.trash-detail-head small{display:block;font-size:11.5px;color:#5b6b88;margin-top:2px}'
+ +'.trash-kv{display:grid;grid-template-columns:minmax(96px,34%) 1fr;gap:6px 12px;margin:0 0 12px;font-size:12.5px}'
+ +'.trash-kv dt{color:#5b6b88;overflow-wrap:anywhere}'
+ +'.trash-kv dd{margin:0;color:#0c225e;font-weight:600;overflow-wrap:anywhere}'
+ +'.trash-kv.is-meta{padding:10px 12px;border:1px solid #e3ecfa;border-radius:12px;background:#f8fbff}'
+ +'.trash-detail-sub{margin:4px 0 8px;font-size:12px;font-weight:800;color:#5b6b88}'
  +'.trash-ops{grid-column:1/-1;justify-content:flex-end}'
  +'.trash-main b{white-space:normal}}';
  document.head.appendChild(style);

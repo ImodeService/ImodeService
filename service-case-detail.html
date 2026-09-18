@@ -3023,16 +3023,34 @@ function repaintProgress(){
   wrap.innerHTML=renderProgress(caseDetailModel);
   host.parentNode.replaceChild(wrap.firstChild,host);
 }
-/* ลบเคส. This page still writes no business data — deleting has to move the record into
-   ถังขยะ, drop the Supabase row and re-render the lists, and only the application can do
-   all three. So the button hands the case over the same way นัดหมาย and เปลี่ยนสถานะ do,
-   with intent=delete, and js/28 calls imodeDeleteCase() there. That function asks for
-   confirmation and checks case.edit itself, which is why this side does not ask twice. */
+/* ลบเคส. Moving the record into ถังขยะ, dropping the Supabase row and re-rendering the lists
+   is still the application's job — only it owns settings.trash — so the case is handed over
+   with intent=delete as นัดหมาย and เปลี่ยนสถานะ are.
+
+   2026-09-18, on the owner's instruction "กดลบหน้าไหน popup ขึ้นหน้านั้น": the QUESTION is asked
+   HERE, on the page the button is on, instead of after the jump. On yes a one-shot marker is
+   left in sessionStorage and js/28 reads it, calls imodeDeleteCaseConfirmed() and clears it —
+   so the visitor is asked exactly once, on the screen they pressed.
+
+   The marker is in sessionStorage on purpose: a hand-made URL carrying intent=delete cannot
+   set one, so that URL still goes through the asking path and still checks case.edit, which
+   is the property part 21 deliberately gave it. */
 function deleteCase(){
-  var id=caseDetailModel&&caseDetailModel.case&&caseDetailModel.case.id;
+  var c=caseDetailModel&&caseDetailModel.case,id=c&&c.id;
   if(!id){toast('ไม่พบเคส');return}
-  toast('กำลังเปิดระบบหลักเพื่อยืนยันการลบเคส…');
-  setTimeout(function(){goApp('cases','&caseId='+encodeURIComponent(id)+'&intent=delete')},450);
+  scdAsk({
+    title:'ลบเคสนี้',
+    message:'เคส '+(c.caseNo||c.ticket||id)+'\n'
+      +'ย้ายไปถังขยะ พร้อมคำขอจากลูกค้าของเคสนี้ (ถ้ามี)\n'
+      +'กู้คืนได้จากถังขยะภายใน 30 วัน',
+    okText:'ลบเคส',
+    danger:true
+  }).then(function(ok){
+    if(!ok)return;
+    try{sessionStorage.setItem('imode_v70_delete_ok',id)}catch(e){}
+    toast('กำลังย้ายเคสไปถังขยะ…');
+    setTimeout(function(){goApp('cases','&caseId='+encodeURIComponent(id)+'&intent=delete')},350);
+  });
 }
 /* This page still writes no business data. Stopping the response clock leaves one entry in
    imode_v70_case_responded — the device-local mirror js/48 owns — and the application

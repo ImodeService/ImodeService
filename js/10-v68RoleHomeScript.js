@@ -174,11 +174,12 @@
     ${profileCard()}
     <div class="rhome-quickhead">
      <b>${esc(L('โมดูลที่ใช้บ่อย','Quick modules'))}</b>
-     <small>${esc(L('เรียงตามการใช้งานของคุณ','Ordered by how often you use them'))}</small>
+     <small>${esc(fixedQuickOrder()?L('โมดูลหลักที่ใช้ทุกวัน','The ones you work in every day')
+                                    :L('เรียงตามการใช้งานของคุณ','Ordered by how often you use them'))}</small>
     </div>
     <div class="rhome-modgrid">${quick.map(moduleCard).join('')}</div>
     ${rest.length?`<button type="button" class="rhome-more-btn" id="rhomeMoreBtn" aria-expanded="false">${esc(L('โมดูลทั้งหมด','All modules'))} (${rest.length}) ▾</button>
-    <div class="rhome-modgrid rhome-modgrid-rest" id="rhomeRestGrid" hidden>${rest.map(moduleCard).join('')}</div>`:''}
+    <div class="rhome-modgrid rhome-modgrid-rest" id="rhomeRestGrid" hidden>${groupedRest(rest)}</div>`:''}
     ${mods.length?'':`<p class="rhome-empty">${esc(L('บัญชีนี้ยังไม่ได้รับสิทธิ์เข้าถึงโมดูลใด','This account has not been granted access to any module'))}</p>`}
    </div>`;
   host.querySelectorAll('.rhome-modcard[data-page]').forEach(btn=>{btn.onclick=()=>launchStaff(btn.dataset.page,btn)});
@@ -225,11 +226,24 @@
    localStorage.setItem(HOME_USAGE_KEY,JSON.stringify(all));
   }catch(e){}
  }
+ /* 2026-09-18, the owner's own list for the ADMIN board, in this order and fixed:
+    "อยากให้จัดโมดุลที่ใช้งานบ่อย ปรับใหม่ เริ่มจาก 1.คำขอจากลูกค้า 2.เคส 3.ใบเสนอราคา 4.เครื่องจักร
+    5.มอบหมายงาน 6.ลูกค้า ส่วนที่เหลือก็เอาไปใส่ไว้ในโมดุลทั้งหมดและแบ่งหมวดหมู่ไว้" — said of the
+    admin, so a technician's board keeps the usage ordering it has had since part 6 §6.
+    It is deliberately NOT reordered by how often each one is opened: an asked-for board that
+    rearranges itself after a few taps is not the board that was asked for. */
+ const STAFF_QUICK=['requests','cases','quotation','machines','assign','customers'];
+ function fixedQuickOrder(){
+  const r=String((currentUser&&(currentUser.permissionRole||currentUser.role))||'');
+  return !(/lead|supervisor|หัวหน้า/i.test(r))&&!(/technician|r&d|engineer|ช่าง/i.test(r));
+ }
  function defaultQuickList(){
   const r=String((currentUser&&(currentUser.permissionRole||currentUser.role))||'');
   if(/lead|supervisor|หัวหน้า/i.test(r))return QUICK_DEFAULT.lead;
   if(/technician|r&d|engineer|ช่าง/i.test(r))return QUICK_DEFAULT.technician;
-  return QUICK_DEFAULT.staff;
+  /* Its own constant rather than QUICK_DEFAULT.staff, which js/16 unshifts 'assign' onto at
+     registration time — that would put มอบหมายงาน first again and undo the order above. */
+  return STAFF_QUICK;
  }
  /* Usage wins, then the role's default order, then the module order itself. A module the
     role cannot open never enters the list, because `mods` is already permission filtered. */
@@ -241,11 +255,39 @@
    const i=pref.indexOf(m.page);
    return i<0?pref.length+mods.indexOf(m):i;
   };
+  /* The admin board is the list above, in that order, whatever has been opened most. */
+  if(fixedQuickOrder()){
+   return mods.slice().sort((a,b)=>rank(a)-rank(b))
+     .slice(0,Math.max(QUICK_LIMIT,mods.length<=QUICK_LIMIT?mods.length:0));
+  }
   return mods.slice().sort((a,b)=>{
    const ua=Number(use[a.page])||0,ub=Number(use[b.page])||0;
    if(ua!==ub)return ub-ua;
    return rank(a)-rank(b);
   }).slice(0,Math.max(QUICK_LIMIT,mods.length<=QUICK_LIMIT?mods.length:0));
+ }
+
+ /* Everything that is not on the quick board, under headings — "ส่วนที่เหลือก็เอาไปใส่ไว้ใน
+    โมดุลทั้งหมดและแบ่งหมวดหมู่ไว้". The categories are js/36's sidebar groups, read at render
+    time rather than copied: the sidebar and this list must not be able to disagree about
+    which group a module belongs to, and js/36 loads after this file. A module in no group,
+    and any module added later, falls into อื่น ๆ rather than disappearing. */
+ function groupedRest(rest){
+  let groups=[];
+  try{groups=(window.imodeNavGroups&&window.imodeNavGroups.groups)||[]}catch(e){}
+  const left=rest.slice(),out=[];
+  groups.forEach(g=>{
+   const inGroup=[];
+   (g.pages||[]).forEach(p=>{
+    const i=left.findIndex(m=>m.page===p);
+    if(i>=0)inGroup.push(left.splice(i,1)[0]);
+   });
+   if(inGroup.length)out.push({name:L(g.th,g.en||g.th),mods:inGroup});
+  });
+  if(left.length)out.push({name:L('อื่น ๆ','Other'),mods:left});
+  if(!out.length)return rest.map(moduleCard).join('');
+  return out.map(sec=>`<h4 class="rhome-restgroup">${esc(sec.name)}</h4>`
+    +sec.mods.map(moduleCard).join('')).join('');
  }
 
  /* The identity block at the top: the person's photo on the left, their details on the

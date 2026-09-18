@@ -127,3 +127,37 @@
    fourth one-off, the class of bug is closed here. Anything that must stay visible while
    carrying the attribute is a bug in its own right. */
 [hidden]{display:none !important}
+
+/* ------------------------------------------------- 7. phone: three corrections ---
+   Reported 2026-09-18 with screenshots of the app on a phone. */
+
+/* 7a. The dashboard's status breakdown was one row per status, so seven statuses meant
+   seven full-width rows under the donut and a lot of scrolling for a legend.
+   "ตัวของปุ่มมันอยู่กันเป็นคู่ครับ" — two to a row. The KPI cards above it are already
+   2x2, so this also stops the page changing rhythm half way down. */
+@media (max-width:900px){
+  .status-legend{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .status-legend-item{padding:9px 10px;border-radius:12px}
+  .status-legend-item b{font-size:12px;line-height:1.35;overflow-wrap:anywhere}
+  .status-legend-item small{font-size:10.5px}
+}
+
+/* 7b. The top bar follows the finger: out of the way going down, back on the way up, and
+   always there at the top of the page. It is position:sticky already (css/01), so its space
+   stays reserved and nothing below it moves when it goes — only the bar itself travels.
+   The class is put on <body> by js/87; with that file removed the bar simply stays put. */
+@media (max-width:900px){
+  .topbar{transition:transform .26s ease}
+  body.v70-topbar-hidden .topbar{transform:translateY(-145%)}
+}
+@media (prefers-reduced-motion:reduce){
+  .topbar{transition:none}
+}
+
+/* 7c. A heading inside the โมดูลทั้งหมด grid spans the whole row, so the categories read as
+   sections rather than as another card. */
+.rhome-modgrid .rhome-restgroup{
+  grid-column:1/-1;margin:10px 2px 2px;font-size:12px;font-weight:800;
+  color:#5b6b88;letter-spacing:.02em;
+}
+.rhome-modgrid .rhome-restgroup:first-child{margin-top:2px}

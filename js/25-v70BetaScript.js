@@ -67,11 +67,20 @@
    {page:'documents',    icon:'📁',th:'เอกสาร',    en:'Documents',perm:'documents.view'}
   ],
   staff:[
-   {page:'dashboard',    icon:'▦', th:'หน้าหลัก',   en:'Home',     perm:'dashboard.view'},
+   /* 2026-09-18: หน้าหลัก means the Home board (#page-home), not the dashboard — "ปุ่มหน้าหลัก
+      กดแล้วควรที่จะไปหน้า Home page". The permission stays dashboard.view because that is what
+      this slot has always been gated on; 'home' itself has no PAGE_PERMISSION key, so
+      applyRoleVisibility() leaves the button alone either way. */
+   {page:'home',         icon:'⌂', th:'หน้าหลัก',   en:'Home',     perm:'dashboard.view'},
    {page:'cases',        icon:'📋',th:'เคส',       en:'Cases',    perm:'case.view'},
    {page:'assign',       icon:'📌',th:'มอบหมาย',   en:'Assign',   perm:'case.assign'},
-   {page:'calendar',     icon:'📅',th:'ปฏิทิน',    en:'Calendar', perm:'calendar.view'},
+   /* 2026-09-18: คำขอจากลูกค้า takes the fourth slot and ปฏิทิน moves into เมนูเพิ่มเติม (js/06)
+      — "อยากให้สิ่งที่จะอยู่แทนปฏิทินคือ คำขอจากลูกค้า". The bar has four slots beside the FAB, so
+      calendar staying further down this list means it only reappears for a role that cannot
+      open one of the four above it. */
+   {page:'requests',     icon:'📥',th:'คำขอ',      en:'Requests', perm:'line.view'},
    {page:'notifications',icon:'🔔',th:'แจ้งเตือน',  en:'Alerts',   perm:'notifications.view'},
+   {page:'calendar',     icon:'📅',th:'ปฏิทิน',    en:'Calendar', perm:'calendar.view'},
    {page:'qc',           icon:'✅',th:'QC',         en:'QC',       perm:'qc.view'},
    {page:'machines',     icon:'⚙', th:'เครื่องจักร',en:'Machines', perm:'machine.view'}
   ]

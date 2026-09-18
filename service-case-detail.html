@@ -1237,14 +1237,28 @@ function fieldDone(m){
   return !!(m.closing&&m.closing.serviceReportReady);
 }
 
+/* 2026-09-18: มอบหมาย and นัดหมาย are ONE circle. They were two, and by then they were two
+   circles for one press — js/16's picker has demanded a technician AND a date together since
+   part 22 ("รวมปุ่ม มอบหมายงาน กับ นัดหมาย ไว้ด้วยกัน"), and js/83's รับใบเสนอราคา goes through
+   the same panel. Both statuses still exist and are still written; they simply share a step.
+
+   EVERY STEP IS ADDRESSED BY KEY, through S(), and never by a literal index. Before this the
+   page carried ~20 hard-coded numbers — stepDrawerHTML's branches, stepGate, WS_LABELS,
+   wsWrite's keepStep, openStep — and merging two entries shifts every one of them by one,
+   which is exactly the kind of silent off-by-one this file has been bitten by. Add or move a
+   step and only this array changes. */
 var STEPS=[
-  {th:'รับแจ้งปัญหา',statuses:['เคสใหม่']},
-  {th:'ตรวจสอบ / มอบหมาย',statuses:['มอบหมายแล้ว']},
-  {th:'นัดหมายบริการ',statuses:['นัดหมายแล้ว']},
-  {th:'กำลังให้บริการ',statuses:['กำลังดำเนินการ','รออะไหล่']},
-  {th:'งานเสร็จ / ตรวจรับ',statuses:['รอส่งงาน','เสร็จสิ้น']},
-  {th:'ปิดเคส',statuses:['ปิดเคส']}
+  {key:'intake',  th:'รับแจ้งปัญหา',       statuses:['เคสใหม่']},
+  {key:'assign',  th:'มอบหมาย / นัดหมาย',  statuses:['มอบหมายแล้ว','นัดหมายแล้ว']},
+  {key:'service', th:'กำลังให้บริการ',      statuses:['กำลังดำเนินการ','รออะไหล่']},
+  {key:'done',    th:'งานเสร็จ / ตรวจรับ',  statuses:['รอส่งงาน','เสร็จสิ้น']},
+  {key:'close',   th:'ปิดเคส',             statuses:['ปิดเคส']}
 ];
+function S(key){
+  for(var i=0;i<STEPS.length;i++)if(STEPS[i].key===key)return i;
+  return -1;
+}
+function stepNo(key){return S(key)+1}   /* what the circle says on screen */
 /* Hold states are shown as their own badges. They are never one of the six steps: a case
    that is waiting for parts is still at "กำลังให้บริการ". */
 var HOLD_STATES={'รออะไหล่':'📦 รออะไหล่'};
@@ -1393,7 +1407,7 @@ function renderProgress(m){
        clicking it then opens step 4's track instead of refusing silently. */
     var role = i<=idx ? 'open' : (i===idx+1 ? 'next' : 'far');
     /* แก้ไขทางออนไลน์: the case may be closed from wherever it is, by the people allowed to. */
-    if(i===5&&!closed&&onlineState(m.raw).on&&mayCloseOnline())role='online';
+    if(i===S('close')&&!closed&&onlineState(m.raw).on&&mayCloseOnline())role='online';
     var gate = role==='next' ? stepGate(m,idx) : '';
     var blocked = !!gate;
     var hint = role==='open' ? 'ดูรายละเอียดขั้นนี้'
@@ -1437,32 +1451,30 @@ function stepDrawerHTML(m,i){
     return '<div class="sd-head"><h4>'+esc(t)+'</h4>'+(sub?'<p>'+esc(sub)+'</p>':'')
       +'<button type="button" class="sd-close" data-action="close-step">ปิด</button></div>';
   };
-  if(isWorkshopCase(m.raw)&&(i===2||i===3||i===4))return wsDrawerHTML(m,i,head);
-  if(i===0){
-    return head('1. รับแจ้งปัญหา','เคสนี้เข้ามาอย่างไร')
+  if(isWorkshopCase(m.raw)&&(i===S('assign')||i===S('service')||i===S('done')))return wsDrawerHTML(m,i,head);
+  if(i===S('intake')){
+    return head(stepNo('intake')+'. รับแจ้งปัญหา','เคสนี้เข้ามาอย่างไร')
       +'<dl class="sd-kv"><dt>รับแจ้ง</dt><dd>'+esc(fmtDateTime(c.createdAt))+'</dd>'
       +'<dt>ช่องทาง</dt><dd>'+esc(c.source||'-')+'</dd>'
       +'<dt>ผู้ติดต่อ</dt><dd>'+esc(m.customer.contactName||'-')+(m.customer.phone?' · '+esc(m.customer.phone):'')+'</dd>'
       +'<dt>อาการที่แจ้ง</dt><dd>'+esc(c.issueDescription||c.issueTitle||'-')+'</dd></dl>';
   }
-  if(i===1){
+  /* One step, both facts — and one button, because the panel it opens writes both. */
+  if(i===S('assign')){
     var t=m.assignment.technician;
-    return head('2. ตรวจสอบ / มอบหมาย','ใครรับผิดชอบงานนี้')
+    return head(stepNo('assign')+'. มอบหมาย / นัดหมาย','ใครรับผิดชอบ และนัดลูกค้าไว้เมื่อไร')
       +(t?'<dl class="sd-kv"><dt>ช่างผู้รับผิดชอบ</dt><dd>'+esc(t.name||'-')+'</dd>'
           +'<dt>มอบหมายเมื่อ</dt><dd>'+esc(fmtDateTime(m.assignment.assignedAt))+'</dd></dl>'
         :'<p class="sd-empty">ยังไม่ได้มอบหมายช่าง</p>')
-      +'<div class="sd-acts"><button type="button" class="sd-go" data-action="assign-technician">เลือกช่าง / มอบหมายงาน ›</button></div>'
-      +quoteSectionHTML();
-  }
-  if(i===2){
-    return head('3. นัดหมายบริการ','วันเวลาที่นัดลูกค้าไว้')
       +(m.appointment.date
         ?'<dl class="sd-kv"><dt>นัดหมาย</dt><dd>'+esc(fmtDateTime(m.appointment.date))+'</dd>'
          +'<dt>สถานที่</dt><dd>'+esc(m.appointment.location||m.customer.address||'-')+'</dd></dl>'
         :'<p class="sd-empty">ยังไม่มีนัดหมาย</p>')
-      +'<div class="sd-acts"><button type="button" class="sd-go" data-action="assign-technician">ตั้ง / แก้นัดหมาย ›</button></div>';
+      +'<div class="sd-acts"><button type="button" class="sd-go" data-action="assign-technician">'
+      +(t||m.appointment.date?'แก้ไขช่าง / นัดหมาย ›':'เลือกช่างและวันนัดหมาย ›')+'</button></div>'
+      +quoteSectionHTML();
   }
-  if(i===3){
+  if(i===S('service')){
     /* the technician's track, drawn under the main one */
     var hit=fieldReached(m),done=fieldDone(m);
     var dots=FIELD_STEPS.map(function(fs,k){
@@ -1473,15 +1485,15 @@ function stepDrawerHTML(m,i){
         +'<b>'+esc(fs)+'</b>'
         +(hit[fs]?'<small>'+esc(fmtDateTime(hit[fs]))+'</small>':'')+'</li>';
     }).join('');
-    return head('4. กำลังให้บริการ','ความคืบหน้าที่ช่างอัปเดตจากหน้างาน')
+    return head(stepNo('service')+'. กำลังให้บริการ','ความคืบหน้าที่ช่างอัปเดตจากหน้างาน')
       +'<ol class="sd-field">'+dots+'</ol>'
       +'<p class="'+(done?'sd-ok':'sd-wait')+'">'
-      +(done?'✔ ช่างทำงานเสร็จแล้ว — กดวงกลมขั้นที่ 5 เพื่อไปต่อได้'
+      +(done?'✔ ช่างทำงานเสร็จแล้ว — กดวงกลมขั้นที่ '+stepNo('done')+' เพื่อไปต่อได้'
             :'⏳ ยังรอช่างอัปเดตให้ถึง “จบงาน” หรือบันทึกใบตรวจ ระหว่างนี้ยังข้ามไปขั้นถัดไปไม่ได้')+'</p>'
       +'<div class="sd-acts"><button type="button" class="sd-go" data-action="open-field-service">เปิดหน้างานช่าง ›</button></div>';
   }
-  if(i===4){
-    return head('5. งานเสร็จ / ตรวจรับ','ใบตรวจและเอกสารของงานนี้')
+  if(i===S('done')){
+    return head(stepNo('done')+'. งานเสร็จ / ตรวจรับ','ใบตรวจและเอกสารของงานนี้')
       +'<dl class="sd-kv"><dt>ใบตรวจ</dt><dd>'
       +(m.closing.serviceReportReady?'มีใบตรวจแล้ว':'ยังไม่มีใบตรวจ')+'</dd>'
       +'<dt>เครื่อง</dt><dd>'+esc(m.machine.name||'-')
@@ -1490,9 +1502,9 @@ function stepDrawerHTML(m,i){
       +'<button type="button" class="sd-go" data-action="open-case-attachments">เอกสาร &amp; รูปภาพ ›</button>'
       +'<button type="button" class="sd-go" data-action="open-machine-history">ประวัติ / เอกสารเครื่อง ›</button>'
       +'</div>'
-      +'<p class="sd-hint">ตรวจรับเรียบร้อยแล้วกดวงกลมขั้นที่ 6 เพื่อปิดเคส</p>';
+      +'<p class="sd-hint">ตรวจรับเรียบร้อยแล้วกดวงกลมขั้นที่ '+stepNo('close')+' เพื่อปิดเคส</p>';
   }
-  return head('6. ปิดเคส','งานนี้จบแล้ว')
+  return head(stepNo('close')+'. ปิดเคส','งานนี้จบแล้ว')
     +'<dl class="sd-kv"><dt>ปิดเมื่อ</dt><dd>'+esc(fmtDateTime(c.updatedAt))+'</dd></dl>'
     +'<div class="sd-acts"><button type="button" class="sd-go" data-action="open-feedback">ประเมินความพึงพอใจ ›</button></div>';
 }
@@ -1739,7 +1751,7 @@ function confirmQuote(){
   try{localStorage.setItem(K.quotes,JSON.stringify(list))}catch(e){toast('บันทึกไม่สำเร็จ');return}
   var done=function(cloud){
     try{CaseDetailData.refresh()}catch(e){}
-    openStep=1;
+    openStep=S('assign');
     repaintProgress();
     toast(cloud?'ยืนยันใบเสนอราคาแล้ว':'ยืนยันแล้ว · ยังอยู่เฉพาะเครื่องนี้ ยังไม่ได้ส่งขึ้นระบบกลาง');
   };
@@ -1752,13 +1764,15 @@ function confirmQuote(){
 /* Only the timestamps the case really has are shown under a step. */
 function stepTimes(m){
   var out=[];
-  out[0]=m.case.createdAt?fmtDateTime(m.case.createdAt):'';
-  out[1]=m.assignment.technician?fmtDateTime(m.assignment.assignedAt):'';
-  out[2]=m.appointment.date?fmtDateTime(m.appointment.date):'';
+  out[S('intake')]=m.case.createdAt?fmtDateTime(m.case.createdAt):'';
+  /* One circle, so the appointment is what it shows once there is one — that is the later
+     of the two facts and the one people are waiting on; the assignment time is in the drawer. */
+  out[S('assign')]=m.appointment.date?fmtDateTime(m.appointment.date)
+    :(m.assignment.technician?fmtDateTime(m.assignment.assignedAt):'');
   var log=(m.activity||[]).filter(function(a){return a.type==='field_status'});
-  out[3]=log.length?fmtDateTime(log[log.length-1].timestamp):'';
-  out[4]=m.closing.serviceReportReady?'มีใบตรวจแล้ว':'';
-  out[5]=m.case.status==='ปิดเคส'?fmtDateTime(m.case.updatedAt):'';
+  out[S('service')]=log.length?fmtDateTime(log[log.length-1].timestamp):'';
+  out[S('done')]=m.closing.serviceReportReady?'มีใบตรวจแล้ว':'';
+  out[S('close')]=m.case.status==='ปิดเคส'?fmtDateTime(m.case.updatedAt):'';
   return out;
 }
 
@@ -1778,8 +1792,8 @@ function stepTimes(m){
      5. เริ่มหน้างาน       hand it to the technician
 
    Item 8 took เปลี่ยนสถานะ off the bar. The status is not a sixth thing you do; it is the
-   consequence of the five above, and the six step circles over this bar already change it —
-   a circle one step ahead moves the case on, and step 6 closes it. changeCaseStatus() is
+   consequence of the five above, and the step circles over this bar already change it —
+   a circle one step ahead moves the case on, and the last one closes it. changeCaseStatus() is
    kept in HANDLERS so the step drawers and any older markup can still reach it. */
 var ACTIONS=[
   {act:'contact-customer', icon:'📞',label:'ติดต่อลูกค้า',cls:'green'},
@@ -2091,7 +2105,8 @@ function openQuotation(){goApp('quotation','&caseId='+encodeURIComponent(caseDet
    module later reopens this one. Without the caseId the module would pick a job on its own. */
 function openFieldService(){
   if(isWorkshopCase(caseDetailModel.raw)){
-    openStep=stepIndex(caseDetailModel.case.status)>=4?4:wsLast(caseDetailModel.raw,'received')?3:2;
+    openStep=stepIndex(caseDetailModel.case.status)>=S('done')?S('done')
+      :wsLast(caseDetailModel.raw,'received')?S('service'):S('assign');
     repaintProgress();
     var pr=document.querySelector('.scd-progress');
     if(pr&&pr.scrollIntoView)pr.scrollIntoView({behavior:'smooth',block:'start'});
@@ -2421,7 +2436,12 @@ function wireCaseCategory(){
 
 var WS_TYPE='ลูกค้าส่งเครื่องเข้าบริษัท';
 var WS_TRACK=['รอตรวจ','กำลังตรวจ','กำลังซ่อม','รออะไหล่','ทดสอบ','พร้อมส่งคืน'];
-var WS_LABELS={2:'รับเครื่องเข้าบริษัท',3:'R&D ตรวจ / ซ่อม',4:'QC / ส่งคืนเครื่อง'};
+/* A Workshop case renames three of the circles. Keyed through S() so the merge of
+   มอบหมาย+นัดหมาย moved them without a renumbering: the machine arriving IS that step now. */
+var WS_LABELS={};
+WS_LABELS[S('assign')]='รับเครื่องเข้าบริษัท';
+WS_LABELS[S('service')]='R&D ตรวจ / ซ่อม';
+WS_LABELS[S('done')]='QC / ส่งคืนเครื่อง';
 var wsPending=[];
 function isWorkshopCase(raw){return !!raw&&String(raw.serviceType||'')===WS_TYPE}
 function wsLast(raw,kind){
@@ -2474,9 +2494,9 @@ function wsWrite(entry,status,keepStep,message){
 function wsDrawerHTML(m,i,head){
   var raw=m.raw||{},c=m.case,l=wsLast(raw,'logistics')||{};
   var may=wsMayWork();
-  if(i===2){
+  if(i===S('assign')){
     var rc=wsLast(raw,'received');
-    return head('3. รับเครื่องเข้าบริษัท','งาน Workshop · เครื่องเข้ามาที่บริษัท')
+    return head(stepNo('assign')+'. รับเครื่องเข้าบริษัท','งาน Workshop · เครื่องเข้ามาที่บริษัท และใครรับผิดชอบ')
       +'<dl class="sd-kv"><dt>นำเครื่องเข้า</dt><dd>'+esc(wsInboundText(l.inbound))+'</dd>'
       +'<dt>รับเครื่องคืน</dt><dd>'+esc(wsOutboundText(l.outbound))+'</dd>'
       +(m.appointment.date?'<dt>นัดรับเครื่อง</dt><dd>'+esc(fmtDateTime(m.appointment.date))+'</dd>':'')
@@ -2488,10 +2508,14 @@ function wsDrawerHTML(m,i,head){
       +(rc?'<p class="sd-ok">✔ รับเครื่องเข้าบริษัทแล้ว</p>':'<p class="sd-wait">⏳ ยังไม่ได้บันทึกรับเครื่องเข้า</p>')
       +'<div class="sd-acts">'
       +(may?'<button type="button" class="sd-go is-primary" data-action="ws-receive">'+(rc?'แก้ไขบันทึกรับเครื่อง ›':'บันทึกรับเครื่องเข้า ›')+'</button>':'')
-      +(l.inbound==='pickup'?'<button type="button" class="sd-go" data-action="assign-technician">ตั้งวันไปรับเครื่อง / มอบหมาย ›</button>':'')
+      /* Always offered now: มอบหมาย used to be a circle of its own, and this one replaces it
+         for a Workshop case — without this the assign panel would have no way in at all. */
+      +'<button type="button" class="sd-go" data-action="assign-technician">'
+      +(l.inbound==='pickup'?'ตั้งวันไปรับเครื่อง / มอบหมาย ›'
+        :(m.assignment.technician?'แก้ไขช่าง / นัดหมาย ›':'เลือกช่างและวันนัดหมาย ›'))+'</button>'
       +'</div>';
   }
-  if(i===3){
+  if(i===S('service')){
     var now=wsTrackNow(raw),at={};
     ((raw.fieldStatusLog)||[]).forEach(function(e){if(e&&e.workshop==='status')at[e.label]=e.createdAt});
     var nowIdx=WS_TRACK.indexOf(now);
@@ -2501,17 +2525,17 @@ function wsDrawerHTML(m,i,head){
         +'<span class="fdot">'+(done?'✔':String(k+1))+'</span><b>'+esc(label)+'</b>'
         +(at[label]?'<small>'+esc(fmtDateTime(at[label]))+'</small>':'')+'</li>';
     }).join('');
-    return head('4. R&D ตรวจ / ซ่อม','สถานะงานในบริษัท — เริ่มได้ก่อนลูกค้าเซ็นใบเสนอราคา')
+    return head(stepNo('service')+'. R&D ตรวจ / ซ่อม','สถานะงานในบริษัท — เริ่มได้ก่อนลูกค้าเซ็นใบเสนอราคา')
       +'<ol class="sd-field">'+dots+'</ol>'
-      +(now==='พร้อมส่งคืน'?'<p class="sd-ok">✔ พร้อมส่งคืน — กดวงกลมขั้นที่ 5 เพื่อไปทำ QC และส่งคืน</p>'
-        :'<p class="sd-wait">⏳ '+(now?'ตอนนี้: '+esc(now):'ยังไม่ได้เริ่มงาน')+' — ไปขั้นที่ 5 ได้เมื่อถึง “พร้อมส่งคืน”</p>')
+      +(now==='พร้อมส่งคืน'?'<p class="sd-ok">✔ พร้อมส่งคืน — กดวงกลมขั้นที่ '+stepNo('done')+' เพื่อไปทำ QC และส่งคืน</p>'
+        :'<p class="sd-wait">⏳ '+(now?'ตอนนี้: '+esc(now):'ยังไม่ได้เริ่มงาน')+' — ไปขั้นที่ '+stepNo('done')+' ได้เมื่อถึง “พร้อมส่งคืน”</p>')
       +(may?'<div class="sd-acts ws-set">'+WS_TRACK.map(function(label){
           return '<button type="button" class="sd-go'+(label===now?' is-primary':'')+'" data-ws-status="'+esc(label)+'">'+esc(label)+'</button>';
         }).join('')+'</div>':'');
   }
-  if(i===4){
+  if(i===S('done')){
     var qc=wsQcPass(c.id),anyQc=wsQcAny(c.id),rt=wsLast(raw,'returned');
-    return head('5. QC / ส่งคืนเครื่อง','ต้องผ่าน QC ก่อนส่งคืนทุกครั้ง')
+    return head(stepNo('done')+'. QC / ส่งคืนเครื่อง','ต้องผ่าน QC ก่อนส่งคืนทุกครั้ง')
       +'<dl class="sd-kv"><dt>QC ก่อนส่งคืน</dt><dd>'
       +(qc?'✔ '+esc(qc.status)+' · '+esc(qc.qcNo||qc.id)
          :anyQc?'✕ ยังไม่ผ่าน ('+esc(anyQc.status||'-')+')':'ยังไม่ได้ทำ QC')+'</dd>'
@@ -2561,7 +2585,7 @@ function wsReceive(){
     wsWrite({workshop:'received',status:'Workshop · รับเครื่องเข้าบริษัทแล้ว',receivedDate:day,note:note,
       accessories:el('wsRecvAcc').value.trim(),
       media:wsPending.map(function(f){return {name:f.name,type:f.type,size:f.size,data:f.data}})},
-      idx<2?'นัดหมายแล้ว':'',2,'บันทึกรับเครื่องเข้าบริษัทแล้ว');
+      idx<S('assign')?'นัดหมายแล้ว':'',S('assign'),'บันทึกรับเครื่องเข้าบริษัทแล้ว');
   });
 }
 function wsRedraw(){
@@ -2591,13 +2615,13 @@ function wsAddFiles(list){
 function wsSetStatus(label){
   if(!wsMayWork()){toast('บัญชีนี้ไม่มีสิทธิ์อัปเดตสถานะงาน');return}
   var raw=caseDetailModel.raw||{},c=caseDetailModel.case;
-  if(!wsLast(raw,'received')){toast('ยังไม่ได้บันทึกรับเครื่องเข้าบริษัท — บันทึกที่ขั้นที่ 3 ก่อน');openStep=2;repaintProgress();return}
+  if(!wsLast(raw,'received')){toast('ยังไม่ได้บันทึกรับเครื่องเข้าบริษัท — บันทึกที่ขั้นที่ '+stepNo('assign')+' ก่อน');openStep=S('assign');repaintProgress();return}
   if(wsTrackNow(raw)===label){toast('สถานะเป็น “'+label+'” อยู่แล้ว');return}
   var idx=stepIndex(c.status),next='';
   /* The case follows the bench: waiting for parts is the case's own hold state, anything else
-     is work in progress. A case already past step 4 is left where it is. */
-  if(idx<=3)next=label==='รออะไหล่'?'รออะไหล่':'กำลังดำเนินการ';
-  wsWrite({workshop:'status',label:label,status:'Workshop · '+label},next,3,'อัปเดตสถานะเป็น “'+label+'” แล้ว');
+     is work in progress. A case already past that step is left where it is. */
+  if(idx<=S('service'))next=label==='รออะไหล่'?'รออะไหล่':'กำลังดำเนินการ';
+  wsWrite({workshop:'status',label:label,status:'Workshop · '+label},next,S('service'),'อัปเดตสถานะเป็น “'+label+'” แล้ว');
 }
 /* ---- QC, in the application's own QC module ---- */
 function wsQc(){
@@ -2635,7 +2659,7 @@ function wsReturn(){
     var method=m?m.value:'self';
     wsWrite({workshop:'returned',status:'Workshop · ส่งคืนเครื่องแล้ว',returnDate:day,method:method,
       receiver:name,sig:qsShrink(pad),note:method==='deliver'?'บริษัทไปส่งคืน':'ลูกค้ามารับเครื่องคืน'},
-      '',4,'บันทึกส่งคืนเครื่องแล้ว');
+      '',S('done'),'บันทึกส่งคืนเครื่องแล้ว');
   });
 }
 /* The form section: shown when ประเภทงาน is the Workshop type, so a field job can be turned into
@@ -2959,12 +2983,12 @@ function applyStatusNow(next){
 /* Why the circle one step ahead cannot be pressed yet, or '' when it can. */
 function stepGate(m,idx){
   if(isWorkshopCase(m.raw)){
-    if(idx===2&&!wsLast(m.raw,'received'))return 'ยังไม่ได้บันทึกรับเครื่องเข้าบริษัท';
-    if(idx===3&&wsTrackNow(m.raw)!=='พร้อมส่งคืน')return 'รอ R&D อัปเดตให้ถึง “พร้อมส่งคืน”';
-    if(idx===4&&!wsLast(m.raw,'returned'))return 'ต้องผ่าน QC และบันทึกส่งคืนเครื่องก่อน';
+    if(idx===S('assign')&&!wsLast(m.raw,'received'))return 'ยังไม่ได้บันทึกรับเครื่องเข้าบริษัท';
+    if(idx===S('service')&&wsTrackNow(m.raw)!=='พร้อมส่งคืน')return 'รอ R&D อัปเดตให้ถึง “พร้อมส่งคืน”';
+    if(idx===S('done')&&!wsLast(m.raw,'returned'))return 'ต้องผ่าน QC และบันทึกส่งคืนเครื่องก่อน';
     return '';
   }
-  return (idx===3&&!fieldDone(m))?'รอช่างอัปเดตให้จบกระบวนการก่อน':'';
+  return (idx===S('service')&&!fieldDone(m))?'รอช่างอัปเดตให้จบกระบวนการก่อน':'';
 }
 /* A circle was pressed. */
 function stepPressed(i,role){
@@ -2976,9 +3000,11 @@ function stepPressed(i,role){
     return;
   }
   /* role === 'next' */
-  /* Workshop step 3 IS the receiving form: pressing it opens the form, and saving it moves
-     the case on. */
-  if(isWorkshopCase(m.raw)&&idx===1&&i===2&&!wsLast(m.raw,'received')){wsReceive();return}
+  /* For a Workshop case that circle IS the receiving form: pressing it opens the form, and
+     saving it moves the case on. Since มอบหมาย and นัดหมาย became one circle it is pressed
+     from รับแจ้งปัญหา rather than from มอบหมายแล้ว; assigning a technician on a Workshop case
+     is done from the drawer or from the นัดหมาย button in the action bar. */
+  if(isWorkshopCase(m.raw)&&idx===S('intake')&&i===S('assign')&&!wsLast(m.raw,'received')){wsReceive();return}
   var gate=stepGate(m,idx);
   if(gate){
     openStep=idx;                     /* show the step that is holding it up, and why */

@@ -151,6 +151,7 @@
    try{if(typeof id==='string')markRead(id)}catch(e){}
    var r=base.apply(this,arguments);
    try{decorate()}catch(e){}
+   try{paintNavCount()}catch(e){}
    return r;
   };
  });
@@ -160,6 +161,7 @@
   window.goPage=function(name){
    var r=baseGoPage.apply(this,arguments);
    try{if(((document.querySelector('.page.active')||{}).id||'')==='page-my-work'){watch();decorate()}}catch(e){}
+   try{paintNavCount()}catch(e){}
    return r;
   };
  }
@@ -168,18 +170,37 @@
   window.renderAll=function(){
    var r=baseRenderAll.apply(this,arguments);
    try{decorate()}catch(e){}
+   try{paintNavCount()}catch(e){}
    return r;
   };
  }
- function start(){try{watch();decorate()}catch(e){}}
+ /* The badge is recomputed rather than incremented, so it can never drift from the rows. */
+ function paintNavCount(){
+  var n=0;
+  try{n=window.imodeNewJobCount()}catch(e){n=0}
+  var nodes=document.querySelectorAll('[data-page="my-work"]');
+  for(var i=0;i<nodes.length;i++){
+   var el=nodes[i],b=el.querySelector('.njb-navcount');
+   if(!n){if(b)b.parentNode.removeChild(b);continue}
+   if(!b){b=document.createElement('span');b.className='njb-navcount';
+    /* Into the label, not the icon, so it does not sit on top of the glyph. */
+    (el.querySelector('b')||el).appendChild(b);}
+   b.textContent=n>99?'99+':String(n);
+   b.setAttribute('aria-label',tl(n+' งานใหม่',n+' new jobs'));
+  }
+ }
+ window.imodePaintNewJobCount=paintNavCount;
+ function start(){try{watch();decorate();paintNavCount()}catch(e){}}
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
  else start();
 
  var st=document.createElement('style');
  st.id='v70NewJobBadgeStyle';
  st.textContent=''
- +'.njb-chip{display:inline-block;margin-left:0;font-size:10px;font-weight:800;letter-spacing:.4px;'
- +'color:#fff;background:linear-gradient(180deg,#ff8a3d,#f26a10);border-radius:999px;padding:2px 9px;'
+ /* 2026-09-20: bigger. Reported as not noticeable on a phone ("เวลามีงานใหม่มาที่หน้าช่าง
+    ให้ไฮไลท์ด้วยว่ามีงานใหม่") — 10px uppercase on a 390px screen reads as decoration. */
+ +'.njb-chip{display:inline-block;margin-left:0;font-size:11.5px;font-weight:800;letter-spacing:.4px;'
+ +'color:#fff;background:linear-gradient(180deg,#ff8a3d,#f26a10);border-radius:999px;padding:3px 11px;'
  +'box-shadow:0 2px 0 #cf5a0c;text-transform:uppercase;align-self:flex-start}'
  /* The row itself, so the whole bar reads as new rather than one small chip. The ledge colour
     is the one css/21 gives a tactile row, kept so the press still lands the same way. */
@@ -187,6 +208,15 @@
  +'.work-row.njb-new:hover{border-color:#f26a10}'
  +'@keyframes njbPulse{0%,100%{box-shadow:0 0 0 0 rgba(242,106,16,.34)}50%{box-shadow:0 0 0 6px rgba(242,106,16,0)}}'
  +'.work-row.njb-new .njb-chip{animation:njbPulse 2.1s ease-in-out infinite}'
- +'@media (prefers-reduced-motion:reduce){.work-row.njb-new .njb-chip{animation:none}}';
+ +'@media (prefers-reduced-motion:reduce){.work-row.njb-new .njb-chip{animation:none}}'
+ /* 2026-09-20 — THE COUNT, WHERE IT IS SEEN BEFORE THE PAGE IS OPENED.
+    The row chip only exists once งานของฉัน is on screen, so a technician had to go and
+    look to find out whether anything had arrived. This puts the same number on every
+    งานของฉัน entry — the sidebar item and the mobile bottom bar are both [data-page] —
+    the way js/49 badges คำขอจากลูกค้า. imodeNewJobCount() already existed. */
+ +'.njb-navcount{display:inline-flex;align-items:center;justify-content:center;min-width:18px;'
+ +'height:18px;padding:0 5px;margin-left:6px;border-radius:999px;background:#f26a10;color:#fff;'
+ +'font-size:11px;font-weight:800;line-height:1;vertical-align:middle;'
+ +'box-shadow:0 0 0 2px rgba(255,255,255,.35)}';
  document.head.appendChild(st);
 })();

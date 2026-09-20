@@ -5186,3 +5186,398 @@ script parses through `new Function`.
    database.
 6. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its
    serial or QR.
+
+---
+
+## Session Change Log — 2026-09-19 (part 28): a bug sweep — dates, money, stock, and three layouts
+
+The owner asked for a full bug hunt rather than a feature ("ตรวจหาบัคทั้งหมด และแก้ไขมัน"). No
+new module, no new file, no storage key, no schema change, no Supabase setting, version
+untouched. Seven defects were found, every one **measured in a browser before it was touched**
+and re-measured after.
+
+| File | What |
+|---|---|
+| `js/03-app-core.js` | `localISO()` / `todayISO()`; `addMonthsISO`; the travel-zone lookup; the dead `sw.js` registration |
+| `js/04-v67EnhanceScript.js` | the six date defaults; **`savePurchaseOrder` stock is a transition, not a state** |
+| `service-case-detail.html` | its own `todayISO()`, for the two Workshop date fields |
+| `css/23-v70-responsive.css` | §8 the dashboard donut, §9 the pager overlap, §10 the distance box |
+| `pages/customer-portal.html` | **deleted** — the superseded copy of the customer page |
+
+### How the sweep was run, because the method found things reading would not have
+
+A CDP driver in the session scratchpad (not added to the repo), carrying every harness note
+this file records. Passes, in order: `node --check` on all 92 JS files · all 287 inline
+`on*=` handler names resolved at runtime (0 missing) · duplicate element ids (0) · parse-time
+captures of a `window.*` defined only in a later file (0 real) · every page walked and every
+non-destructive control clicked as admin and as technician · the customer portal walked on a
+390px phone · the whole business flow asserted on OUTCOMES (19 assertions) · role permissions
+across five consecutive reloads · a responsive sweep at eight widths measuring per-element
+clipping · hostile data (quotes, an `img onerror`) through every list and popup · a
+rendered-page scan for NaN / undefined / Invalid Date / object Object.
+
+Clean, and worth recording so the next session does not re-derive them: **no handler is
+missing, no id is duplicated, escaping holds everywhere (19/19), permissions do not drift any
+more, the crew-vs-lead comparison of part 25 has no remaining sites** (all five survivors are
+guarded `imodeIsAssignedTo` fallbacks), **only ONE accumulating write exists in the whole
+project** (the PO one, below), and no page scrolls sideways at any width from 360 to 1920.
+
+### 1+2. THE DATE BUGS: `toISOString()` is UTC, and this is a UTC+7 country
+
+`new Date().toISOString().slice(0,10)` is the date **in UTC**. Bangkok is UTC+7 with no DST,
+so between **00:00 and 06:59 local it answers yesterday** — 7 hours of every 24. It was the
+"today" behind 23 expressions: the dashboard's `todayKey`, and the default date on the QC,
+petty cash, purchase order, machine document, sales quotation and warranty forms.
+
+The dashboard one is the clearest: `todayList` compares `c.appointment.slice(0,10)` — which is
+a **local** `datetime-local` string — against that UTC key. Before 07:00 they disagree and
+งานนัดหมายวันนี้ silently falls back to "nearest appointments" instead of today's.
+
+`addMonthsISO()` had the same fault one step worse and **always**, not only before 07:00:
+`dateISO(v)` is `new Date(v+'T00:00:00')`, a LOCAL midnight, and `toISOString()` then read it
+back in UTC. Measured in Asia/Bangkok, 8 cases of 8 wrong:
+
+```
+addMonthsISO('2026-09-19',12)  ->  2027-09-18   (should be 2027-09-19)
+addMonthsISO('2026-01-31',12)  ->  2027-01-30
+addMonthsISO('2026-03-31', 1)  ->  2026-04-29
+```
+
+So **every warranty registered through the UI ended a day early**, and the warranty form
+showed it: start 2026-09-19, ระยะเวลา 12 เดือน, สิ้นสุด **2027-09-18**.
+
+`localISO(v)` / `todayISO()` sit beside `dateISO` in js/03 and serialise the date parts the
+user actually sees. `service-case-detail.html` is a separate document and carries its own
+copy — **the two must stay in step**. `createdAt` / `updatedAt` are full UTC ISO timestamps and
+were deliberately not touched; only date-only strings changed. `normalizeDateTimeLocal()`
+(js/03:243) was already correct — it does the `getTimezoneOffset()` compensation — and js/66's
+period filter is all-local and was already correct too.
+
+### 3. THE TRAVEL CHARGE: the zone bands had gaps, and a gap fell through to 10 THB/km
+
+`getQuoteTravel()` matched `d>=min && d<=max`. The table is written in whole km (0-15, 16-30,
+31-50 …) but `#qDistance` is `input type=number step=0.1`, so **15.5 km matched no zone at
+all**, fell through to the `zones[length-1]` fallback — Z6, the >180 km per-km rate — and
+quoted **155 THB instead of 250**. Measured, all undercharging:
+
+```
+15.5 km -> 155 (should be 250)    50.5 km -> 505 (should be 600)
+30.5 km -> 305 (should be 400)    80.7 km -> 807 (should be 900)   120.2 km -> 1202 (1300)
+```
+
+A zone is now read as an **upper bound** — it covers everything above the previous zone up to
+and including its own max — so the first zone whose max is open or `>= d` wins. Every whole-km
+value in the documented table is unchanged; only the gaps are filled, and they fill **upward**
+(15.5 km is more than 15, so it is the "up to 30" band). That is a pricing decision and is
+stated at the code. `getQuoteTravel` is the only zone lookup in the project — js/06's `zones`
+is for drawing the rate table, not for pricing — so this is the one fix point.
+
+### 4. THE STOCK BUG: receiving is a transition, not a state
+
+`savePurchaseOrder()` added `obj.qty` to the part whenever the status **read** `รับเข้าแล้ว`,
+with no look at what the PO said before. So re-opening an already-received PO and pressing
+บันทึก — to fix a supplier, a unit cost, a note — added the whole quantity again, compounding
+on every save. Driven in a browser on a part holding 2:
+
+```
+receive 5  -> 7      re-save -> 12      re-save -> 17      correct qty 5->8 -> 25
+                                                           (it should have been 10)
+```
+
+The delta now comes from the transition between the OLD row and the new one. It is idempotent
+and also handles the two cases the old code could not: correcting the quantity while already
+received (apply only the difference), and taking a received PO back to สั่งซื้อแล้ว / ยกเลิก
+(give the stock back). All six transitions asserted.
+
+**This was the only accumulating write in the project** — every other `save*` replaces rather
+than adds — which was checked rather than assumed.
+
+### 5+6+7. Three layouts, all measured rather than eyeballed
+
+- **The dashboard status legend was cut off.** `.dashboard-primary` is three fixed `fr`
+  columns, so between the 900px breakpoint and about 1600px the donut panel is only ~300px
+  wide; `.status-donut-wrap` asks for a hard `220px` first track out of that, leaving the
+  legend **87px — its min-content** — so labels broke a character at a time ("มอบ / หมา /
+  แล้ว") and css/23 §2's `overflow:hidden` chopped the right edge off each card. The constraint
+  is the PANEL's width, not the viewport's, which is why the existing `@media` collapse never
+  fired. Fixed with a **container query** scoped by `:has()` to the one panel that holds a
+  donut. 1024 and 1920 are untouched; 1280 and 1440 now stack and every label reads in full.
+- **The 10/25/50/100 pager overlapped the buttons beside it** at 1024 (iPad landscape) on
+  customers / petty cash / spare parts — `flex:1 1 0%` with `min-width:0` squeezed it to 163px
+  against 182px of controls, and 19px ran past the 12px gap into the button row.
+  `min-width:min-content` lets the already-`flex-wrap:wrap` head wrap instead. Verified
+  `overlapPx: 0` at 1440 / 1280 / 1024 / 900 / 768 / 390.
+- **The travel-distance box was 26px wide** at 1280 — type `1250` and 35px of it is cut off —
+  because the row is grid `minmax(0,1fr) auto` beside a `white-space:nowrap` button, so the
+  input is allowed to collapse to nothing. This is the field that feeds `getQuoteTravel()`.
+  Flex with wrap and a 90px floor; the Maps button drops to its own line when there is no room,
+  which is what the 640px rule already did by hand. `cut: 0` at every width.
+
+### The dead service-worker registration
+
+`js/03` ended its `load` handler with `navigator.serviceWorker.register('sw.js')`. **There is
+no `sw.js` in this project and never has been**, so it answered 404 on every page load on every
+device, including a customer's phone; the `.catch()` swallowed it but Chrome logged it twice
+per boot. Removed. If a PWA is wanted later, ship `sw.js` first, then register.
+
+### `pages/customer-portal.html` deleted
+
+It was the **pre-rename, pre-redesign** copy of the customer page — 7 action buttons, the old
+blue header, no news card, no `base` tag. Nothing has referenced it since part 13 renamed the
+file to `customer-home.html`, but it was still tracked and still deployed, and its name matches
+the section id (`page-customer-portal`) that every stylesheet and function addresses — so it is
+exactly the file someone edits by mistake. Recoverable with
+`git show HEAD:pages/customer-portal.html`.
+
+### A latent fragility, deliberately NOT patched
+
+Roughly 25 modals bind their submit handler on `setTimeout(()=>xForm.onsubmit=…,20)`. If a
+second `openModal()` replaces `#modalBody` inside that 20ms, the id-global is gone and the
+timer throws a ReferenceError — and the form then silently does not save. **Every one of the 25
+was opened individually and all 25 wired correctly**; the only way to provoke it was a crawler
+clicking 24 settings cards in four seconds, and it picked different buttons on each run. No
+human path reaches it, so js/03 was not churned for it. Worth knowing if a future patch ever
+calls `openModal()` twice in a tick.
+
+### Tests
+
+All suites re-run against the fixed build: boot and 26 pages · the 287 handlers · the business
+flow (19) · every modal form wiring (25) · permissions across five reloads · the case detail
+page and its 19 actions · hostile data (19) · the จบงาน signature gate (4) · PO transitions (6)
+· the fix verification suite (32) · the responsive sweep at eight widths · the customer portal
+on a 390px phone. **0 failures, 0 page errors, and the boot console is now silent** — the two
+`sw.js` 404s were the only entries left. `node --check` passes on all 92 files in `js/`,
+`auth/` and `pages/`, and the detail page's inline script parses.
+
+### Open / risk
+
+1. **Fractional travel distances now price upward** (15.5 km → 400, was 155). That is the
+   documented table applied honestly, but it is a price change on any quotation that carried a
+   decimal. If the owner would rather round the distance to whole km first, that is a one-line
+   change in the same expression.
+2. **Warranties already saved keep their one-day-short end date.** The fix applies from now on;
+   nothing was migrated, because a stored end date may have been edited by hand.
+3. **Stock already corrupted by a re-saved purchase order stays corrupted.** The fix stops it
+   happening again; it cannot know how many of the past increments were real.
+4. `c.serviceTeam`, `c.checkInAt` and `c.machineTh/En` are set on a case but are **not in
+   `cloudUpsertCase`'s column whitelist**, so they do not survive a sync. `serviceTeam` and
+   `machineTh/En` have fallbacks and degrade quietly; `checkInAt` simply does not travel. Not
+   fixed here — it needs a schema decision, and part 18's rule stands: a field added to a case
+   never reaches `service_cases` unless `cloudUpsertCase` names it.
+5. Unchanged from part 15: `04-anon-uat.sql` means anyone on the internet can read and write
+   this database.
+6. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its
+   serial or QR.
+
+---
+
+## Session Change Log — 2026-09-20 (part 29): the owner's test pass — accounts, realtime, the crew, and a purchasing page
+
+Nine items reported after the owner walked the process end to end, plus one defect found while
+checking the first of them. Version untouched, no storage key renamed, no schema change.
+
+| File | What |
+|---|---|
+| `js/09-v68UatAccountsScript.js` | `tech_test1` → T003 (พี่เต้); `R&D_test1` removed |
+| `js/23-v69CloudConfigScript.js` | **the login provider ships with the app** — see §0 |
+| `js/03-app-core.js` | the ใบตรวจ names the whole crew; the technician card shows its account |
+| `js/74-v70NewJobBadgeScript.js` | a bigger chip, and the count on every งานของฉัน entry |
+| `js/89-v70PurchasingPageScript.js` | **new** — การจัดซื้อ as a page of its own |
+| `service-case-detail.html` | realtime; the whole crew; the customer's satisfaction |
+| `index.html` | one `<script src>` |
+
+### 0. THE DEFECT FOUND WHILE CHECKING พี่เต้: a new device cannot sign in
+
+Asked to link `tech_test1` to a technician called พี่เต้, and to check first whether they
+already had an account. Reading the live database answered that (พี่เต้ = **T003**, no
+account) and turned up something else: **`tech_test1` → `T-TEST-1` and `R&D_test1` → `T-RD-1`
+both pointed at technician records that had been deleted.** Those two accounts signed in
+perfectly and then saw an empty งานของฉัน and an empty หน้างาน for ever, because every one of
+those screens resolves work through `currentUser.technicianId`. Nothing on any screen said so.
+
+Then the sign-in itself proved intermittent, which is worse. Measured on a fresh profile:
+
+```
+before syncCloud() lands   settings.authConfig = null
+                           -> selectProvider() (auth-integration.js:31) finds no cfg.provider
+                              and falls to Auth.autoSelect(['supabase','local'])
+                           -> supabase wins, because js/23 has just configured a cloud
+                           -> tech_test1: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"
+after  syncCloud() lands   authConfig.provider === 'local'  ->  the same sign-in works
+```
+
+`settings.authConfig` **has no default anywhere in the code** — it exists only in the
+`system_settings` row, where part 17 §9 put it. Only three accounts exist in Supabase Auth
+(`03-users.sql`), so on any new device, cleared browser or incognito window **four of the six
+accounts were rejected until the settings row came down.** A technician opening the site on a
+new phone hit it every time and it looked like a wrong password.
+
+`js/23` now writes `provider:'local'` locally if nothing has set it, and re-applies after a
+sync (`syncCloud()` replaces `settings` wholesale). It never overrides an explicit value, so
+moving the project to Supabase Auth later is still one settings change. Verified: all six
+accounts sign in on a fresh profile 1.5s after navigation, before any sync can land.
+
+### 1+2. The accounts
+
+`tech_test1` now points at **T003 (พี่เต้)** and signs in to four open jobs. `R&D_test1` is
+removed outright, as instructed. The `R&D` role and js/25's `T-RD-1` seed are untouched —
+only the account is gone.
+
+**The technician card now shows which account is linked** (`techAccountLabel()`, one new
+`.detail-box`), read through `window.uatAuth` so accounts created or re-pointed in js/39 are
+included. A technician with no account reads "ยังไม่มีบัญชี", which is exactly the state that
+was invisible above.
+
+### 3. REALTIME: the stream was never the problem — the page was a different document
+
+Reported as the quotation track sitting on รอลูกค้าเซ็น after the customer had signed.
+Measured first, two browsers against the live project: an INSERT reached the other device in
+5s and a status UPDATE in **0.5s**. `09-v70-realtime-all.sql` had been run.
+
+**`service-case-detail.html` loads supabase-js and js/51 and nothing else** — js/85 is
+index.html's, so this page had no subscription of any kind. The one screen an admin sits on
+while waiting for a customer was the only one that could not update itself.
+
+New `CaseLive` in that file subscribes to `service_cases` (this case only), `quotations` and
+`system_settings`, and writes the incoming row into localStorage in the app's shape before
+re-rendering. **Only the fields this page displays are mapped** — restating `fromCaseDb()`
+here in full is how two copies drift (part 18's media column). A repaint is skipped when
+nothing really changed, so your own writes do not make the page flash, and deferred while a
+drawer is open so an update cannot close a panel under the person reading it.
+
+Measured after: **0.5s, no reload, `scdReady` still true.**
+
+### 4+5. The crew, in the two places that showed one name
+
+- **The case page** loaded `loadTechnician(c.assignee)` — one record. New `loadCrew()` reads
+  `c.assignees` first and the comma list in `c.assignee` second (js/38's wire format), and the
+  มอบหมาย drawer prints one chip per technician with the lead marked. `m.assignment.technician`
+  stays the lead, because several expressions read it as a single record. `loadCrew` is
+  appended **last** in the `Promise.all`, since everything below reads `r[]` by index.
+- **The printed ใบตรวจ** filled ผู้ดำเนินการ with `techById(x.techId)?.name`, and `x.techId` is
+  written as `c.assignee||fieldTechId` — the lead, every time. There is no per-step record of
+  who pressed the button, so `reportOperatorNames()` prints everybody the case is assigned to,
+  keeping the step's own id when it names somebody no longer on the crew. Reads
+  "พี่ย้ง · พี่เต้" now.
+
+### 6. The satisfaction score was already being collected and never shown
+
+`loadFeedback()` on the case page returned a hard-coded `null` under a comment saying no such
+store existed. **That comment went stale in part 26**: js/77 has been writing
+`settings.caseFeedback` from the five faces under the signature pads on the technician's ใบตรวจ
+ever since. The live project already held one — `{rating:5, comment:"งานดีคับรู้มือ"}` — while
+the panel said the system was not collecting it.
+
+It reads the real record now, and `feedbackHTML()` shows all four things stored: the five faces
+with the chosen one lit, the score and its word, the customer's comment, and who took it and
+when.
+
+### 7. งานใหม่ was working, and invisible
+
+`js/74` was correct — the chip appears, on the right row, and clears when the job is opened
+(all asserted). Two reasons the owner never saw it: the first visit for an account marks
+everything currently assigned as read, by design, so nothing lights up until the *next* job
+arrives; and a 10px uppercase chip on a 390px screen reads as decoration.
+
+The chip is 11.5px now, and **the count is on every งานของฉัน entry** — the sidebar item and
+the mobile bottom bar are both `[data-page]` — so a technician can see that something arrived
+without opening the page. `imodeNewJobCount()` already existed; the badge is recomputed rather
+than incremented so it cannot drift from the rows.
+
+### 8. การจัดซื้อ
+
+New page + sidebar entry. The ระบบการสั่งซื้ออะไหล่ panel is **moved, not rebuilt**: it carries
+`<tbody id="purchaseOrderTable">`, which `renderSpareParts()` in js/04 fills by id on every
+render. Rebuilding it would leave js/04 filling a table nobody can see. js/04 is not edited.
+
+Gated on **`parts.view`, deliberately an existing key** — a file that pushes a new key into
+`PERMISSION_CATALOG` has to load before js/20, and this one loads long after it. It finds its
+nav group through the `spare-parts` page rather than naming one, so a later re-organisation
+moves both together. สต๊อกอะไหล่ keeps its own table and KPIs.
+
+### Tests
+
+Every suite re-run: 93 JS files syntax-clean and the case page's inline script parses ·
+regression at 1440 and 390 (9 + 9, 27 pages, console silent, no horizontal scroll) · all six
+accounts on a fresh cloud device (6) · tech_test1 = พี่เต้ with real jobs (5) · the case page
+live against the real database (10: realtime SUBSCRIBED, status in 0.5s, feedback, crew) ·
+the technician account row (3) · the report operator column (2) · the new-job chip (4) and the
+nav count (6) · the purchasing page (10). **0 failures, 0 page errors.**
+
+### A harness lesson worth keeping
+
+`open(path,'w')` **truncates before it writes**, so a `UnicodeEncodeError` part-way through
+left `service-case-detail.html` at **0 bytes**. Restored from a copy taken minutes earlier and
+re-applied. Any script that rewrites a file in this project now writes a `.tmp` beside it and
+`shutil.move`s it into place, and lone surrogates are avoided by letting Python emit the real
+characters rather than `\uD83D` pairs.
+
+### Open / risk
+
+1. **The case page now subscribes to three tables.** It is one channel per open tab; a tab left
+   on a case holds it until closed. Same exposure as js/85 and the same blanket RLS.
+2. The realtime mapper covers only the fields the page shows. A field added to the case that
+   this page starts displaying has to be added there too, or it will update only on reload.
+3. `imode_v70_seen_jobs` still marks everything read on an account's first visit, so the first
+   batch of jobs never lights up. That is deliberate; it is only worth knowing when testing.
+4. Unchanged from part 15: `04-anon-uat.sql` means anyone on the internet can read and write
+   this database.
+5. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its
+   serial or QR.
+
+### Follow-up (2026-09-20/21): the sidebar animation, and a signature that a render could erase
+
+**The sidebar buttons were too fast.** Slowed transform .26s → .42s and the colour/glow
+.2s → .34s. The fold timings for opening and closing a nav group (.34s) are a different
+animation and were left alone.
+
+**The value is written in THREE places and css/01 is not the one that wins.** Editing css/01
+alone changed nothing — measured, still 0.2s. `js/36` injects
+`.side-nav .nav-item{transition:…!important}` at runtime (specificity 0,2,0 and `!important`),
+and `css/10-v68-style-correction.css` carries the icon chip's own `!important` copy after
+css/01. All three had to move together or the icon lands before the button does. A note now
+sits at each one.
+
+**The quotation signatures.** Reported: "ลายเซ็นแรก ok แต่ลายเซ็นที่ 2 พอเซ็นไปแล้วลายเซ็นลูกค้าหาย".
+Could **not** be reproduced offline — the walk was driven through the real controls (open the
+step-2 drawer, open the document, ink each pad, press บันทึก) and both signatures saved with
+`quoteApprovals` intact each time. So the report is a cloud-only path, and two guards were put
+in where it can happen:
+
+- **`qsFillCell()` cleared before it decided.** It did `area.innerHTML=''` unconditionally and
+  only then put an image back if it had one. `openQuoteDoc()` re-stamps all three cells every
+  time it opens, and `finish()` re-opens it after each staff signature — so a render pass whose
+  `sig` came through empty wiped the customer's signature off the stored paper. Empty now means
+  "nothing new to stamp here", not "clear this box": a render may add to the paper and never
+  take away. ล้างลายเซ็น still works, because it removes the record and the document is
+  regenerated rather than re-stamped.
+- **`CaseLive.applySettings` could import an approval with no image.** `saveStaffSign()` writes
+  the WHOLE settings object back to `system_settings` and this subscription hears its own echo;
+  a copy that came back without `sig` would delete the signature from this device.
+  `mergeApprovals()` keeps whichever copy actually carries the image. Approvals are only ever
+  added, so this cannot hide a real change.
+
+**Worth saying plainly:** the second guard is against a hole that only exists because this
+session added the subscription. If the owner still sees it, the thing to check is whether the
+data is gone or only the drawing —
+`JSON.parse(localStorage.imode_v5_settings).quoteApprovals`.
+
+**The satisfaction panel links to the ใบตรวจ.** The owner's first description was read as
+"show the score", which was only half of it: they wanted the score *and* a way through to the
+sheet it was taken on. `openReportDoc()` opens `reportDocsHTML()` — the read view part 24 built
+— on its own, so it stays on this page and costs neither a reload nor the re-login that every
+hand-off back into the application still does. The button shows whether or not a rating exists
+yet; with none, the sheet is the thing you most want to look at. Nothing was added to the PDF,
+as instructed.
+
+**Not exercised in a browser:** that last button. Everything else in parts 28 and 29 was.
+
+### Harness note worth keeping
+
+A patch script that matches a long literal against this project's files will fail for two
+reasons that look identical: the script's own file may be stored with **CRLF** while the target
+reads back as `\n`, and `service-case-detail.html` contains a **non-breaking space** (U+00A0) in
+`textContent=name||' '` that no editor round-trip preserves. Normalise both sides, or —
+better — replace **by index between markers** rather than by matching text. And always write a
+`.tmp` and `shutil.move` it: `open(path,'w')` truncates before it writes, which left that file
+at 0 bytes once this session.

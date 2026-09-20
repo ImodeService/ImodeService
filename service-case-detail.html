@@ -626,6 +626,21 @@ body.scd-modal-open{overflow:hidden}
   .scd-act:hover,.scd-mod:hover{transform:none}
   .skeleton{animation:none}
 }
+/* 2026-09-20 — the crew chips in the มอบหมาย drawer, and the customer's satisfaction
+   as the technician recorded it on the ใบตรวจ. */
+.scd-crew{display:flex;flex-wrap:wrap;gap:6px}
+.scd-crew-name{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;
+  background:#eef4ff;border:1px solid #d7e4fb;font-size:13px;color:#123b94;font-weight:600}
+.scd-crew-lead{font-size:10.5px;font-weight:800;letter-spacing:.02em;padding:1px 6px;border-radius:999px;
+  background:#0b63e5;color:#fff}
+.scd-fb{display:grid;gap:10px}
+.scd-faces{display:flex;gap:8px;font-size:26px;line-height:1}
+.scd-face{filter:grayscale(1);opacity:.35}
+.scd-face.is-on{filter:none;opacity:1;transform:scale(1.18)}
+.scd-fb-score{margin:0;font-size:15px;color:#123b94}
+.scd-fb-note{margin:0;padding:10px 12px;border-left:3px solid #0b63e5;background:#f4f8ff;
+  border-radius:0 10px 10px 0;font-size:14px;color:#25324d}
+.scd-fb-by{margin:0;font-size:12px;color:#6b7d9e}
 </style>
 </head>
 <body>
@@ -704,6 +719,11 @@ function readJSON(key,fallback){
   try{var raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch(e){return fallback}
 }
 function el(id){return document.getElementById(id)}
+/* 2026-09-19 — the same LOCAL-date rule as js/03's todayISO(). This document does not load
+   js/03, so it carries its own copy; the two must stay in step. toISOString() is the date in
+   UTC and Thailand is UTC+7, so before 07:00 local the Workshop รับเครื่อง / ส่งคืน dates
+   defaulted to yesterday. */
+function todayISO(){const x=new Date();return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0')}
 /* The same precedence the application's canPermission() uses — an enabled per-user entry
    wins, otherwise the resolved role's list — read from the same two keys. It is a display
    gate only: the delete itself is carried out by the application, which checks again with
@@ -846,6 +866,29 @@ var CaseDetailData=(function(){
     loadMachine:function(machineId){return Promise.resolve(byId(all().machines,machineId))},
     loadCustomer:function(customerId){return Promise.resolve(byId(all().customers,customerId))},
     loadTechnician:function(techId){return Promise.resolve(byId(all().technicians,techId))},
+    /* 2026-09-20 — A JOB CAN HAVE A CREW, and this page only ever showed its lead.
+       js/38 (part 17 §2) keeps the whole crew in c.assignees and the lead in c.assignee;
+       across the wire the crew travels as a comma list in that one column, because
+       service_cases has no assignees column. Both shapes are read here, in that order, so a
+       row that came from the cloud reads the same as one written on this device.
+       Unknown ids are dropped rather than shown blank: a technician removed from the team
+       should not leave a nameless chip on the case. */
+    loadCrew:function(c){
+      var ids=[];
+      try{
+        if(c&&Object.prototype.toString.call(c.assignees)==='[object Array]'&&c.assignees.length)ids=c.assignees.slice();
+        else if(c&&c.assignee)ids=String(c.assignee).split(',');
+      }catch(e){}
+      var seen={},out=[];
+      ids.forEach(function(raw){
+        var id=String(raw||'').trim();
+        if(!id||seen[id])return;
+        seen[id]=1;
+        var t=byId(all().technicians,id);
+        if(t)out.push(t);
+      });
+      return Promise.resolve(out);
+    },
     allTechnicians:function(){return all().technicians.slice()},
     currentUser:function(){return all().user},
     roles:function(){return (all().settings.roles)||[]},
@@ -932,9 +975,22 @@ var CaseDetailData=(function(){
       out.sort(function(a,b){return new Date(b.timestamp||0)-new Date(a.timestamp||0)});
       return Promise.resolve(out);
     },
-    /* No feedback and no internal-notes store exists in the application yet. Returning
-       null instead of a fabricated value is what lets the panels say so honestly. */
-    loadFeedback:function(){return Promise.resolve(null)},
+    /* 2026-09-20 — THE COMMENT ABOVE THIS WAS STALE and the panel was lying as a result.
+       js/77 (part 26 item 16) added the five faces under the two signature pads on the
+       technician's ใบตรวจ and has been writing settings.caseFeedback since. Measured on the live
+       project: one case already carried {rating:5, comment:"งานดีคับรู้มือ"} while this page
+       still said "ระบบยังไม่ได้เก็บข้อมูลส่วนนี้", because loadFeedback() returned a hard-coded null.
+       Shape, from js/77: settings.caseFeedback[caseId] = {rating,comment,at,by}. settings is
+       already in all(), so this needs no new storage key and no new read. */
+    loadFeedback:function(caseId){
+      try{
+        var f=(all().settings||{}).caseFeedback||{};
+        var r=f[caseId];
+        if(!r||typeof r!=='object')return Promise.resolve(null);
+        return Promise.resolve({rating:Number(r.rating)||0,comment:String(r.comment||''),
+                                at:r.at||'',by:r.by||''});
+      }catch(e){return Promise.resolve(null)}
+    },
     loadInternalNotes:function(c){
       return Promise.resolve(c&&c.note?[{text:c.note,at:c.updatedAt||c.createdAt,by:''}]:[]);
     },
@@ -961,7 +1017,7 @@ var caseDetailModel={
   customer:{id:'',name:'',address:'',contactName:'',phone:'',email:'',lineUserId:'',whatsapp:''},
   machine:{id:'',name:'',model:'',serialNumber:'',type:'',image:'',installDate:'',
            warrantyStatus:'',warrantyEnd:'',warrantyDaysLeft:null,status:'',technicalSpecs:{}},
-  assignment:{coordinator:null,technician:null,assignedAt:''},
+  assignment:{coordinator:null,technician:null,assignedAt:'',crew:[]},
   appointment:{date:'',time:'',location:'',contact:'',status:''},
   quotation:{required:false,quotationNo:'',total:0,status:'not_required'},
   service:{fieldStatus:'',partsStatus:'none',partsItems:[],qcStatus:'',reportStatus:''},
@@ -991,7 +1047,7 @@ function mockModel(caseId){
     machine:{id:'',name:'เครื่องผลิตแก๊สไฮโดรเจน',model:'HO500WT',serialNumber:'22-11-HO500WT-0023',
       type:'เครื่องผลิตแก๊สไฮโดรเจน',image:'',installDate:'',warrantyStatus:'Active',warrantyEnd:'',
       warrantyDaysLeft:182,status:'ใช้งานปกติ',technicalSpecs:{}},
-    assignment:{coordinator:'',technician:null,assignedAt:''},
+    assignment:{coordinator:'',technician:null,assignedAt:'',crew:[]},
     appointment:{date:'',time:'',location:'',contact:'',status:'pending'},
     quotation:{required:false,quotationNo:'',total:0,status:'not_required'},
     service:{fieldStatus:'',partsStatus:'none',partsItems:[],qcStatus:'',reportStatus:''},
@@ -1029,7 +1085,10 @@ function buildModel(c){
     CaseDetailData.loadFeedback(c.id),
     CaseDetailData.loadInternalNotes(c),
     CaseDetailData.loadMachineHistory(c.machineId),
-    CaseDetailData.loadReports(c.id)
+    CaseDetailData.loadReports(c.id),
+    /* Appended LAST on purpose: everything below reads r[] by index, so a new entry in the
+       middle would silently re-point twelve fields. */
+    CaseDetailData.loadCrew(c)
   ]).then(function(r){
     var cu=r[0],ma=r[1],te=r[2],wa=r[3];
     m.customer={id:cu&&cu.id||c.customerId||'',name:cu&&cu.name||c.customer||'-',
@@ -1046,7 +1105,11 @@ function buildModel(c){
       warrantyStatus:days==null?(ma&&ma.warranty||'-'):(days<0?'หมดประกัน':'Active'),
       warrantyEnd:wa&&wa.endDate||'',warrantyDaysLeft:days,
       technicalSpecs:{}};
-    m.assignment={coordinator:r[4].coordinator,technician:te,assignedAt:r[4].assignedAt};
+    /* `technician` stays the LEAD, because several expressions on this page read it as one
+       record. `crew` is the whole job, lead first, and is what the drawer prints. */
+    m.assignment={coordinator:r[4].coordinator,technician:te,assignedAt:r[4].assignedAt,
+                  crew:(Object.prototype.toString.call(r[13])==='[object Array]')?r[13]:[]};
+    if(!m.assignment.technician&&m.assignment.crew.length)m.assignment.technician=m.assignment.crew[0];
     m.appointment=r[5];
     var q=r[6];
     m.quotation={required:!!q,quotationNo:q&&q.quoteNo||q&&q.id||'',total:q&&q.grand||0,
@@ -1462,8 +1525,18 @@ function stepDrawerHTML(m,i){
   /* One step, both facts — and one button, because the panel it opens writes both. */
   if(i===S('assign')){
     var t=m.assignment.technician;
+    /* 2026-09-20: the WHOLE crew, not just the lead. A job can carry several technicians
+       (js/38) and this drawer printed one name, so a second or third technician was invisible
+       on the case they were actually working. The lead is marked rather than listed twice —
+       it is the one id `assignee` carries and the one the reports are headed with. */
+    var crew=(m.assignment.crew&&m.assignment.crew.length)?m.assignment.crew:(t?[t]:[]);
+    var crewHTML=crew.map(function(x,k){
+      return '<span class="scd-crew-name">'+esc(x.name||x.id||'-')
+        +(k===0&&crew.length>1?' <b class="scd-crew-lead">หัวหน้างาน</b>':'')+'</span>';
+    }).join('');
     return head(stepNo('assign')+'. มอบหมาย / นัดหมาย','ใครรับผิดชอบ และนัดลูกค้าไว้เมื่อไร')
-      +(t?'<dl class="sd-kv"><dt>ช่างผู้รับผิดชอบ</dt><dd>'+esc(t.name||'-')+'</dd>'
+      +(crew.length?'<dl class="sd-kv"><dt>ช่างผู้รับผิดชอบ'
+          +(crew.length>1?' ('+crew.length+' คน)':'')+'</dt><dd><div class="scd-crew">'+crewHTML+'</div></dd>'
           +'<dt>มอบหมายเมื่อ</dt><dd>'+esc(fmtDateTime(m.assignment.assignedAt))+'</dd></dl>'
         :'<p class="sd-empty">ยังไม่ได้มอบหมายช่าง</p>')
       +(m.appointment.date
@@ -1594,16 +1667,27 @@ function qsFillCell(cell,name,date,sig){
   var parts=cell.children;              /* area, line, name, date */
   var area=cell.querySelector('.quote-sign-area');
   if(area){
-    area.innerHTML='';
+    /* 2026-09-21 — A SIGNATURE ALREADY ON THE PAPER IS NEVER ERASED.
+       Reported: "ลายเซ็นแรก ok แต่ลายเซ็นที่ 2 พอเซ็นไปแล้วลายเซ็นลูกค้าหาย".
+       This did `area.innerHTML=''` unconditionally and only then put an image back if it had
+       one. openQuoteDoc() re-stamps all three cells every time it opens — and finish() re-opens
+       it after each staff signature — so the moment the caller's `sig` came through empty, the
+       customer's signature that quotationDocHTML() had already baked into the stored paper was
+       wiped off it. That is the exact shape of "the first was fine, the second lost it".
+       Empty now means "nothing new to stamp here", not "clear this box". The stored paper is
+       the record: a render pass may add to it, never take away. Clearing still works, because
+       ล้างลายเซ็น removes the record and the document is regenerated rather than re-stamped. */
     if(sig){
+      area.innerHTML='';
       var img=document.createElement('img');
       img.src=sig;img.alt='ลายเซ็น';
       img.style.cssText='max-width:100%;max-height:56px;object-fit:contain';
       area.appendChild(img);
     }
   }
-  if(parts[2])parts[2].textContent=name||' ';
-  if(parts[3])parts[3].textContent='Date '+date;
+  /* Same rule for the printed name and date: an empty value leaves what the paper already says. */
+  if(parts[2]&&name)parts[2].textContent=name;
+  if(parts[3]&&date&&String(date).indexOf('...')<0)parts[3].textContent='Date '+date;
 }
 function qsPadHTML(r,q,rec){
   return '<div class="qs-block" data-qs-role="'+r.key+'">'
@@ -2562,7 +2646,7 @@ function wsReceive(){
   wsPending=[];
   panel('บันทึกรับเครื่องเข้าบริษัท',
     '<form id="wsReceiveForm" class="scd-ce" novalidate>'
-    +'<label class="scd-ce-f"><span>วันที่รับเครื่อง <b>*</b></span><input type="date" id="wsRecvDate" value="'+esc(rc.receivedDate||new Date().toISOString().slice(0,10))+'"></label>'
+    +'<label class="scd-ce-f"><span>วันที่รับเครื่อง <b>*</b></span><input type="date" id="wsRecvDate" value="'+esc(rc.receivedDate||todayISO())+'"></label>'
     +'<label class="scd-ce-f"><span>สภาพเครื่องตอนรับ <b>*</b></span><textarea id="wsRecvNote" rows="3" placeholder="เช่น ฝาครอบมีรอยขีดข่วนด้านซ้าย เปิดเครื่องไม่ติด">'+esc(rc.note||'')+'</textarea></label>'
     +'<label class="scd-ce-f"><span>อุปกรณ์ที่มากับเครื่อง</span><input id="wsRecvAcc" placeholder="เช่น สายไฟ 1 เส้น, รีโมท, คู่มือ" value="'+esc(rc.accessories||'')+'"></label>'
     +'<div class="scd-ol-files"><label class="scd-chip-btn scd-ol-add">📷 แนบรูปเครื่องตอนรับ'
@@ -2635,7 +2719,7 @@ function wsReturn(){
   var l=wsLast(raw,'logistics')||{};
   panel('บันทึกส่งคืนเครื่อง',
     '<form id="wsReturnForm" class="scd-ce" novalidate>'
-    +'<label class="scd-ce-f"><span>วันที่ส่งคืน <b>*</b></span><input type="date" id="wsRetDate" value="'+new Date().toISOString().slice(0,10)+'"></label>'
+    +'<label class="scd-ce-f"><span>วันที่ส่งคืน <b>*</b></span><input type="date" id="wsRetDate" value="'+todayISO()+'"></label>'
     +'<div class="scd-ce-f"><span>วิธีส่งคืน</span><div class="ws-radio">'
     +'<label><input type="radio" name="wsRetMethod" value="self"'+(l.outbound!=='deliver'?' checked':'')+'> ลูกค้ามารับเอง (ไม่มีค่าส่ง)</label>'
     +'<label><input type="radio" name="wsRetMethod" value="deliver"'+(l.outbound==='deliver'?' checked':'')+'> บริษัทไปส่ง (คิดค่าส่งตามระยะทาง)</label></div></div>'
@@ -3090,6 +3174,14 @@ function openMachineHistory(){panel('ประวัติการบริก�
 function openCustomerDetail(){panel('ข้อมูลลูกค้า',customerHTML())}
 function openAssignmentDetail(){panel('ผู้รับผิดชอบและนัดหมาย',assignmentHTML())}
 function openCaseAttachments(){panel('เอกสาร & รูปภาพ',attachmentsHTML())}
+/* 2026-09-21 — the ใบตรวจ on its own, reached from the satisfaction panel.
+   reportDocsHTML() is the read view part 24 built; it already lives inside the
+   เอกสาร & รูปภาพ drawer beside the photos. Opening it alone is what "ปุ่มเพื่อที่จะเข้าไปดู
+   ใบตรวจ" asks for — the score and the sheet it was taken on, one press apart, without the
+   customer's attachments in between. It stays on this page: no reload, and no re-login,
+   which every hand-off back into the application still costs. With no report on the case it
+   says so itself, so the button never opens an empty box. */
+function openReportDoc(){panel('ใบตรวจหน้างาน',reportDocsHTML())}
 function openInternalNotes(){panel('หมายเหตุภายใน (เฉพาะเจ้าหน้าที่)',notesHTML())}
 function openFeedback(){panel('ประเมินความพึงพอใจ',feedbackHTML())}
 
@@ -3392,9 +3484,31 @@ function notesHTML(){
 }
 function feedbackHTML(){
   var f=caseDetailModel.feedback;
-  if(!f)return '<p class="scd-empty">ยังไม่มีการประเมินความพึงพอใจ ระบบยังไม่ได้เก็บข้อมูลส่วนนี้</p>';
-  return '<dl class="kv"><dt>คะแนน</dt><dd>'+esc(f.rating)+' / 5</dd></dl>';
+  /* The score, the words, the comment and who took it — all four things js/77 records when
+     the customer taps a face at the foot of the technician's ใบตรวจ. The faces are the same
+     five, in the same order, so the office reads exactly what the customer saw.
+     2026-09-21: and a way through to that sheet, because a score with no way to see the job
+     it belongs to is half an answer. The button shows whether or not there is a rating yet —
+     with none, the sheet is the thing you want to look at most. */
+  var go='<div class="sd-acts"><button type="button" class="sd-go" data-action="open-report-doc">'
+    +'\uD83E\uDDF0 \u0e14\u0e39\u0e43\u0e1a\u0e15\u0e23\u0e27\u0e08\u0e2b\u0e19\u0e49\u0e32\u0e07\u0e32\u0e19 \u203a</button></div>';
+  if(!f)return '<p class="scd-empty">ยังไม่มีการประเมินความพึงพอใจ — '
+    +'ลูกค้าให้คะแนนได้ที่ท้ายใบตรวจของช่าง ตอนเซ็นรับงานหน้างาน</p>'+go;
+  var FACES=['\uD83D\uDE16','\uD83D\uDE41','\uD83D\uDE10','\uD83D\uDE42','\uD83D\uDE0D'];
+  var WORDS=['ไม่พอใจมาก','ไม่พอใจ','เฉย ๆ','พอใจ','พอใจมาก'];
+  var n=Math.max(1,Math.min(5,Number(f.rating)||0));
+  var faces=FACES.map(function(g,k){
+    return '<span class="scd-face'+(k===n-1?' is-on':'')+'">'+g+'</span>';
+  }).join('');
+  return '<div class="scd-fb">'
+    +'<div class="scd-faces">'+faces+'</div>'
+    +'<p class="scd-fb-score"><b>'+n+' / 5</b> · '+esc(WORDS[n-1])+'</p>'
+    +(f.comment?'<blockquote class="scd-fb-note">'+esc(f.comment)+'</blockquote>':'')
+    +'<p class="scd-fb-by">'+(f.by?'บันทึกโดย '+esc(f.by):'')
+      +(f.at?(f.by?' · ':'')+esc(fmtDateTime(f.at)):'')+'</p>'
+    +'</div>'+go;
 }
+
 
 /* =======================================================================
    8. wiring
@@ -3440,6 +3554,7 @@ var HANDLERS={
   'open-customer-detail':openCustomerDetail,
   'open-assignment-detail':openAssignmentDetail,
   'open-case-attachments':openCaseAttachments,
+  'open-report-doc':openReportDoc,
   'open-attachments':openCaseAttachments,
   'open-internal-notes':openInternalNotes,
   'open-feedback':openFeedback,
@@ -3515,10 +3630,199 @@ window.getCaseIdFromUrl=getCaseIdFromUrl;
 window.contactCustomer=contactCustomer;
 window.scdReady=false;
 
+
+/* =======================================================================
+   REALTIME — this page catches up without a reload
+   -----------------------------------------------------------------------
+   REPORTED 2026-09-20, with a screenshot of the quotation track sitting on รอลูกค้าเซ็น:
+   "ลูกค้าส่งใบเสนอราคาแล้วแต่สถานะไม่เรียลไทม์ต้องกดรีหน้าเว็บก่อน".
+
+   MEASURED BEFORE CHANGING ANYTHING, two browsers against the live project: an INSERT reached
+   the other device in 5s and a status UPDATE in 0.5s. So Supabase realtime is on and
+   09-v70-realtime-all.sql really was run — the stream was never the problem.
+
+   THE PROBLEM IS THAT THIS FILE IS A DIFFERENT DOCUMENT. js/85-v70RealtimeScript.js subscribes
+   and applies rows for index.html; service-case-detail.html loads supabase-js and js/51 and
+   nothing else, so it had no subscription of any kind. Every other screen in the project
+   updated itself and this one — the one an admin sits on while waiting for a customer to
+   sign — could only be reloaded by hand.
+
+   WHY IT DOES NOT JUST CALL syncCloud(): that lives in js/03, which this document does not
+   load, and it replaces eleven arrays wholesale. Here we want the opposite — touch as little
+   as possible.
+
+   WHAT IT MAPS, AND WHY THE LIST IS SHORT. The page reads localStorage, so an incoming row has
+   to be written there in the application's camelCase shape. Restating js/03's fromCaseDb()
+   here in full is exactly how two copies drift apart (part 18's media column), so only the
+   fields this page actually displays are mapped, and every other field on the local record is
+   left untouched:
+
+       service_cases     status, assignee, appointment, field_status, field_status_log, updated_at
+       quotations        status, updated_at
+       system_settings   quoteApprovals, quoteAccepts, caseFeedback, caseStatusLog  (nothing else —
+                         never the configuration, same rule js/85 follows)
+
+   A repaint is skipped when nothing actually changed, so your own writes do not make the page
+   flash, and it is deferred while a drawer is open so an update cannot close a panel from
+   under the person reading it. */
+var CaseLive=(function(){
+  var channel=null,pending=false,timer=null;
+  var state={on:false,status:'',events:0};
+
+  function readJ(k,d){try{var v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}}
+  function writeJ(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}
+
+  /* A drawer is a modal on this page; repainting under one would close it mid-read. */
+  function busy(){
+    try{
+      var p=document.getElementById('scdPanel');
+      if(p&&p.classList.contains('is-open'))return true;
+      if(document.body.classList.contains('scd-modal-open'))return true;
+    }catch(e){}
+    return false;
+  }
+  function repaint(){
+    if(busy()){
+      pending=true;
+      if(!timer)timer=setInterval(function(){
+        if(busy())return;
+        clearInterval(timer);timer=null;
+        if(pending){pending=false;repaint()}
+      },700);
+      return;
+    }
+    pending=false;
+    try{CaseDetailData.refresh()}catch(e){}
+    try{
+      load().then(function(res){
+        if(res&&res.error)return;
+        renderPage(res);
+      },function(){});
+    }catch(e){}
+  }
+
+  function caseId(){return getCaseIdFromUrl()}
+
+  function applyCase(row){
+    if(!row||!row.id)return false;
+    var list=readJ(K.cases,[])||[],hit=null;
+    for(var i=0;i<list.length;i++)if(list[i]&&list[i].id===row.id){hit=list[i];break}
+    if(!hit)return false;                       /* a case this device has never seen */
+    var before=JSON.stringify([hit.status,hit.assignee,hit.appointment,hit.fieldStatus,
+                               (hit.fieldStatusLog||[]).length]);
+    if('status' in row)hit.status=row.status||'';
+    if('appointment' in row)hit.appointment=row.appointment||'';
+    if('field_status' in row)hit.fieldStatus=row.field_status||'';
+    if('field_status_log' in row&&Array.isArray(row.field_status_log))hit.fieldStatusLog=row.field_status_log;
+    if('updated_at' in row)hit.updatedAt=row.updated_at||hit.updatedAt;
+    /* js/38 keeps a crew as a comma list in the one `assignee` column; both shapes are kept in
+       step so the drawer and every reader agree. */
+    if('assignee' in row){
+      var raw=String(row.assignee||'');
+      var crew=raw?raw.split(',').map(function(x){return x.trim()}).filter(Boolean):[];
+      hit.assignee=crew[0]||'';
+      hit.assignees=crew;
+    }
+    var after=JSON.stringify([hit.status,hit.assignee,hit.appointment,hit.fieldStatus,
+                              (hit.fieldStatusLog||[]).length]);
+    if(before===after)return false;
+    writeJ(K.cases,list);
+    return true;
+  }
+
+  function applyQuote(row){
+    if(!row||!row.id)return false;
+    var list=readJ(K.quotes,[])||[],hit=null;
+    for(var i=0;i<list.length;i++)if(list[i]&&list[i].id===row.id){hit=list[i];break}
+    if(!hit)return false;
+    if(!('status' in row))return false;
+    if(String(hit.status||'')===String(row.status||''))return false;
+    hit.status=row.status||'';
+    if(row.updated_at)hit.updatedAt=row.updated_at;
+    writeJ(K.quotes,list);
+    return true;
+  }
+
+  var SETTING_KEYS=['quoteApprovals','quoteAccepts','caseFeedback','caseStatusLog'];
+  /* 2026-09-21 — AN APPROVAL THAT HAS A SIGNATURE IS NEVER REPLACED BY ONE THAT HAS NONE.
+     saveStaffSign() writes the WHOLE settings object back to system_settings, and this
+     subscription hears its own echo a moment later. If that round trip ever returns an approval
+     whose `sig` has been dropped — a trimmed payload, an older row, a device that never held
+     the image — a blind copy would delete the customer's signature from this device, and the
+     next openQuoteDoc() would render the paper without it. Approvals are only ever added, so
+     preferring whichever copy actually carries the image is both the safe answer and the
+     correct one. */
+  function mergeApprovals(local,incoming){
+    if(!incoming||typeof incoming!=='object')return local;
+    if(!local||typeof local!=='object')return incoming;
+    var out={},k;
+    for(k in incoming)if(Object.prototype.hasOwnProperty.call(incoming,k))out[k]=incoming[k];
+    for(k in local){
+      if(!Object.prototype.hasOwnProperty.call(local,k))continue;
+      var mine=local[k],theirs=out[k];
+      if(mine&&mine.sig&&(!theirs||!theirs.sig))out[k]=mine;      /* keep the image */
+      else if(!theirs)out[k]=mine;                                /* ours, not pushed yet */
+    }
+    return out;
+  }
+  function applySettings(row){
+    var data=row&&row.data;
+    if(!data||typeof data!=='object')return false;
+    var s=readJ(K.settings,{})||{},moved=false;
+    SETTING_KEYS.forEach(function(k){
+      if(!(k in data))return;
+      var next=(k==='quoteApprovals')?mergeApprovals(s[k],data[k]):data[k];
+      var a='',b='';
+      try{a=JSON.stringify(next)}catch(e){return}
+      try{b=JSON.stringify(s[k])}catch(e){b=''}
+      if(a===b)return;
+      s[k]=next;moved=true;
+    });
+    if(!moved)return false;
+    writeJ(K.settings,s);
+    return true;
+  }
+
+  function start(){
+    var sb=null;
+    try{sb=CaseWrite.client()}catch(e){}
+    if(!sb||typeof sb.channel!=='function'){state.status='no-client';return}
+    var mine=caseId();
+    try{
+      channel=sb.channel('scd-live-'+Math.random().toString(36).slice(2,8));
+      channel.on('postgres_changes',{event:'*',schema:'public',table:'service_cases'},function(p){
+        state.events++;
+        var row=p&&p.new;
+        /* Only this case. Every other row on the project streams past and is ignored. */
+        if(!row||!mine||(row.id!==mine&&String(row.ticket||'')!==mine))return;
+        if(applyCase(row))repaint();
+      });
+      channel.on('postgres_changes',{event:'*',schema:'public',table:'quotations'},function(p){
+        state.events++;
+        if(applyQuote(p&&p.new))repaint();
+      });
+      channel.on('postgres_changes',{event:'*',schema:'public',table:'system_settings'},function(p){
+        state.events++;
+        if(applySettings(p&&p.new))repaint();
+      });
+      channel.subscribe(function(st){
+        state.status=String(st||'');
+        state.on=(state.status==='SUBSCRIBED');
+      });
+    }catch(e){state.status='error'}
+  }
+
+  return {start:start,state:function(){return state}};
+})();
+window.CaseLive=CaseLive;
+
 load().then(function(res){
   if(res&&res.error){renderError(res.error);window.scdReady=true;return}
   renderPage(res);
   window.scdReady=true;
+  /* After the first paint, never before: subscribing earlier would race the render it is
+     meant to refresh. */
+  try{CaseLive.start()}catch(e){}
 }).catch(function(err){
   renderError('not-found');
   window.scdReady=true;

@@ -243,12 +243,13 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app-shell{min-h
     color:#f5f8ff;
     font-size:16.5px;
     letter-spacing:.005em;
+    /* 2026-09-20: slowed with js/36's matching rule — see the note there. */
     transition:
-      transform .20s cubic-bezier(.2,.8,.2,1),
-      box-shadow .20s ease,
-      background .20s ease,
-      border-color .20s ease,
-      color .20s ease;
+      transform .42s cubic-bezier(.2,.8,.2,1),
+      box-shadow .34s ease,
+      background .34s ease,
+      border-color .34s ease,
+      color .34s ease;
     will-change:transform;
     text-shadow:0 1px 4px rgba(0,22,78,.18);
   }
@@ -267,7 +268,8 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app-shell{min-h
     box-shadow:
       0 6px 12px rgba(2,19,66,.16),
       inset 0 1px 0 rgba(255,255,255,.28);
-    transition:transform .20s ease,background .20s ease,box-shadow .20s ease;
+    /* 2026-09-20: matches .nav-item above, or the icon lands before the button. */
+    transition:transform .42s cubic-bezier(.2,.8,.2,1),background .34s ease,box-shadow .34s ease;
   }
 
   .nav-item b{

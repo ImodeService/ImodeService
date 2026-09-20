@@ -40,6 +40,27 @@
      happens — js/11 for staff, the portal entry for a QR — not here. `qr` is left computed
      above so the two tests stay side by side and cannot drift apart. */
   void qr;
+  /* 2026-09-18: the same test, exported, because the answer is needed after boot too —
+     "หน้าของลูกค้าอะมันมักจะมีแจ้งเตือนของแอดมินโผล่มา". Anything that speaks to staff on its own
+     (js/85's realtime notices, js/24's cloud warning) asks this before it opens its mouth.
+     The URL is only half of it: a customer reaches the portal from the entry page without the
+     URL changing, so the surface on screen counts as well. This is the fourth copy of the URL
+     test (js/01, js/46, js/84 and now its exported form) and they are kept in step by hand —
+     if one grows a new customer route, all of them have to learn it. */
+  window.imodeCustomerSurface=function(){
+   try{
+    if(/[?&]machineToken=/.test(location.search))return true;
+    if(/[?&]serial=/.test(location.search))return true;
+    if(/[?&]page=(customer-entry|scan|customer-portal|customer-home)\b/.test(location.search))return true;
+    if(/#\/(customer-portal|customer-home|customer-entry|scan)/.test(location.hash))return true;
+    if(/customer-portal/.test(location.hash))return true;
+    var b=document.body;
+    if(b&&b.classList&&b.classList.contains('customer-portal-mode'))return true;
+    var active=(document.querySelector('.page.active')||{}).id||'';
+    return active==='page-customer-portal'||active==='page-customer-entry'
+        || active==='page-customer-home'||active==='page-scan';
+   }catch(e){return false}
+  };
   var st=document.createElement('style');
   st.id='v69QrBootGuardStyle';
   st.textContent='html.qr-booting .app-shell{visibility:hidden!important}'

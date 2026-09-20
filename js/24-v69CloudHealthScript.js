@@ -61,8 +61,15 @@
   state.lastTable = table;
   console.warn('[imode cloud] upsert ' + table + ' failed:', err);
 
-  /* Once per session. Repeating it on every row of a sync would bury the page in toasts. */
-  if (!state.notified) {
+  /* Once per session. Repeating it on every row of a sync would bury the page in toasts.
+     2026-09-18: and never on a customer surface. The wording is for whoever runs the system —
+     a customer who scanned a QR can do nothing with "บันทึกขึ้นระบบส่วนกลางไม่สำเร็จ" except
+     worry. The console warning below, the settings badge and imodeCloudHealth() are unchanged,
+     so nothing is hidden from the people who can act on it. */
+  var customerSurface = false;
+  try { customerSurface = typeof window.imodeCustomerSurface === 'function'
+                       && window.imodeCustomerSurface(); } catch (e) {}
+  if (!state.notified && !customerSurface) {
    state.notified = true;
    toast('บันทึกขึ้นระบบส่วนกลางไม่สำเร็จ: ' + describe(err));
    if (isDenied(err)) {

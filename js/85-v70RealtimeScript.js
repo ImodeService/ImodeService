@@ -250,7 +250,15 @@
   };
   var fn=pages[active];
   if(fn&&typeof window[fn]==='function'){try{window[fn]()}catch(e){}}
-  if(lastNote){toast('🔄 '+lastNote);lastNote=''}
+  /* NOT ON A CUSTOMER SURFACE. Every device that opens the app subscribes, including the
+     phone a customer scanned a QR with — and every case any coordinator touches anywhere
+     was popping "🔄 SRV-… → มอบหมายแล้ว" over that customer's screen. Reported as
+     "หน้าของลูกค้าอะมันมักจะมีแจ้งเตือนของแอดมินโผล่มา". The data is still applied; only the
+     announcement, which is written for staff, is held back. */
+  var quiet=false;
+  try{quiet=typeof window.imodeCustomerSurface==='function'&&window.imodeCustomerSurface()}catch(e){}
+  if(lastNote&&!quiet)toast('🔄 '+lastNote);
+  lastNote='';
  }
 
  /* ------------------------------------------------ system_settings, carefully ----

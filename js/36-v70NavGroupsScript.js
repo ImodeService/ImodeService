@@ -264,7 +264,12 @@
     visibly jumped from 55px to 16px before anything animated. */
  +'.side-nav .nav-item{transition:max-height .34s cubic-bezier(.2,.8,.2,1),min-height .34s cubic-bezier(.2,.8,.2,1),opacity .26s ease,'
  +'margin .34s cubic-bezier(.2,.8,.2,1),padding .34s cubic-bezier(.2,.8,.2,1),'
- +'transform .26s cubic-bezier(.2,.8,.2,1),box-shadow .2s,background .2s,border-color .2s,color .2s!important;'
+ /* 2026-09-20: the press/hover feel was reported as too fast ("animation ของปุ่มใน Slide bar
+    มันเร็วไปอะ"). transform .26s -> .42s and the colour/glow .2s -> .34s. The FOLD timings
+    above (max-height / min-height / margin / padding .34s) are a different animation — the
+    group opening and closing — and are deliberately left alone. css/01's .nav-item and its
+    icon chip were moved to the same numbers, or the icon finishes before the button does. */
+ +'transform .42s cubic-bezier(.2,.8,.2,1),box-shadow .34s,background .34s,border-color .34s,color .34s!important;'
  +'max-height:64px;overflow:hidden}'
  /* A small lift as each item folds away, so it reads as tucking under the header rather than
     being cut off. Collapsed items take no pointer events, so this never fights the hover lift. */

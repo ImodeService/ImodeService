@@ -136,7 +136,11 @@
     background:linear-gradient(145deg,rgba(255,255,255,.22),rgba(255,255,255,.08))!important;
     border:1px solid rgba(255,255,255,.14)!important;
     box-shadow:0 6px 12px rgba(2,19,66,.16),inset 0 1px 0 rgba(255,255,255,.28)!important;
-    transition:transform .20s ease,background .20s ease,box-shadow .20s ease!important;
+    /* 2026-09-20: THIS is the icon-chip timing that actually wins — it is !important and it
+       sits after css/01's copy, so editing css/01 alone changes nothing. Slowed to match
+       .nav-item in js/36 (transform .42s, the rest .34s), which is where the button's own
+       press/hover timing lives. All three have to move together or the icon lands first. */
+    transition:transform .42s cubic-bezier(.2,.8,.2,1),background .34s ease,box-shadow .34s ease!important;
   }
   .side-nav .nav-item b{
     min-width:0!important;

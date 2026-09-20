@@ -161,3 +161,50 @@
   color:#5b6b88;letter-spacing:.02em;
 }
 .rhome-modgrid .rhome-restgroup:first-child{margin-top:2px}
+
+/* ── 8. The dashboard status legend was being cut off ────────────────────────────────────
+   MEASURED 2026-09-19, admin dashboard, several widths:
+
+       viewport 1920  panel 496  ->  donut 220 + legend 216   fine
+       viewport 1440  panel 340  ->  donut 220 + legend  87   <== min-content, unreadable
+       viewport 1280  panel 455  ->  donut 220 + legend 175   tight but readable
+
+   .dashboard-primary is three fixed fr columns, so between the 900px two-column breakpoint
+   and roughly 1600px the donut panel is only ~300px wide. .status-donut-wrap asks for a hard
+   220px first track out of that, leaving the legend 87px — its min-content — so every label
+   broke a character at a time ("มอบ / หมา / แล้ว") and §2's overflow:hidden above cut the
+   right edge of each card off. The overflow rule is what turned a cramped legend into a
+   silently truncated one.
+
+   The constraint is the PANEL's width, not the viewport's, so a media query cannot see it —
+   which is why the existing @media collapse at 1450 never fired here. A container query can.
+   Scoped with :has() to the one panel that holds a donut, so no other panel gains containment.
+   Where @container is unsupported the current layout simply remains: no regression. */
+.panel-body:has(> .status-donut-wrap){container-type:inline-size}
+@container (max-width:430px){
+  .status-donut-wrap{grid-template-columns:1fr;justify-items:center;gap:14px}
+  .status-donut-wrap .status-legend{width:100%}
+}
+
+/* ── 9. The 10/25/50/100 pager overlapped the buttons beside it ──────────────────────────
+   MEASURED 2026-09-19 at a 1024px viewport (iPad landscape) on customers / petty cash /
+   spare parts: .panel-head is 671px, the button row takes 466 and .machine-head-copy is
+   flex:1 1 0% with min-width:0 — so it was squeezed to 163px while its controls need 182,
+   and the 19px of overflow ran past the 12px gap into the left edge of the buttons.
+   Part 17 §8 gave it its own line below 900px; this is the same problem in the CONTENT
+   column at a wider viewport. min-content is what the controls genuinely need, so the row
+   wraps (the parent is already flex-wrap:wrap) instead of overlapping. */
+.panel-head .machine-head-copy{min-width:min-content}
+
+/* ── 10. The travel-distance box was too narrow to read ──────────────────────────────────
+   MEASURED 2026-09-19, quotation page at a 1280px viewport: #qDistance was 26px wide and
+   a realistic "1250" needed 61, so 35px of the number the admin had just typed was cut off.
+   .distance-input-row is grid `minmax(0,1fr) auto` and .distance-calc-btn is white-space:
+   nowrap, so the button takes its full natural width and the input is allowed to collapse
+   to nothing. This is the field that feeds getQuoteTravel() — the travel charge on the
+   quotation — so it has to stay readable.
+   Flex with wrap instead: the input keeps a 90px floor and the Google Maps button drops to
+   its own line when there is no room, which is what the ≤640px rule already did by hand. */
+.distance-input-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.distance-input-row>input{flex:1 1 90px;min-width:90px}
+.distance-input-row>.distance-calc-btn{flex:0 1 auto}

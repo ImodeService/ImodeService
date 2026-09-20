@@ -12,6 +12,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b2f8f">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <!-- 2026-09-19: the Apple-prefixed name is deprecated and Chrome logs a warning for it on
+       every single page load. The standard name does the same job; the Apple one stays for
+       older iOS, which is the only thing that still reads it. -->
+  <meta name="mobile-web-app-capable" content="yes">
   <title>I-MODE Plus Service & Maintenance · Beta 1.0 Service focus full system</title>
 <link rel="stylesheet" href="./css/01-base-theme.css">
 <link rel="stylesheet" href="./css/02-v6.1-sales-easy-mode.css">
@@ -1013,6 +1017,7 @@
 <script src="./js/85-v70RealtimeScript.js"></script>
 <script src="./js/87-v70TopbarScrollScript.js"></script>
 <script src="./js/88-v70NotifyCasePopupScript.js"></script>
+<script src="./js/89-v70PurchasingPageScript.js"></script>
 
 </body>
 </html>

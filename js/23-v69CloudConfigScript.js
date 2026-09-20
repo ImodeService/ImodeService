@@ -65,5 +65,55 @@
    return baseSave.apply(this,arguments);
   };
  }
+ /* ---------------------------------------------------------------------------------------
+    2026-09-20 — THE LOGIN PROVIDER HAS TO SHIP WITH THE APP TOO, for the same reason the
+    connection above does.
+
+    MEASURED on a fresh browser profile against the live project:
+
+      before syncCloud() lands   settings.authConfig = null
+                                 -> selectProvider() (auth/auth-integration.js:31) finds no
+                                    cfg.provider and falls through to
+                                    Auth.autoSelect(['supabase','local'])
+                                 -> supabase wins, because THIS FILE just configured a cloud
+                                 -> tech_test1 signs in and is told
+                                    "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"
+      after syncCloud() lands    authConfig.provider === 'local'  ->  the same sign-in works
+
+    Only three accounts exist in Supabase Auth (supabase/03-users.sql). The other four —
+    lead_technical, lead_rd, tech_test1 and whatever the owner creates — live in the local
+    registry in js/09, so on a NEW device they were all rejected until the settings row came
+    down. A technician opening the site on a new phone hit it every time, and it looked like
+    a wrong password rather than a race.
+
+    The owner pinned provider:'local' in the live settings back in part 17 §9; it simply had
+    no way to reach a device that had not synced yet. This writes the same value locally so
+    it is true from the first paint.
+
+    It does NOT override anything: an explicit provider already in settings — from this
+    device's cached copy or from the cloud — is left exactly as it is, so switching the
+    project to Supabase Auth later is still one settings change. The re-apply after a sync is
+    there because syncCloud() replaces `settings` wholesale, so a cloud row carrying no
+    authConfig at all would otherwise wipe the default back out mid-session. */
+ function ensureAuthProvider(){
+  try{
+   if(typeof settings!=='object'||!settings)return;
+   if(!settings.authConfig||typeof settings.authConfig!=='object')settings.authConfig={};
+   if(!settings.authConfig.provider)settings.authConfig.provider='local';
+  }catch(e){}
+ }
+ ensureAuthProvider();
+ var baseSync=window.syncCloud;
+ if(typeof baseSync==='function'){
+  window.syncCloud=function(){
+   var r=baseSync.apply(this,arguments);
+   if(r&&typeof r.then==='function')return r.then(function(v){ensureAuthProvider();return v},
+                                                  function(e){ensureAuthProvider();throw e});
+   ensureAuthProvider();
+   return r;
+  };
+ }
+ window.imodeEnsureAuthProvider=ensureAuthProvider;
+
  window.imodeDefaultCloud=DEFAULT_CLOUD;
 })();

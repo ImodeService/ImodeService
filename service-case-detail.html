@@ -151,8 +151,17 @@ a{color:var(--imode-blue)}
 .scd-steps li.is-blocked .mark{background:#fdf0e2;color:#9a6516;box-shadow:0 0 0 2px #f3d3b2}
 
 /* ---------- the drawer under a step ---------- */
-.scd-stepdrawer{margin-top:14px;border:1px solid var(--line-2);border-radius:14px;
+/* 2026-09-21 - it slides, like the field panel inside it. The border, padding and background
+   had to move to an inner element: they belong to the box that is being revealed, and left on
+   the slider they would still paint a 30px empty sliver at max-height:0. */
+.scd-stepdrawer{max-height:0;opacity:0;overflow:hidden;margin-top:0;
+  transition:max-height .3s ease-in,opacity .22s ease,margin-top .3s ease-in}
+.scd-stepdrawer.is-open{max-height:2400px;opacity:1;margin-top:14px;
+  transition:max-height .34s cubic-bezier(.22,.9,.3,1),opacity .26s ease,margin-top .34s ease}
+.scd-stepdrawer-in{border:1px solid var(--line-2);border-radius:14px;
   background:#f8fbff;padding:14px 16px}
+@media (prefers-reduced-motion:reduce){.scd-stepdrawer{transition:opacity .18s ease}
+  .scd-stepdrawer.is-open{max-height:none}}
 .sd-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .sd-head h4{margin:0;font-size:15px;color:var(--imode-navy)}
 .sd-head p{margin:0;flex:1;font-size:12.5px;color:var(--muted)}
@@ -219,6 +228,36 @@ a{color:var(--imode-blue)}
 .sd-field b{display:block;margin-top:7px;font-size:11.5px;color:var(--imode-navy);line-height:1.35}
 .sd-field li.pending b{color:#93a4c1}
 .sd-field small{display:block;font-size:10.5px;color:var(--muted);margin-top:2px}
+/* 2026-09-21 - every circle on the technician's track opens what was recorded at that step.
+   The <li> keeps the connector line and the state classes; the button inside it is the
+   control, so none of the rules above had to change. */
+.sd-field .fdot{transition:transform .18s ease,box-shadow .18s ease}
+.sd-fbtn{display:block;width:100%;margin:0;padding:2px 0 4px;border:0;background:none;
+  font:inherit;color:inherit;cursor:pointer;border-radius:10px;text-align:center}
+.sd-fbtn:hover .fdot{transform:scale(1.14)}
+.sd-fbtn:focus-visible{outline:2px solid var(--imode-blue);outline-offset:2px}
+.sd-field li.is-open .fdot{box-shadow:0 0 0 3px #f6a11a}
+.sd-field li.is-open b{color:#b26a00}
+/* The slide. max-height rather than grid-template-rows: it needs no browser caveat, and
+   1600px is far above a note plus a row of thumbnails. */
+/* Two easings, on purpose. A declaration on the BASE selector is the one that runs when the
+   class is REMOVED — the close — and the one on .is-open runs when it is added. Sharing the
+   opening curve made the collapse look clipped: cubic-bezier(.22,.9,.3,1) is front-loaded, so
+   a 226px panel was already down to 80px 55ms in and the slide was over before the eye caught
+   it. Closing eases IN instead: slow off the mark, quick at the end. */
+.sd-fdetail{max-height:0;opacity:0;overflow:hidden;margin-top:0;
+  transition:max-height .3s ease-in,opacity .22s ease,margin-top .3s ease-in}
+.sd-fdetail.is-open{max-height:1600px;opacity:1;margin-top:12px;
+  transition:max-height .34s cubic-bezier(.22,.9,.3,1),opacity .26s ease,margin-top .34s ease}
+.sd-fdetail-in{border:1px solid var(--line-2);border-radius:14px;background:#f7faff;padding:12px 14px}
+.sd-fdetail-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.sd-fdetail-head b{font-size:14px;color:var(--imode-navy)}
+.sd-fdetail-x{margin-left:auto;border:1px solid var(--line-2);background:#fff;border-radius:999px;
+  font:inherit;font-size:12px;padding:3px 12px;cursor:pointer;color:var(--muted)}
+.sd-fentry+.sd-fentry{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line-2)}
+.sd-fnote{margin:8px 0 0;font-size:13.5px;line-height:1.6;color:#22304a;white-space:pre-wrap}
+@media (prefers-reduced-motion:reduce){.sd-fdetail{transition:opacity .18s ease}
+  .sd-fdetail.is-open{max-height:none}.sd-fbtn:hover .fdot{transform:none}}
 
 /* the status picker the ⇄ button opens */
 .sd-when{margin-top:14px;border:1px solid var(--line-2);border-radius:12px;background:#f8fbff;padding:11px 12px}
@@ -365,11 +404,16 @@ a{color:var(--imode-blue)}
 #scdPanel.is-open{position:fixed;inset:0;z-index:11000;display:grid;place-items:center;padding:18px}
 .scd-modal-back{position:absolute;inset:0;background:rgba(9,18,38,.55);backdrop-filter:blur(1px)}
 #scdPanel.is-open .scd-modal-card{position:relative;z-index:1;width:min(620px,100%);
-  max-height:88vh;display:flex;flex-direction:column;margin:0;
+  max-height:88vh;display:flex;flex-direction:column;margin:0;min-width:0;
   box-shadow:0 26px 70px rgba(9,26,64,.32);animation:scdPop .16s ease-out}
 #scdPanel.is-open .scd-modal-card:focus{outline:none}
 #scdPanel.is-open .card-head{flex:0 0 auto}
-.scd-modal-body{overflow:auto;padding:0 16px 16px}
+/* min-width:0 on BOTH, measured — without it the card is a grid item and the body a flex
+   item, and min-width:auto lets each take its min-content width from .scd-qdoc's min-width:720px.
+   On a 390px phone the card came out 794px wide, so the signature pads and their buttons sat
+   half off-screen along with the paper. Now only the paper scrolls, inside .scd-modal-body.
+   Pre-existing — measured identical on the build before the combined save button. */
+.scd-modal-body{overflow:auto;padding:0 16px 16px;min-width:0}
 @keyframes scdPop{from{opacity:0;transform:translateY(8px) scale(.99)}to{opacity:1;transform:none}}
 body.scd-modal-open{overflow:hidden}
 @media (max-width:640px){
@@ -479,7 +523,13 @@ body.scd-modal-open{overflow:hidden}
 .qs-acts{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 .qs-file{cursor:pointer;display:inline-flex;align-items:center;margin-right:auto}
 .qs-file:focus-within{outline:2px solid var(--imode-blue);outline-offset:2px}
-@media (max-width:640px){.qs-wrap{grid-template-columns:minmax(0,1fr)}}
+/* One button for both pads, spanning the pair — the same shape as the combined QR print
+   button. The per-role buttons stay: a person who only signs one still presses that one. */
+.qs-both{grid-column:1/-1;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.qs-both small{color:var(--muted);font-size:11.5px;margin-right:auto}
+.qs-both-btn{padding:12px 20px}
+@media (max-width:640px){.qs-wrap{grid-template-columns:minmax(0,1fr)}
+  .qs-both small{margin-right:0;order:2}.qs-both-btn{width:100%;order:1}}
 /* ใบเสนอราคาของเคสนี้ — the section in step 2 */
 .sd-qt{margin-top:16px;padding-top:14px;border-top:1px dashed var(--line-2)}
 .sd-qt-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;margin-bottom:10px}
@@ -490,6 +540,11 @@ body.scd-modal-open{overflow:hidden}
 .sd-go.is-primary:hover{color:#fff;filter:brightness(1.07)}
 /* The full paper, drawn from the application's stored HTML. These rules restate the
    .quote-paper-* rules of css/01 (this page does not load css/), scoped to .scd-qdoc. */
+/* min-width:0 is what actually makes the overflow-x work. Without it this flex item takes its
+   min-content width from .scd-qdoc's min-width:720px, so on a phone the whole modal body was
+   720px wide inside a 390px card: the paper scrolled, but so did the signature pads and their
+   buttons, half off-screen. Pre-existing — measured identical on the build before the combined
+   save button — and fixed here because that button is the thing it hides. */
 .scd-qdoc-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .scd-qdoc{min-width:720px;color:#1d232f}
 .scd-qdoc .quote-doc.official{border:1px solid #dadce8;padding:18px 22px;background:#fff}
@@ -1289,6 +1344,143 @@ function fieldReached(m){
   if(now&&!Object.prototype.hasOwnProperty.call(hit,now))hit[now]='';
   return hit;
 }
+/* The name behind fieldStatusLog's techId. saveFieldStatus() writes `c.assignee||fieldTechId`,
+   which for a crew is js/38's comma list, so only the lead is resolved - that is who the entry
+   is attributed to. Read straight from storage: all() lives inside the data adapter. */
+function fieldTechName(id){
+  var raw=String(id||'').split(',')[0].trim();
+  if(!raw)return '-';
+  var list=readJSON(K.tech,[])||[];
+  for(var i=0;i<list.length;i++)if(list[i]&&list[i].id===raw)return list[i].name||raw;
+  return raw;
+}
+/* What the technician recorded at one field status: the time, who, the note, and the photos
+   and clips attached through the บันทึกสถานะพร้อมรูป button - all of it already stored on the case as
+   fieldStatusLog[], and until now shown nowhere on this page except as an anonymous thumbnail
+   in the เอกสาร & รูปภาพ panel.
+
+   The tiles are addressed by their index in caseDetailModel.attachments, matched on the data
+   URL, so they reuse mediaTiles() and the page's existing lightbox rather than carrying a
+   second copy of either. loadAttachments() pushes the very same string, so the match is an
+   identity comparison in practice. */
+function fieldStepDetailHTML(m,k){
+  var fs=FIELD_STEPS[k]||'';
+  var entries=fieldLog(m).filter(function(e){return e&&e.status===fs});
+  var atts=m.attachments||[];
+  var head='<div class="sd-fdetail-head"><b>'+esc(fs)+'</b>'
+    +'<button type="button" class="sd-fdetail-x" data-fstep-close="1">ปิด</button></div>';
+  if(!entries.length){
+    var isNow=String((m.raw&&m.raw.fieldStatus)||'')===fs;
+    return head+'<p class="sd-empty">'+(isNow
+      ? 'ช่างอยู่ที่ขั้นนี้ แต่ยังไม่ได้บันทึกรายละเอียดหรือรูปจากหน้างาน'
+      : 'ยังไม่ถึงขั้นนี้ - ยังไม่มีข้อมูลจากหน้างาน')+'</p>';
+  }
+  return head+entries.map(function(e){
+    var tiles=[];
+    (e.media||[]).forEach(function(mm){
+      if(!mm||!mm.data)return;
+      for(var i=0;i<atts.length;i++){
+        if(atts[i]&&atts[i].data===mm.data){tiles.push({a:atts[i],i:i});return}
+      }
+    });
+    var missing=(e.media||[]).length-tiles.length;
+    return '<div class="sd-fentry">'
+      +'<dl class="sd-kv"><dt>เวลา</dt><dd>'+esc(fmtDateTime(e.createdAt))+'</dd>'
+      +'<dt>ช่าง</dt><dd>'+esc(fieldTechName(e.techId))+'</dd></dl>'
+      +(e.note?'<p class="sd-fnote">'+esc(e.note)+'</p>'
+              :'<p class="sd-empty">ไม่ได้บันทึกรายละเอียดเพิ่มเติม</p>')
+      +(tiles.length?'<div class="cmp-grid" style="margin-top:10px">'+mediaTiles(tiles)+'</div>':'')
+      +(missing>0?'<p class="sd-empty">มีไฟล์แนบอีก '+missing+' รายการที่เปิดจากเครื่องนี้ไม่ได้</p>':'')
+      +'</div>';
+  }).join('');
+}
+
+/* ============================ the two sliding blocks ============================
+   The step drawer and the field panel inside it both open and close by sliding, and both are
+   rendered by repaintProgress(), which REPLACES the whole progress block. That is what makes
+   this less trivial than a class toggle:
+
+   OPENING. A node that is inserted already-open has no start value to animate from, so a block
+   being opened by a press is rendered collapsed and gets .is-open on the second animation
+   frame. But repaintProgress() is also called by applyStatus(), by CaseLive and by the delete
+   flow — and a block re-rendered by one of those must come back ALREADY open, or it would sit
+   at max-height:0 with nothing left to trigger it and simply be invisible. slideNext is what
+   tells the two apart: it names the one block this particular render is about to animate.
+
+   SETTLING. When the opening transition finishes the cap is dropped to max-height:none, so a
+   tall drawer can never be clipped by whatever number the stylesheet guessed.
+
+   CLOSING. repaintProgress() removes the element, and a node that is gone cannot transition, so
+   the collapse is run first and the repaint happens only once it has arrived. The pin is the
+   whole trick: .is-open is a cap far above the content, so removing the class alone would
+   animate 2400 -> 0 and nothing would appear to move until the value passed the real height,
+   then it would snap. Pinning to scrollHeight first makes the whole 340ms visible — and it
+   works whether the cap was a number or none. The inline value is set on both sides because
+   inline beats the class, so the class alone could not take it back down.
+
+   transitionend is not trusted on its own (a browser that skips the transition never fires it),
+   so a timeout finishes the job and a data-closing flag stops the two from both repainting. */
+var slideNext=null;
+function slideWrap(id,cls){
+  var fresh=(slideNext===id);
+  return '<div class="'+cls+(fresh?'':' is-open')+'" id="'+id+'"'
+    +(fresh?'':' style="max-height:none"')+'>';
+}
+function slideOpen(id){
+  requestAnimationFrame(function(){requestAnimationFrame(function(){
+    var box=document.getElementById(id);
+    if(!box)return;
+    var reduce=false;
+    try{reduce=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)}catch(e){}
+    if(reduce){box.classList.add('is-open');box.style.maxHeight='none';return}
+    /* Animate to the block's REAL height, not to the class's cap. Measured: with the cap at
+       2400px and a 163px drawer, max-height passes the content height about 24ms in, so the
+       whole thing looked instant however long the transition was — the mirror image of what
+       the cap does on the way out. scrollHeight is readable while max-height is 0 because the
+       overflow is hidden, not display:none. */
+    box.style.maxHeight=box.scrollHeight+'px';
+    box.classList.add('is-open');
+    var settle=function(){
+      if(!box.classList.contains('is-open'))return;   /* closed again in the meantime */
+      if(box.getAttribute('data-closing'))return;
+      box.style.maxHeight='none';
+    };
+    box.addEventListener('transitionend',function(e){if(e.propertyName==='max-height')settle()});
+    setTimeout(settle,420);
+  })});
+}
+function slideShut(id,after){
+  var box=document.getElementById(id);
+  var reduce=false;
+  try{reduce=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)}catch(e){}
+  if(!box||reduce){after();return}
+  if(box.getAttribute('data-closing'))return;        /* already on its way out */
+  box.setAttribute('data-closing','1');
+  box.style.maxHeight=box.scrollHeight+'px';
+  void box.offsetHeight;
+  box.classList.remove('is-open');
+  box.style.maxHeight='0px';
+  var done=function(){
+    if(!box.getAttribute('data-closing'))return;
+    box.removeAttribute('data-closing');
+    after();
+  };
+  box.addEventListener('transitionend',function(e){if(e.propertyName==='max-height')done()});
+  setTimeout(done,420);
+}
+/* Closing the whole drawer closes the field panel with it — it lives inside. */
+function closeStepDrawer(){
+  slideShut('sdStepDrawer',function(){openStep=null;openField=null;repaintProgress()});
+}
+function closeFieldDetail(){
+  /* the circle lets go at once, rather than staying ringed through the collapse */
+  var li=document.querySelector('.sd-field li.is-open');
+  if(li)li.classList.remove('is-open');
+  var btn=document.querySelector('.sd-fbtn[aria-expanded="true"]');
+  if(btn)btn.setAttribute('aria-expanded','false');
+  slideShut('sdFieldDetail',function(){openField=null;repaintProgress()});
+}
+
 /* "the technician has finished" — จบงาน on the field track, or a service report exists.
    Either one is proof the work is over; a case can reach เสร็จสิ้น through the report path
    without the field track ever being touched. */
@@ -1454,6 +1646,10 @@ function statusLogHTML(m){
 
 /* Which step is open underneath the track. null = none. */
 var openStep=null;
+/* Which circle on the technician's field track is expanded, or null. Same shape as openStep:
+   repaintProgress() redraws the block, so this is read while rendering rather than toggled
+   on a live node. */
+var openField=null;
 
 function renderProgress(m){
   var idx=stepIndex(m.case.status),closed=m.case.status==='ปิดเคส';
@@ -1496,7 +1692,8 @@ function renderProgress(m){
   return '<section class="scd-progress" aria-label="ความคืบหน้าของเคส">'
     +'<ol class="scd-steps">'+lis+'</ol>'
     +onlineBannerHTML(m)
-    +(openStep==null?'':'<div class="scd-stepdrawer">'+stepDrawerHTML(m,openStep)+'</div>')
+    +(openStep==null?'':slideWrap('sdStepDrawer','scd-stepdrawer')
+      +'<div class="scd-stepdrawer-in">'+stepDrawerHTML(m,openStep)+'</div></div>')
     +(subs?'<div class="scd-substates">'+subs+'</div>':'')
     +statusLogHTML(m)
     +'<div class="scd-after"><span class="mark">★</span>'
@@ -1553,13 +1750,20 @@ function stepDrawerHTML(m,i){
     var dots=FIELD_STEPS.map(function(fs,k){
       var on=Object.prototype.hasOwnProperty.call(hit,fs);
       var isNow=String((m.raw&&m.raw.fieldStatus)||c.subStatus||'')===fs;
-      return '<li class="'+(on?'done':'pending')+(isNow?' now':'')+'">'
+      /* Every step is pressable, reached or not - one that has not happened yet says so,
+         which is more use than a dead circle. */
+      return '<li class="'+(on?'done':'pending')+(isNow?' now':'')+(openField===k?' is-open':'')+'">'
+        +'<button type="button" class="sd-fbtn" data-fstep="'+k+'"'
+        +' aria-expanded="'+(openField===k?'true':'false')+'">'
         +'<span class="fdot">'+(on?'✔':String(k+1))+'</span>'
         +'<b>'+esc(fs)+'</b>'
-        +(hit[fs]?'<small>'+esc(fmtDateTime(hit[fs]))+'</small>':'')+'</li>';
+        +(hit[fs]?'<small>'+esc(fmtDateTime(hit[fs]))+'</small>':'')
+        +'</button></li>';
     }).join('');
-    return head(stepNo('service')+'. กำลังให้บริการ','ความคืบหน้าที่ช่างอัปเดตจากหน้างาน')
+    return head(stepNo('service')+'. กำลังให้บริการ','ความคืบหน้าที่ช่างอัปเดตจากหน้างาน - กดวงกลมเพื่อดูรายละเอียด')
       +'<ol class="sd-field">'+dots+'</ol>'
+      +(openField==null?'':slideWrap('sdFieldDetail','sd-fdetail')
+        +'<div class="sd-fdetail-in">'+fieldStepDetailHTML(m,openField)+'</div></div>')
       +'<p class="'+(done?'sd-ok':'sd-wait')+'">'
       +(done?'✔ ช่างทำงานเสร็จแล้ว — กดวงกลมขั้นที่ '+stepNo('done')+' เพื่อไปต่อได้'
             :'⏳ ยังรอช่างอัปเดตให้ถึง “จบงาน” หรือบันทึกใบตรวจ ระหว่างนี้ยังข้ามไปขั้นถัดไปไม่ได้')+'</p>'
@@ -1675,8 +1879,9 @@ function qsFillCell(cell,name,date,sig){
        customer's signature that quotationDocHTML() had already baked into the stored paper was
        wiped off it. That is the exact shape of "the first was fine, the second lost it".
        Empty now means "nothing new to stamp here", not "clear this box". The stored paper is
-       the record: a render pass may add to it, never take away. Clearing still works, because
-       ล้างลายเซ็น removes the record and the document is regenerated rather than re-stamped. */
+       the record: a render pass may add to it, never take away. ล้างลายเซ็น clears the PAD,
+       which is the input for a new signature — it does not remove a signature already on the
+       paper, and the way to replace one is to sign again and save. */
     if(sig){
       area.innerHTML='';
       var img=document.createElement('img');
@@ -1752,6 +1957,42 @@ function qsHasInk(c){
     return false;
   }catch(e){return c.dataset.ink==='1'}
 }
+/* 2026-09-21 — SAVING ONE PAD MUST NOT EMPTY THE OTHER.
+   Reported: "มันมีปุ่มบันทึกแยกกันอยู่ระหว่างผู้อนุมัติกับผู้จัดทำ เวลากดเซฟ1อัน อีกอันหาย".
+   It really did. saveStaffSign() ends by calling openQuoteDoc(), which rebuilds the whole
+   panel — and a rebuilt <canvas> is blank, so ink drawn in the other pad but not yet saved,
+   and a name typed into it, were thrown away by the act of saving its neighbour. The rebuild
+   is what stamps the new signature onto the paper and draws the ✓ chip, so it stays; what is
+   on screen is captured immediately before it and put back immediately after. Nothing the
+   person drew disappears, including in the pad that was just saved. */
+function qsCapture(){
+  var out={};
+  QS_ROLES.forEach(function(r){
+    var pad=el('qsPad_'+r.key),name=el('qsName_'+r.key);
+    var ink='';
+    try{if(pad&&qsHasInk(pad))ink=pad.toDataURL('image/png')}catch(e){}
+    out[r.key]={ink:ink,name:name?name.value:''};
+  });
+  return out;
+}
+function qsRestore(snap){
+  if(!snap)return;
+  QS_ROLES.forEach(function(r){
+    var s=snap[r.key];
+    if(!s)return;
+    var name=el('qsName_'+r.key);
+    /* Only when the rebuilt field came back empty — a saved name is the record and wins. */
+    if(name&&s.name&&!name.value)name.value=s.name;
+    if(!s.ink)return;
+    var pad=el('qsPad_'+r.key);
+    if(!pad)return;
+    var img=new Image();
+    img.onload=function(){
+      try{pad.getContext('2d').drawImage(img,0,0,pad.width,pad.height);pad.dataset.ink='1'}catch(e){}
+    };
+    img.src=s.ink;
+  });
+}
 function qsShrink(c){
   var w=300,h=Math.round(c.height*(w/c.width));
   var o=document.createElement('canvas');o.width=w;o.height=h;
@@ -1770,7 +2011,11 @@ function openQuoteDoc(){
   var signs=qsSigns(q.id),mayEdit=can('quotation.create');
   panel('ใบเสนอราคา '+q.id,'<div class="scd-qdoc-wrap"><div class="scd-qdoc">'+f.doc.html+'</div></div>'
     +(mayEdit?'<div class="qs-wrap"><div class="qs-head">ลายเซ็นฝั่งบริษัท</div>'
-      +QS_ROLES.map(function(r){return qsPadHTML(r,q,signs[r.key])}).join('')+'</div>':''));
+      +QS_ROLES.map(function(r){return qsPadHTML(r,q,signs[r.key])}).join('')
+      +'<div class="qs-both"><small>เซ็นทั้งสองช่องแล้วกดปุ่มนี้ครั้งเดียว — หรือกดบันทึกแยกทีละช่องก็ได้</small>'
+      +'<button type="button" class="scd-ce-save qs-both-btn" data-qs-save-all="1">'
+      +'💾 บันทึกลายเซ็นทั้งสอง</button></div>'
+      +'</div>':''));
   var cells=document.querySelectorAll('#scdPanel .quote-sign-cell');
   QS_ROLES.forEach(function(r,i){
     var rec=signs[r.key]||{};
@@ -1780,36 +2025,77 @@ function openQuoteDoc(){
   if(cells[2]&&a)qsFillCell(cells[2],a.name||q.purchaserName||'',qsThaiDate(a.at||q.purchaserDate),a.sig||'');
   if(mayEdit)QS_ROLES.forEach(function(r){qsInitPad('qsPad_'+r.key)});
 }
-function saveStaffSign(key){
-  var q=caseQuote(),r=QS_ROLES.filter(function(x){return x.key===key})[0];
-  if(!q||!r)return;
+/* 2026-09-21 — ONE BUTTON FOR BOTH PADS, on top of the two per-role buttons.
+   saveStaffSign(key) is now saveStaffSigns([key]): one function saves any number of roles in
+   ONE pass, which is not only tidier but safer. Two separate saves meant two separate
+   read-modify-writes of the settings row, and the second could read it before the first had
+   landed and push the first back out — the same shape of race that lost the signatures in the
+   first place. Saving both together is a single read and a single write.
+
+   An empty block is skipped when the combined button is pressed (somebody may genuinely only
+   be signing one) but complained about when its own button is pressed, because pressing that
+   button is a statement about that block. A half-filled block — a name with no signature, or
+   a signature with no name — always stops the save, whichever button was pressed. */
+function saveStaffSign(key){return saveStaffSigns([key])}
+function saveStaffSigns(keys){
+  var q=caseQuote();
+  if(!q)return;
   if(!can('quotation.create')){toast('บัญชีนี้ไม่มีสิทธิ์เซ็นใบเสนอราคา');return}
-  var nameEl=el('qsName_'+key),pad=el('qsPad_'+key);
-  var name=nameEl?nameEl.value.trim():'';
-  if(!name){toast('กรุณาพิมพ์ชื่อ'+r.th);if(nameEl){nameEl.focus();nameEl.classList.add('is-missing');setTimeout(function(){nameEl.classList.remove('is-missing')},1800)}return}
-  if(!pad||!qsHasInk(pad)){toast('กรุณาเซ็นชื่อในกรอบก่อนบันทึก');return}
-  var now=new Date().toISOString(),day=now.slice(0,10),sig=qsShrink(pad);
+  var lenient=keys.length>1,jobs=[],stop=false;
+  keys.forEach(function(key){
+    if(stop)return;
+    var r=QS_ROLES.filter(function(x){return x.key===key})[0];
+    if(!r)return;
+    var nameEl=el('qsName_'+key),pad=el('qsPad_'+key);
+    var name=nameEl?nameEl.value.trim():'';
+    var inked=!!(pad&&qsHasInk(pad));
+    if(!name&&!inked&&lenient)return;              /* this role is simply not being signed */
+    if(!name){
+      stop=true;toast('กรุณาพิมพ์ชื่อ'+r.th);
+      if(nameEl){nameEl.focus();nameEl.classList.add('is-missing');
+        setTimeout(function(){nameEl.classList.remove('is-missing')},1800)}
+      return;
+    }
+    if(!inked){stop=true;toast('กรุณาเซ็นชื่อ'+r.th+'ในกรอบก่อนบันทึก');return}
+    jobs.push({r:r,name:name,sig:qsShrink(pad)});
+  });
+  if(stop)return;
+  if(!jobs.length){toast('ยังไม่มีลายเซ็นให้บันทึก — กรุณาเซ็นชื่อในกรอบก่อน');return}
+
+  var now=new Date().toISOString(),day=now.slice(0,10);
+  var what='ลายเซ็น'+jobs.map(function(j){return j.r.th}).join(' และ ');
   /* 1. name and date: the quotation's own columns */
   var list=readJSON(K.quotes,[])||[];
-  list.forEach(function(x){if(x&&x.id===q.id){x[r.nameKey]=name;x[r.dateKey]=day;x.updatedAt=now}});
-  /* 2. the image: settings, beside quoteApprovals */
+  list.forEach(function(x){
+    if(!x||x.id!==q.id)return;
+    jobs.forEach(function(j){x[j.r.nameKey]=j.name;x[j.r.dateKey]=day});
+    x.updatedAt=now;
+  });
+  /* 2. the images: settings, beside quoteApprovals */
   var s=readJSON(K.settings,{})||{};
   s.quoteStaffSigns=s.quoteStaffSigns||{};
   s.quoteStaffSigns[q.id]=s.quoteStaffSigns[q.id]||{};
-  var rec={name:name,sig:sig,at:now};
-  s.quoteStaffSigns[q.id][key]=rec;
+  jobs.forEach(function(j){
+    j.rec={name:j.name,sig:j.sig,at:now};
+    s.quoteStaffSigns[q.id][j.r.key]=j.rec;
+  });
   try{
     localStorage.setItem(K.quotes,JSON.stringify(list));
     localStorage.setItem(K.settings,JSON.stringify(s));
   }catch(e){toast('บันทึกไม่สำเร็จ — พื้นที่ในเครื่องเต็ม');return}
   try{CaseDetailData.refresh()}catch(e){}
   var finish=function(cloud){
+    var snap=qsCapture();          /* taken now, not earlier: the other pad may have been
+                                      drawn in while the cloud round trip was in flight */
     openQuoteDoc();
-    toast(cloud?('บันทึกลายเซ็น'+r.th+'แล้ว'):('บันทึกลายเซ็น'+r.th+'แล้ว · ยังอยู่เฉพาะเครื่องนี้ ยังไม่ได้ส่งขึ้นระบบกลาง'));
+    qsRestore(snap);
+    toast(cloud?('บันทึก'+what+'แล้ว')
+               :('บันทึก'+what+'แล้ว · ยังอยู่เฉพาะเครื่องนี้ ยังไม่ได้ส่งขึ้นระบบกลาง'));
   };
   var sb=CaseWrite.client();
   if(!sb){finish(false);return}
-  var row={updated_at:now};row[r.col]=name;row[r.dateCol]=day;
+  var row={updated_at:now};
+  jobs.forEach(function(j){row[j.r.col]=j.name;row[j.r.dateCol]=day});
   /* The settings row is read fresh and only this one key is merged in, so this page never
      writes back a stale copy of everything else in settings. */
   Promise.all([
@@ -1819,7 +2105,7 @@ function saveStaffSign(key){
       var data=res.data.data;
       data.quoteStaffSigns=data.quoteStaffSigns||{};
       data.quoteStaffSigns[q.id]=data.quoteStaffSigns[q.id]||{};
-      data.quoteStaffSigns[q.id][key]=rec;
+      jobs.forEach(function(j){data.quoteStaffSigns[q.id][j.r.key]=j.rec});
       return sb.from('system_settings').update({data:data,updated_at:now}).eq('id','main');
     })
   ]).then(function(rs){finish(!rs.some(function(x){return x&&x.error}))},function(){finish(false)});
@@ -3079,7 +3365,12 @@ function stepPressed(i,role){
   var m=caseDetailModel,idx=stepIndex(m.case.status);
   if(role==='online'){closeOnline();return}
   if(role==='open'||role==='far'){
-    openStep=(openStep===i)?null:i;
+    if(openStep===i){closeStepDrawer();return}
+    /* Opening from closed slides. Moving from one step to another swaps the content where it
+       stands: sliding out and back in for a single press costs .7s and reads as sluggish. */
+    if(openStep==null)slideNext='sdStepDrawer';
+    openStep=i;
+    openField=null;          /* a different step: start with the field track collapsed */
     repaintProgress();
     return;
   }
@@ -3091,6 +3382,7 @@ function stepPressed(i,role){
   if(isWorkshopCase(m.raw)&&idx===S('intake')&&i===S('assign')&&!wsLast(m.raw,'received')){wsReceive();return}
   var gate=stepGate(m,idx);
   if(gate){
+    if(openStep==null)slideNext='sdStepDrawer';
     openStep=idx;                     /* show the step that is holding it up, and why */
     repaintProgress();
     toast('ยังข้ามไปขั้นถัดไปไม่ได้ — '+gate);
@@ -3102,10 +3394,15 @@ function stepPressed(i,role){
 /* Redraws only the progress block, so the rest of the page keeps its scroll and panels. */
 function repaintProgress(){
   var host=document.querySelector('.scd-progress');
-  if(!host||!host.parentNode)return;
+  /* slideNext is read while rendering, so it is cleared after, and cleared on the early
+     return too — a stale one would render the next block collapsed with nothing to open it. */
+  if(!host||!host.parentNode){slideNext=null;return}
+  var id=slideNext;
   var wrap=document.createElement('div');
   wrap.innerHTML=renderProgress(caseDetailModel);
   host.parentNode.replaceChild(wrap.firstChild,host);
+  slideNext=null;
+  if(id)slideOpen(id);
 }
 /* ลบเคส. Moving the record into ถังขยะ, dropping the Supabase row and re-rendering the lists
    is still the application's job — only it owns settings.trash — so the case is handed over
@@ -3532,7 +3829,7 @@ var HANDLERS={
   'open-field-service':openFieldService,
   'change-status':changeCaseStatus,
   'edit-case':editCase,
-  'close-step':function(){openStep=null;repaintProgress()},
+  'close-step':function(){closeStepDrawer()},
   /* The printable A4 sheet and the edit form are js/03's and stay there, so there is one
      of each. js/28 turns these intents into previewServiceReport() / openServiceReport()
      for the report that belongs to this case. The OLD name pointed at intent=status, which
@@ -3579,6 +3876,11 @@ document.addEventListener('click',function(e){
   if(e.target.closest('[data-media-close]')){closeMediaView();return}
   var tile=e.target.closest('[data-media]');
   if(tile){e.preventDefault();openMediaView(tile.getAttribute('data-media'));return}
+  if(e.target.closest('[data-qs-save-all]')){
+    e.preventDefault();
+    saveStaffSigns(QS_ROLES.map(function(r){return r.key}));
+    return;
+  }
   var qsSave=e.target.closest('[data-qs-save]');
   if(qsSave){e.preventDefault();saveStaffSign(qsSave.getAttribute('data-qs-save'));return}
   var qsClear=e.target.closest('[data-qs-clear]');
@@ -3590,6 +3892,22 @@ document.addEventListener('click',function(e){
   }
   var contact=e.target.closest('[data-contact]');
   if(contact){contactCustomer(contact.getAttribute('data-contact'));return}
+  if(e.target.closest('[data-fstep-close]')){
+    e.preventDefault();closeFieldDetail();return;
+  }
+  var fstep=e.target.closest('[data-fstep]');
+  if(fstep){
+    e.preventDefault();
+    var fk=Number(fstep.getAttribute('data-fstep'))||0;
+    /* the same circle again: slide it shut. A DIFFERENT circle swaps the content and slides
+       straight back in — sliding out and in again for one press would cost .7s and read as
+       sluggish rather than as an answer. */
+    if(openField===fk){closeFieldDetail();return}
+    if(openField==null)slideNext='sdFieldDetail';   /* switching circles swaps in place */
+    openField=fk;
+    repaintProgress();
+    return;
+  }
   var step=e.target.closest('[data-step]');
   if(step&&!step.disabled){
     e.preventDefault();
@@ -3743,7 +4061,8 @@ var CaseLive=(function(){
     return true;
   }
 
-  var SETTING_KEYS=['quoteApprovals','quoteAccepts','caseFeedback','caseStatusLog'];
+  var SETTING_KEYS=['quoteApprovals','quoteAccepts','caseFeedback','caseStatusLog',
+                    'quoteStaffSigns','quoteDocs'];
   /* 2026-09-21 — AN APPROVAL THAT HAS A SIGNATURE IS NEVER REPLACED BY ONE THAT HAS NONE.
      saveStaffSign() writes the WHOLE settings object back to system_settings, and this
      subscription hears its own echo a moment later. If that round trip ever returns an approval
@@ -3771,7 +4090,12 @@ var CaseLive=(function(){
     var s=readJ(K.settings,{})||{},moved=false;
     SETTING_KEYS.forEach(function(k){
       if(!(k in data))return;
-      var next=(k==='quoteApprovals')?mergeApprovals(s[k],data[k]):data[k];
+      /* 2026-09-21 — every one of these is an {id: record} map that only ever grows, so the
+         union is right for all of them, not only for approvals: an incoming copy that has
+         lost an id this device holds must not delete it. The `.sig` clause inside simply
+         never fires for the ones that carry no image. quoteDocs is the exception and is
+         replaced: it is a cache js/80 re-bakes and caps at 25, and holds no signature. */
+      var next=(k==='quoteDocs')?data[k]:mergeApprovals(s[k],data[k]);
       var a='',b='';
       try{a=JSON.stringify(next)}catch(e){return}
       try{b=JSON.stringify(s[k])}catch(e){b=''}

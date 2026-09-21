@@ -181,6 +181,26 @@
  function advance(cid,status){
   if(typeof window.saveFieldStatus!=='function')return;
   if(document.querySelector('#modal.open'))return;
+  /* 2026-09-21 — WHY THE IDS BELOW ARE PARKED FIRST.
+     closeModal() (js/03:1129) is `modal.classList.remove('open')` and nothing else, so the
+     status popup opened by 📷 บันทึกสถานะพร้อมรูป leaves its own #fieldStatusSelect and
+     #fieldStatusNote in the document for good. Appending ours then gives TWO elements with
+     each id — and a duplicated id makes the id-global an HTMLCollection instead of the
+     element, so saveFieldStatus()'s `fieldStatusNote.value.trim()` reads undefined and
+     throws. It is an async function, so that is a rejected promise, and the .then(clean,clean)
+     below swallows it: nothing saved, nothing in the console, and the ถัดไป button silently
+     stopped working for the rest of the session once the popup had been used once.
+     Measured: window.fieldStatusSelect came back as [object HTMLCollection] with
+     value undefined, and the call rejected with "Cannot read properties of undefined".
+     The stale copies are parked under no id for the length of this call and put back after,
+     so ours is the only one the id-global can resolve to. */
+  var parked=[];
+  ['fieldStatusSelect','fieldStatusNote'].forEach(function(id){
+   [].forEach.call(document.querySelectorAll('[id="'+id+'"]'),function(el){
+    parked.push([el,id]);
+    el.id='';
+   });
+  });
   var box=document.createElement('div');
   box.style.display='none';
   box.innerHTML='<select id="fieldStatusSelect"><option></option></select><textarea id="fieldStatusNote"></textarea>';
@@ -189,7 +209,11 @@
   box.querySelector('select').value=status;
   document.body.appendChild(box);
   try{pendingFieldStatusMedia=[]}catch(e){}
-  var clean=function(){if(box.parentNode)box.parentNode.removeChild(box)};
+  var clean=function(){
+   if(box.parentNode)box.parentNode.removeChild(box);
+   parked.forEach(function(p){p[0].id=p[1]});
+   parked=[];
+  };
   var r;
   try{r=window.saveFieldStatus(cid)}catch(e){clean();return}
   if(r&&typeof r.then==='function')r.then(clean,clean);

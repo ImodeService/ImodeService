@@ -274,7 +274,30 @@
     re-run against someone else's copy. These are the shared operational records — things one
     device writes for the others to see — and nothing about configuration. */
  var SETTING_KEYS=['quoteApprovals','quoteAccepts','quoteRequestLink','caseStatusLog',
-                   'caseFeedback','trash','portalNews','uatAccounts','uatAccountEdits'];
+                   'caseFeedback','trash','portalNews','uatAccounts','uatAccountEdits',
+                   /* 2026-09-21 — quoteStaffSigns WAS MISSING, and that made a loss certain
+                      rather than merely likely. service-case-detail.html writes the two staff
+                      signature images there; a running application could never learn they
+                      existed, so js/80's fingerprint stayed wrong and the next
+                      cloudSaveSettings() pushed a blob without them and deleted them from the
+                      database. Measured — see js/90's header. quoteDocs joins it so the paper
+                      another device re-bakes is picked up too. */
+                   'quoteStaffSigns','quoteDocs'];
+ /* Keys that are {id: record} and only ever grow. An incoming copy that has lost an id this
+    device holds must not delete it: the writer may simply not have seen it yet. Same rule as
+    js/90 applies to the push and the sync, and as CaseLive applies on the case page.
+    quoteDocs is taken but NOT unioned: it is a cache js/80 re-bakes on a fingerprint change
+    and caps at 25, so keeping entries another device just trimmed would only grow the row. */
+ var ADDITIVE={quoteApprovals:1,quoteAccepts:1,quoteRequestLink:1,caseStatusLog:1,
+               caseFeedback:1,quoteStaffSigns:1};
+ function unionById(local,incoming){
+  if(!incoming||typeof incoming!=='object'||Array.isArray(incoming))return local;
+  if(!local||typeof local!=='object'||Array.isArray(local))return incoming;
+  var out={},k,own=Object.prototype.hasOwnProperty;
+  for(k in incoming)if(own.call(incoming,k))out[k]=incoming[k];
+  for(k in local)if(own.call(local,k)&&!own.call(out,k))out[k]=local[k];
+  return out;
+ }
  function applySettings(payload){
   state.events++;
   var data=payload&&payload.new&&payload.new.data;
@@ -282,11 +305,12 @@
   var moved=[];
   SETTING_KEYS.forEach(function(k){
    if(!(k in data))return;
-   var incoming='',local='';
-   try{incoming=JSON.stringify(data[k])}catch(e){return}
+   var incoming='',local='',next;
+   try{next=ADDITIVE[k]?unionById(settings[k],data[k]):data[k]}catch(e){next=data[k]}
+   try{incoming=JSON.stringify(next)}catch(e){return}
    try{local=JSON.stringify(settings[k])}catch(e){local=''}
    if(incoming===local)return;              /* our own echo, or nothing new */
-   try{settings[k]=data[k];moved.push(k)}catch(e){}
+   try{settings[k]=next;moved.push(k)}catch(e){}
   });
   if(!moved.length)return;
   /* The quotation list and the case page read the approval through js/75's helpers, so the

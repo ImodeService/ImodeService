@@ -5581,3 +5581,326 @@ reads back as `\n`, and `service-case-detail.html` contains a **non-breaking spa
 better — replace **by index between markers** rather than by matching text. And always write a
 `.tmp` and `shutil.move` it: `open(path,'w')` truncates before it writes, which left that file
 at 0 bytes once this session.
+
+---
+
+## Session Change Log — 2026-09-21 (part 30): the settings blob deleted the signatures
+
+One reported bug: sign ผู้อนุมัติ and ผู้จัดทำ on `service-case-detail.html`, reload, and every
+signature is gone — the customer's included — while `index.html` on a local Five Server still
+showed them all. One new JS file, small edits to two existing ones and one script tag.
+
+| File | What |
+|---|---|
+| `js/90-v70SettingsMergeScript.js` | **new** — a settings push may not delete another device's record, and a sync may not delete one this device holds |
+| `js/85-v70RealtimeScript.js` | `quoteStaffSigns` and `quoteDocs` added to `SETTING_KEYS`; the {id:record} maps are now unioned, not replaced |
+| `service-case-detail.html` | saving one pad no longer empties the other; the same union rule in `CaseLive` |
+| `index.html` | one `<script src>` |
+
+### THE BUG: `settings` is one jsonb blob and every device pushes its whole copy
+
+Measured on the live project before anything was written, and the chain is exact:
+
+| | |
+|---|---|
+| 01:28:45 | the case page saves the two staff signatures. `quotations.authorized_by` / `prepared_by` are real columns and survived; the images went to `system_settings.data.quoteStaffSigns`. **That write was correct** — it reads the row fresh and merges only its own key. |
+| 01:28:45 | the application, open elsewhere, hears the `quotations` UPDATE on realtime. js/80's fingerprint changed, so it re-bakes the paper and calls `push()` → `saveLocal()` + `cloudSaveSettings()`. |
+| 01:33:31 | `cloudSaveSettings()` (js/03:1727) writes `data: settings` — **the whole in-memory blob, read at boot**. It does not merge; it replaces. |
+
+Read back out of the database afterwards: **`quoteStaffSigns` absent entirely**, `quoteApprovals`
+holding only `…-019` and `…-020` with the reported quotation's customer approval gone too, and
+the re-baked paper fingerprinted `อนุมัติ|2026-09-21T01:28:45.839Z|||2568||` — the two empty
+fields at the end are the staff-signature timestamps the application could not see.
+
+**Nothing was wrong with the signature code.** The flaw is that any key another device added
+since this device last read is destroyed on the next push. js/85 made it certain rather than
+merely likely: `quoteStaffSigns` was not in its `SETTING_KEYS`, so a running application could
+never learn a staff signature existed.
+
+Why the local Five Server looked fine: a different origin, whose localStorage still held the
+records the cloud had lost.
+
+### The rule js/90 imposes, in both directions
+
+```
+a settings push may not delete an id the cloud has and this device does not
+a settings sync may not delete an id this device has and the cloud does not
+```
+
+Additive by id only, over `quoteApprovals`, `quoteStaffSigns`, `quoteAccepts`,
+`quoteRequestLink`, `caseFeedback`, `caseStatusLog` — all {id:record} maps that only ever grow.
+An id present on both sides is left exactly as it is, so a deliberate edit still wins and no
+configuration key is involved. The sync half also **heals**: a device that still holds a record
+the cloud lost pushes it back on its next sync, which is how signatures already destroyed come
+home without anybody re-signing — provided that device loads this file before it syncs again.
+
+**`quoteDocs` is deliberately NOT protected**, although it is the same shape. It is a cache
+js/80 re-bakes on a fingerprint change, it holds no signature (`renderPaper()` strips every data
+URL), and it is capped at `DOC_CAP=25` — today 71 KB of the row's 108 KB. Protecting it would
+mean each device re-adding what another had just trimmed, so the cap would never hold. Where a
+merge and a cap do meet (js/69's per-case cap, js/75's `SIG_CAP`) **the merge wins and the cap
+becomes approximate**; js/75 is unaffected in practice because it keeps the id and drops only
+`.sig`, and an id present on both sides is never touched.
+
+Cost: one ~110 KB read of the settings row before each settings push, of which there are a
+handful per session. Loads last, after js/29, js/47 and js/71, so its wrappers are outermost.
+
+### Saving one pad emptied the other
+
+Separately real, and exactly as reported. `saveStaffSign()` ends by calling `openQuoteDoc()`,
+which rebuilds the whole panel — and **a rebuilt `<canvas>` is blank**, so ink drawn in the
+other pad but not yet saved, and a name typed into it, were thrown away by the act of saving its
+neighbour. Pressing บันทึก there then refused ("กรุณาเซ็นชื่อในกรอบก่อนบันทึก") and nothing was
+stored. The rebuild is what stamps the signature onto the paper and draws the ✓ chip, so it
+stays; `qsCapture()` / `qsRestore()` take what is on screen immediately before it and put it
+back immediately after.
+
+### Tests
+
+Three headless suites, **50 assertions, 0 failures, 0 page errors**:
+
+- **M (17)** — the measured chain replayed against stubs: a push keeps the customer signature
+  and both staff images the cloud had, adopts them locally, still pushes configuration, does not
+  overwrite an id both sides hold; a sync keeps what the incoming copy dropped, still takes what
+  the cloud has, still lets configuration come from the cloud, pushes the union back to heal the
+  row, converges (a second sync pushes nothing), and a failed pre-read still lets the save through.
+- **C (22)** — the real case page driven with real mouse events: ink in both pads, save one, the
+  **other pad keeps its ink and its typed name**, both signatures stored, the customer approval
+  untouched by either save, all three stamped on the paper, and **all three still there after a
+  reload** with both ✓ chips.
+- **B (11)** — the application boots with js/90 in the chain, the merging wrapper is installed, a
+  push with no cloud resolves rather than throwing, both version strings unchanged, no overflow.
+
+**The control matters here:** suite C run against `git show HEAD:service-case-detail.html`
+fails 8 of 22 — the other pad at 0 ink, its name gone, the second signature never stored. The
+suite detects the reported bug rather than merely agreeing with the fix.
+
+`node --check` passes on all 94 files in `js/`, `auth/` and `pages/`, and the case page's inline
+script parses.
+
+### Open / risk
+
+1. **The signatures already destroyed are not in the database.** `quoteApprovals['QT-SRV-202609-022']`
+   and `quoteStaffSigns` were deleted at 01:33:31 and only exist in a browser that has not synced
+   since. Loading the fixed build there restores them to the cloud automatically; otherwise they
+   must be signed again. The names and dates are real columns and survived.
+2. A settings push now costs a read of the row first. If that read fails the push proceeds as
+   before rather than losing the save — so an offline device can still clobber.
+3. `quoteDocs` is still replaced wholesale, by design. Losing an entry costs a re-bake.
+4. Unchanged from part 15: `04-anon-uat.sql` means anyone on the internet can read and write this
+   database.
+
+### Follow-up (same day): one button for both signatures, and the phone layout behind it
+
+Asked for: "เพิ่มปุ่มบันทึกทั้ง2ลายเซ็นพร้อมกันไว้ข้างล่างก็ได้นะ".
+
+**`saveStaffSign(key)` is now `saveStaffSigns(keys)`** — one function saves any number of roles
+in one pass, and the single-role buttons call it with a list of one. That is not only tidier: two
+separate saves meant two separate read-modify-writes of the `system_settings` row, and the second
+could read it before the first had landed and push the first back out — the same shape of race
+that lost the signatures to begin with. Both together is **one read and one write**, and both
+records carry the same timestamp, which is what the suite asserts to prove it was one pass.
+
+- The new `💾 บันทึกลายเซ็นทั้งสอง` spans the pair (`grid-column:1/-1`, the same shape as the
+  combined QR print button of part 12). **The two per-role buttons stay** — somebody signing only
+  one still presses that one.
+- **An empty block is skipped by the combined button** (only one role may be signing) but still
+  complained about when its own button is pressed, because pressing that button is a statement
+  about that block. **A half-filled block always stops the save**, whichever button was pressed:
+  a name with no signature, or a signature with no name.
+
+**The phone layout fault this exposed, pre-existing.** `#scdPanel.is-open` is a grid and
+`.scd-modal-card` a flex column, and `min-width:auto` on each let them take their *min-content*
+width from `.scd-qdoc{min-width:720px}` — the A4 paper. Measured on a 390px phone: the card came
+out **794px wide**, so the pads, ล้างลายเซ็น, both save buttons and the new combined button all
+sat half off-screen, and only the paper was ever supposed to scroll. `min-width:0` on
+`.scd-modal-card` and `.scd-modal-body` fixes it: card 794 → 390, `.qs-wrap` 720 → 316, nothing
+clipped, desktop identical (811 / 400 / 192 before and after).
+
+Confirmed pre-existing by running the same probe against `git show HEAD:service-case-detail.html`
+— byte-identical numbers — so it was not introduced by the combined button; it is fixed here
+because that button is the thing it was hiding. **The first guess was wrong**
+(`min-width:0` on `.scd-qdoc-wrap`, which changed nothing) and the constraint was only found by
+walking the ancestor chain in the browser printing each element's width, `display`, `overflow-x`
+and `min-width`. Worth doing that before theorising about a width.
+
+Suite C is **42 assertions** now, still 0 failures: the combined button spans the pair and the two
+per-role buttons survive; pressing it with nothing signed saves nothing and says why; ink with no
+name is refused with the field called out; one role signed saves that one and skips the empty one;
+one press saves both, both names reach the quotation row, one timestamp, one toast naming both
+roles, both ✓ chips; all three signatures still on the paper after a reload; and on a 390px phone
+the button is full width with nothing scrolling sideways.
+
+
+### Follow-up (same day): the 📷 button, and the field track is readable at last
+
+Two reported items. One edit to `js/32`, one to `service-case-detail.html`.
+
+#### 1. WHERE 📷 บันทึกสถานะพร้อมรูป PUTS THINGS, and why ถัดไป died after it
+
+**Where it stores.** The button calls `openFieldStatusModal(cid)` (js/03:996, rebuilt as a
+stepper by js/26). Photos and clips are buffered in `pendingFieldStatusMedia`, and
+`saveFieldStatus()` appends **one entry to `c.fieldStatusLog`** on the case:
+
+```
+{id, status, note, media:[{type,name,data,size}], createdAt, techId}
+```
+
+plus `c.fieldStatus`. That goes to `localStorage.imode_test_v532_cases` and, through
+`cloudUpsertCase()`, to `service_cases.field_status_log` (a real jsonb column) — so it does
+travel between devices. Nothing new was added; it has always been stored.
+
+**Why the ถัดไป button then stopped working, measured in a browser:**
+
+`closeModal()` is `modal.classList.remove('open')` (js/03:1129) **and nothing else**, so the
+popup leaves its own `#fieldStatusSelect` and `#fieldStatusNote` in the document for good.
+js/32's `advance()` appends a hidden box carrying **the same two ids** — and a duplicated id
+makes the id-global an **HTMLCollection instead of the element**, so `saveFieldStatus()`'s
+`fieldStatusNote.value.trim()` reads `undefined` and throws. It is an `async` function, so that
+is a rejected promise, and `advance()`'s own `.then(clean,clean)` swallows it.
+
+Measured on the real screen: `window.fieldStatusSelect` came back as `[object HTMLCollection]`
+with `value undefined`, and the call rejected with *Cannot read properties of undefined*.
+**Nothing saved, nothing in the console, and ถัดไป silently dead for the rest of the session
+once the popup had been opened once.** Exactly "กดไปแล้วเหมือนมันเอ๋อ".
+
+Fixed where the duplicate is created: `advance()` parks any existing element holding those two
+ids (sets `id=''`), appends its own, and restores them in `clean()`. js/03 is not touched, and
+the underlying habit — a closed modal keeping its markup — is left alone because js/29's modal
+history stack restores that markup.
+
+#### 2. The nine field circles open what the technician recorded
+
+Item 2 was right that there was nowhere to see it: the note was shown nowhere on the case page
+at all, and the photos only as anonymous thumbnails inside เอกสาร & รูปภาพ.
+
+Every circle on the step-3 track is a `<button data-fstep="k">` now. Pressing one slides a panel
+down under the track with **เวลา · ช่าง · the note · the photos and clips** of that status;
+pressing it again, or ปิด, closes it. A step the technician has not reached says so rather than
+being a dead circle. `openField` sits beside `openStep` and is read during render, because
+`repaintProgress()` redraws the block — the same shape the drawer already used.
+
+- The tiles reuse `mediaTiles()` and the page's existing lightbox, addressed by their index in
+  `caseDetailModel.attachments` and **matched on the data URL**, so there is no index arithmetic
+  and no second copy of either. A media item the page cannot match is counted, not hidden.
+- `fieldTechName()` resolves `techId` through `imode_v5_tech`; for a crew that id is js/38's
+  comma list, so the lead is who the entry is attributed to.
+- The slide is a `max-height` transition, opened on the second `requestAnimationFrame` after
+  insertion — an element inserted already-open has no start value to animate from.
+  `grid-template-rows:0fr/1fr` would be tidier but carries a browser caveat; `max-height:1600px`
+  is far above a note plus a row of thumbnails. `prefers-reduced-motion` drops it to a fade.
+
+#### Tests
+
+Two new suites, **37 assertions, 0 failures, 0 page errors**, plus every earlier suite re-run
+(M 17 · C 42 · B 11) — **107 in total**.
+
+- **F (15)** — the real workspace as technician_test1: ถัดไป advances; 📷 opens the popup and
+  saving from it really writes an entry with the note into `fieldStatusLog`; **then ถัดไป still
+  advances**, does not re-save the old note, and advances again on the next press.
+  **Before the fix the same suite failed those last three** — field status frozen, log stuck at
+  2 entries, no error anywhere — which is the report reproduced exactly.
+- **T (22)** — nine circles are buttons; one opens with its note, the technician's **name** (not
+  the id), the time, a photo tile that really decodes and a video tile; the panel **starts at
+  height 0 and grows** with `max-height` transitioning; switching circles keeps exactly one
+  open; an unreached step says so; ปิด closes it; a tile opens the lightbox; **opening circles
+  changes no data** (status, fieldStatus and log length unchanged); no overflow at 390px.
+
+`node --check` passes on all 94 files in `js/`, `auth/` and `pages/`.
+
+#### Open / risk
+
+1. The duplicate-id trap is fixed at `advance()`, not at its source. **Any future code that
+   creates an element whose id a modal also uses will hit it again**, because `closeModal()`
+   still leaves the modal body in the document.
+2. The field panel is transient: a realtime repaint of the progress block closes it.
+
+#### Follow-up: the panel slides shut as well
+
+Closing was instant, because `repaintProgress()` removes the element and **a node that is gone
+cannot transition**. `closeFieldDetail()` does the collapse by hand and repaints only once it
+has finished.
+
+The order matters and is the whole trick:
+
+```
+box.style.maxHeight = box.scrollHeight + 'px';   // pin to the REAL height
+void box.offsetHeight;                            // reflow, so that is the start value
+box.classList.remove('is-open');                  // opacity and margin-top go via CSS
+box.style.maxHeight = '0px';                      // inline beats the class, so run it down here
+```
+
+Without the pin, `.is-open` is `max-height:1600px`, so removing the class would animate
+1600 → 0: nothing appears to move until the value passes the content height, then it snaps.
+The inline value has to be set on both sides for the same reason — inline wins, so the class
+alone could not take it back down again.
+
+`transitionend` is not trusted on its own (a browser that skips the transition never fires it),
+so a 420ms timeout finishes the job and a `data-closing` flag stops the two from both
+repainting. The circle drops its ring and its `aria-expanded` immediately rather than staying
+lit through the collapse.
+
+**Pressing a DIFFERENT circle still swaps instantly** — sliding out and back in for one press
+would cost ~0.7s and read as sluggish rather than as an answer. Under
+`prefers-reduced-motion: reduce` it closes at once instead of half-animating.
+
+Suite T is **34 assertions** now, still 0 failures: the collapse **starts at the panel's own
+height** (what the pin buys), passes through intermediate heights, never goes back up, ends
+removed, the ปิด button takes the same path, a double press while it is collapsing still ends
+closed and leaves the track usable, switching circles stays instant, and reduced motion closes
+immediately.
+
+**Testing note worth keeping:** reading `style.maxHeight` after `click()` returns always shows
+`0px`, because the pin, the reflow and the run-down all happen inside one synchronous handler.
+An animation has to be measured by sampling `getBoundingClientRect()` over time, not by
+inspecting the style afterwards — the first version of these assertions failed for exactly that
+reason while the code was correct.
+
+#### Follow-up: the five main step circles slide too
+
+Asked for after seeing the field panel do it. The drawer under the main track now opens and
+closes the same way, and both share one pair of helpers — `slideOpen(id)` / `slideShut(id, after)`
+with `slideWrap(id, cls)` and a `slideNext` flag.
+
+**The chrome had to move.** `.scd-stepdrawer` carried the border, padding and background, and
+at `max-height:0` those still paint a ~30px empty sliver. They are on a new
+`.scd-stepdrawer-in` now; the outer element is a bare slider. Screenshot before and after is
+identical.
+
+**Three things that are easy to get wrong here, all found by measuring:**
+
+1. **A repaint that is not a press must not leave the block invisible.** `repaintProgress()`
+   replaces the whole progress block, and it is called by `applyStatus()`, by CaseLive and by
+   the delete flow — not only by a press. A block re-rendered by one of those has to come back
+   *already* open, or it sits at `max-height:0` with nothing left to trigger it. `slideNext`
+   names the one block a given render is about to animate; everything else renders with
+   `is-open` and `max-height:none`. The first version of the field panel had this bug.
+2. **Opening must animate to the block's REAL height, not to the class's cap.** Measured: with
+   the cap at 2400px and a 163px drawer, `max-height` passes the content height about **24ms**
+   in, so it looked instant however long the transition was — the mirror image of what the cap
+   does on the way out. `slideOpen()` sets `scrollHeight` explicitly and drops the cap to
+   `none` once it has settled, so nothing can ever be clipped either.
+3. **The two directions need different easings.** A declaration on the base selector is the one
+   that runs when the class is *removed* (the close); the one on `.is-open` runs when it is
+   added. Sharing `cubic-bezier(.22,.9,.3,1)` made the collapse look clipped — it is
+   front-loaded, so a 226px panel was already down to 80px 55ms in. Closing eases **in** now.
+
+**Pressing a different circle still swaps in place** for both tracks: sliding out and back in
+for one press costs ~0.7s and reads as sluggish. Closing the drawer takes the field panel with
+it, since it lives inside.
+
+Suite T is **49 assertions**: the drawer grows and shrinks through intermediate heights, never
+reverses direction, the cap is dropped on settle, the chrome really is on the inner element, a
+repaint provoked by opening the field panel leaves the drawer open and not stranded, the ปิด
+button takes the same path as the circle, switching steps stays instant, the field panel still
+opens inside a settled drawer **without being clipped by it**, closing the drawer closes the
+panel, and **none of it changes the case**.
+
+**Two testing notes worth keeping**, both of which produced false failures first:
+
+- `data-step` is the **0-based step index**, and a circle one ahead of the case is role `next` —
+  it moves the case on or hits the gate, it is not a drawer toggle. Clicking `data-step="3"` on
+  a case sitting at step 2 measures the gate, not the drawer. Find a toggling circle by
+  behaviour rather than assuming one.
+- The page's script is an IIFE, so `repaintProgress()` cannot be called from a driver. Provoke a
+  real one instead — opening the field panel repaints the whole progress block.

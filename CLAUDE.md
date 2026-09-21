@@ -5904,3 +5904,365 @@ panel, and **none of it changes the case**.
   behaviour rather than assuming one.
 - The page's script is an IIFE, so `repaintProgress()` cannot be called from a driver. Provoke a
   real one instead — opening the field panel repaints the whole progress block.
+
+#### Follow-up: 🖨 พิมพ์ / PDF on the quotation panel
+
+Asked for beside บันทึกลายเซ็นทั้งสอง, so that is where it is. An account that may not sign
+gets the same button on a row of its own, because reading and printing a quotation is not the
+same permission as signing one.
+
+**It prints the LIVE DOM, not `settings.quoteDocs[id].html`.** js/80 strips every data URL out
+of the stored copy on purpose ("the signature rides in quoteApprovals already") and
+`qsFillCell()` stamps the three signatures back in when the panel opens — so printing the
+stored HTML would come out with three empty boxes, which is the whole thing the owner wants on
+paper. A clone of what is on screen is what they are asking to print.
+
+**The styling has to travel with it**, because this page does not load `js/03` and
+`printQuotation()` is not available here. `quoteDocCss()` walks `document.styleSheets` and keeps
+only the rules that dress the paper — the `.scd-qdoc` selectors, and `:root` for the custom
+properties they resolve against — rather than the whole stylesheet, which would drag the modal,
+the drawers and the app chrome into a window that has none of those elements. One rule needed
+excluding by hand: `#scdPanel.is-open .scd-modal-card:has(.scd-qdoc)` names the paper but is
+about the modal.
+
+Then two overrides after the page's own rules, so they win: `@page{size:A4}`, and
+`.scd-qdoc{min-width:0}` — inside the modal the paper carries a 720px floor it must not keep
+when it *is* the document.
+
+Every `src` is made absolute first: a relative URL inside a `window.open('')` document resolves
+against `about:blank`, which is how js/18's QR sheet once printed a broken logo (part 12).
+`onload` can already have gone by on a `document.write` page, so a 900ms timeout fires the print
+as well, guarded by a flag. A blocked pop-up says so instead of failing silently.
+
+**Verified by rendering, not by grepping.** The print document was built from a REAL paper taken
+out of the live `quoteDocs` (`QT-SRV-202609-023`) and rendered at 820px: the full A4 sheet comes
+out — logo, company header, QUOTATION title, the item table, Total / VAT / Grand Total, and the
+three signature cells **side by side** (`tops [532,532,532]`) with all **4 images decoding**,
+signatures included. A first pass with a hand-made stub paper printed as an unstyled stack,
+which was the fixture being a stub and not the code — worth knowing before trusting a print test.
+
+Suite C is **56 assertions**: the button is in the row beside the save-both button, pressing it
+builds a whole document titled with the quotation id, the signatures are in it as data URLs,
+every src is absolute, the paper's rules travelled and the modal's did not, `:root` came along,
+A4 and no min-width floor, **it renders in an iframe with its stylesheet, three cells, every
+image decoding and the paper wider than 700px**, and a blocked pop-up is reported.
+
+#### Follow-up: save moves the job on, and a recorded step can be corrected — `js/91`
+
+| File | What |
+|---|---|
+| `js/91-v70FieldStepEditScript.js` | **new** — the อัปเดตสถานะงาน popup |
+| `service-case-detail.html` | the office sees the correction history, read only |
+| `index.html` | one `<script src>` |
+
+Two things asked for on หน้างานช่าง, and the owner chose both behaviours when asked:
+
+1. **"หลังกดบันทึกสถานะที่เลือกเสร็จไปสถานะต่อไปออโต้"** — the note and the photos describe the
+   step just finished, so they are saved against the **current** status and the job then moves on
+   by itself. One press instead of two. The button says where it is going: *บันทึก แล้วไปต่อ: …*
+2. **"กดกลับมาแก้ไขได้เผื่อเขียนอะไรผิด"** — the numbered chips are pressable. One already
+   recorded reopens what was written there; saving **corrects that entry** rather than adding
+   another. Every correction keeps the version it replaced, with a 🕘 ประวัติการแก้ไข list and a
+   **ใช้ฉบับนี้** button, so a wrong correction can be put back — and the restore is itself kept,
+   so it can be undone again.
+
+**THE DEFECT THE FIRST VERSION HAD, caught by the suite.** `saveFieldStatus()` always APPENDS.
+Handing it the note therefore left **two entries for the same step** on every single step — the
+empty one written on arrival, and a second carrying the note — and the correction history hung
+off the older of the two, where nothing would ever look for it. Measured: the ladder filled with
+pairs. The note now goes into the entry the step already has; only the move to the NEXT status
+goes through js/03, by reusing js/32's `advance()`, so the status write, the cloud push and the
+re-render stay in the one function that owns them, and จบงาน still meets js/63's confirmation and
+js/68's signature gate. One step, one entry, accumulating what happened there.
+
+**Where the history lives.** `editedAt`, `editedBy` and `revisions[]` on the log entry —
+`service_cases.field_status_log`, a real jsonb column already in `cloudUpsertCase()`'s whitelist,
+so it travels between devices with the case and needs no SQL from anybody.
+
+**A revision keeps the note always and the photos only when the edit changed them.** A note-only
+correction would otherwise copy hundreds of KB of data URLs into the same case row, and this
+project has already hit the localStorage ceiling once (part 26). A revision that did not touch
+the photos says so on screen, and restoring it puts the note back and leaves the photos alone.
+Capped at `REV_CAP` = 5, oldest dropped.
+
+Filling in a step that was recorded **empty** on arrival is not a correction and writes no
+revision — otherwise every job would arrive with nine meaningless history rows.
+
+**Why not wrap `saveFieldStatus`:** js/32's step bar and js/26's own ถัดไป buttons call it too
+and must NOT auto-advance — they already *are* the advance. Only the one button inside this
+popup changes, so its `onclick` is replaced during the enhancement pass and js/03, js/26, js/63
+and js/68 are untouched.
+
+**The listener is on `#modalBody`, not `document`** — js/05 stops propagation on `#modalPanel`
+(the ต้องกดกากบาทเท่านั้น guard), so a delegated listener on `document` never fires inside a
+popup. Recorded in js/16, walked into again in part 26, and it would have silently done nothing
+here too.
+
+#### Tests
+
+**187 assertions across six suites, 0 failures, 0 page errors** (E 36 · C 56 · T 52 · M 17 ·
+F 15 · B 11). `node --check` clean on all 95 files in `js/`, `auth/` and `pages/`.
+
+- **E (36, new)** — the chips are buttons, only recorded ones are marked, an unreached one says
+  so instead of opening; a recorded chip loads what was written, hides the ถัดไป buttons and
+  renames the save button; the correction **replaces** the entry and does not add one, is stamped
+  edited, keeps the version it replaced, and does **not** move the job backwards; the history
+  lists the old wording, ใช้ฉบับนี้ puts it back **and keeps the version it replaced**, the popup
+  stays open so the result is visible; leaving edit mode clears the note box; then save+advance
+  files the note under the step just finished, moves the job on, adds **exactly one** entry, does
+  not list that step twice, and leaves the correction history intact; editing works at 390px.
+- **T (52)** — the office sees ✎ แก้ไขล่าสุด, can open the previous version, and has **no restore
+  control** there: restoring belongs where the correction is made.
+
+**Suite F broke and was right to.** It matched the save button on the old label
+`/บันทึกสถานะ/`, which js/91 renamed. It now finds the button by its id and asserts the new
+behaviour — the note filed under the step that was finished, and the job moved on. Matching a
+control by its visible wording is what made a passing suite fail for no defect; use the id.
+
+#### Open / risk
+
+1. Saving at รอลูกค้าตรวจรับ now auto-advances into จบงาน, which raises js/63's confirmation and
+   js/68's signature gate. That is the gates doing their job, but it is one more prompt than
+   before at that one step.
+2. A revision's photos are only kept when an edit changed them, so restoring a note-only revision
+   deliberately leaves the current photos in place. The history row says so.
+3. `latestFor()` corrects the **newest** entry at a status. A job that legitimately passed through
+   รออะไหล่ twice has two, and only the later one is editable from the chip.
+
+#### Follow-up: เคสทั้งหมด puts what moved on top, and the customer's แจ้งปัญหา turns red
+
+| File | What |
+|---|---|
+| `js/92-v70CaseUpdatedScript.js` | **new** — the เคสทั้งหมด tab orders by `updatedAt` and marks what has moved |
+| `pages/customer-home.html`, `css/22-v69-customer-home.css` | แจ้งปัญหาเครื่อง wears the หมดประกัน red |
+| `index.html` | one `<script src>` |
+
+**1. "โชว์เคสที่มีการอัพเดตล่างสุดขึ้นมาไว้บนๆก่อน และไฮไลท์ว่าอัพเดตล่าสุด พอเปิดดูก็เอาไฮไลท์ออก"**
+
+`renderCases()` sorts by `createdAt` (js/03:504), so a case opened months ago and updated five
+minutes ago sits at the *bottom* — exactly the one the coordinator wants. On the **เคสทั้งหมด tab
+only**, as asked, the order becomes `updatedAt` and anything that has moved since this account
+last opened it carries an `อัปเดตใหม่` chip and a warm tint. Opening it clears the mark. The
+other KPI cards are status queues and are untouched; `allTab()` is the single condition.
+
+**The sort is done at `paginateList()`, not by re-ordering the rendered rows.** The pager slices
+the list, so re-ordering only the page on screen would be right until the day there is more than
+one page and the newest update is on the second. `paginateList()` is handed the whole filtered
+list before the slice, which is the only honest place to change the order.
+
+**The "seen" mark is per PERSON and device-local** — `imode_v70_seen_cases`,
+`{account: {caseId: the updatedAt that was seen}}`. What the coordinator has looked at says
+nothing about what the technician has, and a field added to a case never reaches
+`service_cases` unless `cloudUpsertCase()` names it (part 18's rule). Losing the key lights the
+list up once.
+
+**The first-run trap, straight from js/74:** with an empty record *every* case would be "updated"
+on the day this ships. The first time an account is seen, everything it can already see is
+recorded as read; only what moves afterwards is marked.
+
+**2. แจ้งปัญหาเครื่อง in red.** The one button a customer is looking for when something is wrong
+now wears the same red as the หมดประกัน pill above it (`.chome-warranty.expired`: `#fdeceb` on
+`#f5c9c6` with `#9d2b26` type), including its ledge, its icon chip and its small-caps stripe.
+
+Two things worth keeping about that stylesheet:
+
+- It is addressed **by class (`.chome-report`), not `:nth-child(1)`**. The colours around it are
+  positional and would follow the order if the buttons were ever rearranged; this one has to
+  follow the meaning.
+- **The block had to go AFTER the `:nth-child` colour list.** `.chome-grid > button.chome-report
+  i::before` and `.chome-grid > button:nth-child(1) i::before` are both (0,2,2), so on equal
+  specificity the later rule wins — measured: placed before them the stripe stayed blue. One
+  extra class is also what lets these rules outrank css/21, which is loaded after css/22 and
+  dresses every `.portal-action-grid > button`, without reaching for `!important`.
+
+#### Tests
+
+**213 assertions across seven suites, 0 failures, 0 page errors** (U 26 · E 36 · C 56 · T 52 ·
+M 17 · F 15 · B 11), plus an 8-assertion check of the customer page. `node --check` clean on all
+96 files in `js/`, `auth/` and `pages/`.
+
+- **U (26, new)** — the most recently *updated* case is at the top and the whole list is in
+  `updatedAt` order; nothing is marked on a first visit and the account starts with everything
+  recorded as read; a case that moves is marked, climbs to the top and carries the chip; opening
+  it clears the mark but keeps its place; `imodeOpenCase` records it **before** navigating away;
+  a status tab is neither re-ordered nor marked and no chip leaks onto it; returning brings the
+  mark back; another account gets its own record; no overflow at 390px.
+- **customer page (8)** — the report button's title is byte-identical in colour to the หมดประกัน
+  pill, its border and stripe are red, the other buttons are untouched, **it still opens the
+  report form**, and nothing scrolls sideways at 390px.
+
+**Two fixture faults that produced false failures**, both worth remembering: seeded `updatedAt`
+values of `2026-09-21T09:00Z` were *in the future* relative to a real `new Date()` in UTC+7, so
+the case under test correctly refused to climb; and `imodeOpenCase` **navigates** (js/28), so the
+page is gone by the next `page.eval` and the result has to be read from localStorage, not from
+`cases`.
+
+#### Open / risk
+
+1. The marking is scoped to the เคสทั้งหมด tab because that is what was asked. Widening it to the
+   status tabs is one condition in `allTab()`.
+2. `imode_v70_seen_cases` grows by one short entry per case per account on that device. Nothing
+   prunes it; at a few thousand cases it is still tens of KB, but it is one more thing in a
+   localStorage that has hit its ceiling once (part 26).
+
+#### Follow-up: the ช่าง row names everyone assigned to the case
+
+Reported against the field-step panel: it showed one name. It could only ever show one —
+`saveFieldStatus()` records `techId: c.assignee||fieldTechId`, and js/38 keeps `c.assignee` as the
+**lead** with the crew in `c.assignees` (part 17 §2), so the entry itself never knew the rest.
+
+The crew therefore comes from the case: `m.assignment.crew`, which `loadCrew()` has already
+resolved to real technician records (reading `c.assignees` first and the comma list in
+`c.assignee` second). One chip each, the lead marked หัวหน้างาน.
+
+**Whoever the entry recorded is added on the end if they are no longer on the case**, greyed and
+labelled ไม่ได้อยู่ในเคสแล้ว. A technician taken off a case afterwards still did that step, and
+dropping their name would rewrite history.
+
+Suite T is **58 assertions**: the row lists the whole crew and not just the lead, every assigned
+technician is named, exactly one is marked as lead, and a step recorded by someone since removed
+from the case still names them and says they are no longer on it.
+
+#### Follow-up: the ladder ON THE PAGE is pressable too, and บันทึกสถานะ gets the upload popup
+
+**1. หน้างานช่าง draws its own copy of the nine steps** (js/32's `.fw-ladder`), and only the one
+inside the popup had been made pressable — missed the first time round. Pressing a recorded step
+on the page opens the popup **already in edit mode for it**, so there is one correction form and
+not two.
+
+The click is delegated on `document`, which is right here and would have been wrong in the popup:
+the ladder is on the page, not inside `#modal`, so js/05's propagation guard does not apply (that
+guard is exactly why the popup's listener sits on `#modalBody`). Delegating also survives every
+re-render of `#fwStatus` — and `renderWorkspace()` is reached through js/32's **closure**, not
+through `window.imodeRenderFieldWorkspace`, so wrapping the exported name would have missed the
+main path, the trap `renderMyWork` set in part 18. The decoration (role, tabindex, the pencil
+mark) is applied by an observer on `#fwStatus` disconnected around its own writes; if it ever
+misses a pass the clicking still works, because that does not depend on it.
+
+**2. อัปเดตสถานะงาน gets the same upload popup as the customer.** js/67's header used to say the
+technician paths keep js/30's toast because they are not used by someone waiting on a phone —
+wrong about this one: a photo taken at the machine is exactly as slow to prepare, and
+บันทึกสถานะพร้อมรูป is used standing in front of it.
+
+**One popup, two doors.** js/67's wrapper became a function of the counter and the wording rather
+than a second copy of the progress UI — the two forms keep their pending files in different
+places (`window.portalIssuePendingMedia` for the customer; `pendingFieldStatusMedia`, a top-level
+`let` in js/03 and therefore a lexical global that is never on `window`, for the technician).
+**js/30 already wraps `addFieldStatusMedia` and reports through `window.imodeMediaProgress`**, so
+this path gets a real percentage for free, and js/30's own toast stands down by itself while the
+hook is installed, so nothing is said twice. The other two technician paths (`addReportVideos`
+and the report photos) keep the toast.
+
+**A CSS gotcha worth keeping:** `content:"\u270e"` is NOT a CSS escape — CSS wants `\270e`, and
+`\u` there is only an escaped letter u. The literal character is what the rest of the file uses.
+
+**Verified lightly, at the owner's request** ("นายไม่ต้องเทสเดี๋ยวผมจะเทสเอง"): an 11-assertion smoke
+run — the page ladder is marked pressable and keyboard-reachable, recorded steps are
+distinguished, clicking one opens the popup in edit mode with that step's note, an unreached one
+says so and opens nothing, both upload forms are wrapped and an empty file list still raises no
+popup, 0 page errors — plus suites E (36), F (15) and T (58) re-run and `node --check` on all 96
+files. **The upload popup itself was not driven with a real file this time.**
+
+---
+
+## OPEN BUG — 2026-09-21: the field track reads as "never happened" on a finished job
+
+**Reported with a screenshot, NOT YET FIXED.** `service-case-detail.html`, case
+`SRV-20260917-002` (สถานะ เสร็จสิ้น, step 4 current). The step-3 drawer's nine-step field track
+shows **chips 1–8 grey and numbered** — รอลูกค้าตรวจรับ included — while chip 9 จบงาน is blue
+with a ✔, and the line between 8 and 9 is green. Opening chip 8 says
+*"ยังไม่ถึงขั้นนี้ — ยังไม่มีข้อมูลจากหน้างาน"*, and the badge under the drawer says
+**หน้างาน: จบงาน**. The main five-step track above it shows 1–3 as done. So one track says the
+work is finished and the other says none of it happened.
+
+**Cause, read out of the code (not yet confirmed against that case's stored data):**
+
+```js
+function fieldReached(m){                       // service-case-detail.html
+  var hit={};
+  fieldLog(m).forEach(function(e){ hit[e.status]=e.createdAt||... });   // ONLY logged steps
+  var now=(m.raw&&m.raw.fieldStatus)||...;
+  if(now&&!hit.hasOwnProperty(now))hit[now]='';  // plus the current one, with no time
+  return hit;
+}
+...
+var on=Object.prototype.hasOwnProperty.call(hit,fs);   // 'done' iff it is in hit
+```
+
+A step is drawn as reached **only if it has its own `fieldStatusLog` entry**. A case whose
+`fieldStatus` ended at จบงาน with an empty or partial log therefore shows exactly this: every
+step grey except the current one, which `fieldReached()` adds by hand with no timestamp. The
+ladder is ordered, so being at step 9 means 1–8 were passed whether or not each wrote a row —
+and there are real paths that set the status without a per-step row (js/63's จบงาน, a status set
+from the case page, a case seeded or synced from elsewhere).
+
+**Direction for the fix** — in `stepDrawerHTML`'s `i===S('service')` branch:
+
+* treat every step whose index is **at or before** `FIELD_STEPS.indexOf(currentFieldStatus)` as
+  passed, instead of requiring a log entry;
+* keep the two apart visually and in the panel: *recorded* (has an entry, a time, maybe a note
+  and photos) vs *passed with nothing recorded*. The detail panel must stop saying
+  "ยังไม่ถึงขั้นนี้" for a step the job has clearly gone past — that wording is the actual
+  falsehood in the screenshot;
+* `รออะไหล่` is a BRANCH, not a stage every job passes (CLAUDE.md, Service Case), so it must not
+  be marked passed by index alone — only when it has its own entry.
+
+**Check before fixing:** read that case's real `fieldStatusLog` from the database or the device.
+If it is empty the diagnosis above is complete; if it has entries whose `status` strings do not
+match `FIELD_STEPS` exactly, the fault is a mismatch instead and the fix is different.
+
+Not caused by this session's work: the same expression has drawn that ladder since part 21, and
+the chips-are-buttons change (js/91) only wrapped the contents of each `<li>` — the done /
+pending / now classes are still set by the code above.
+
+### Uncommitted at the time of writing — 8 files
+
+`js/91-v70FieldStepEditScript.js` and `js/92-v70CaseUpdatedScript.js` are **new and untracked**;
+`service-case-detail.html`, `pages/customer-home.html`, `css/22-v69-customer-home.css`,
+`js/67-v70UploadProgressScript.js`, `index.html` and `CLAUDE.md` are modified. Everything in the
+entries above from "the 📷 button, and the field track is readable at last" onwards is in that
+working tree and **has not been pushed**, so GitHub Pages is still serving `aa4ad0f`.
+
+### 2026-09-21 — the OPEN BUG above is FIXED, and a correction now reaches the office live
+
+**The bug is closed.** It was fixed in the working tree by the owner's other assistant, along the
+direction recorded above, and verified here against the exact reported shape (a case at
+`fieldStatus: จบงาน` with an EMPTY `fieldStatusLog`):
+
+* `FIELD_MAIN = FIELD_STEPS.filter(x => x !== FIELD_HOLD)` — the hold branch is excluded, which
+  is the part that mattered most;
+* `fieldReached()` now infers every main step up to `FIELD_MAIN.indexOf(fieldStatus)`;
+* the drawer's empty state gained a third wording — `ผ่านขั้นนี้แล้ว แต่ไม่มีรายละเอียด…` — so a
+  passed step no longer claims it was never reached.
+
+Measured: 8 of 9 chips read as passed, **รออะไหล่ stays pending**, จบงาน is current, a passed step
+says it was passed with nothing recorded, and รออะไหล่ still says it was never reached. 7/7.
+
+#### The half that was still missing: a correction never reached the case page
+
+`CaseLive.applyCase()` compared the log as `(hit.fieldStatusLog||[]).length`. **An edit does not
+change the length.** So a technician fixing a note through js/91, or restoring an earlier
+version, arrived on the realtime channel, was written onto `hit` — and was then thrown away,
+because `before === after` returned false before `writeJ()` ran. The office kept showing the old
+wording, and it was not even persisted to that device's localStorage.
+
+`logPrint()` replaces the length with a small fingerprint: `id`, `status`, the note itself, the
+edit stamp, and the COUNTS of media and revisions, joined per entry. **Deliberately not
+`JSON.stringify(log)`** — an entry carries base64 photos, so that would stringify hundreds of KB
+twice on every realtime event. Those six fields are what an edit actually moves; a photo swapped
+for another with the same count is caught by the edit stamp js/91 writes beside it.
+
+**Nothing was needed on the application side.** js/85 maps `service_cases` through
+`fromCaseDb(row)`, which carries `field_status_log` whole, and accepts a row whose `updatedAt` is
+newer — and js/91 stamps `c.updatedAt` on every correction. So the admin's list and every other
+technician assigned to the same case already receive it; only this page had its own mapper and
+its own comparison, which is exactly why only this page was stale.
+
+**The admin's view of the edit history was already in place** (`sd-frevs` in
+`fieldStepDetailHTML`, added earlier the same day): ✎ แก้ไขล่าสุด with the time and the person,
+and a 🕘 ประวัติการแก้ไข list of the previous versions, read only — restoring belongs where the
+correction is made.
+
+**Verified:** bugcheck 7/7 and suite T 58/58 on the patched page, and the inline script parses.
+**Not verified end to end:** the live two-device round trip for a correction. The mapping and the
+comparison were read and reasoned about, not driven against the real database.

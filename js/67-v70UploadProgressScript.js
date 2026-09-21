@@ -32,9 +32,14 @@
    Blocking is deliberate. The backdrop swallows a second tap on เพิ่มไฟล์ while the first file
    is still being prepared, which is exactly what a customer does when nothing seems to happen.
 
-   Only the customer's own form is wrapped. The three technician upload paths keep js/30's
-   toast — they are used inside the application by someone who is not waiting on a phone — and
-   js/30 stands that toast down only while this popup's hook is installed.
+   2026-09-21: อัปเดตสถานะงาน GETS THE SAME POPUP. The header used to say that the technician
+   paths keep js/30's toast because they are not used by someone waiting on a phone — which was
+   wrong about this one: a photo taken at the machine is exactly as slow to prepare as one taken
+   by a customer, and บันทึกสถานะพร้อมรูป is used standing in front of it on a phone. The other two
+   (addReportVideos on the ใบตรวจ, and the report photos) keep the toast.
+
+   One popup, two doors: the wrapper below is a function of the counter and the wording, so
+   there is no second copy of the progress UI to drift out of step with this one.
 
    js/03 and js/30's own wrapper are not edited. This file loads last, so it is the outermost
    wrapper and the promise it receives covers the whole operation, shrink and preview together. */
@@ -220,43 +225,64 @@
  }
  window.imodeUploadProgressClose=close;
 
- /* ------------------------------------------------------------- the wrapper ---- */
- var base=window.portalIssueMediaChanged;
- if(typeof base!=='function')return;
+ /* ------------------------------------------------------------- the wrappers ---- */
+ /* The two forms keep their pending files in different places, so the counter is passed in:
+    window.portalIssuePendingMedia for the customer, and pendingFieldStatusMedia for the
+    technician — a top-level `let` in js/03, which makes it a lexical global that is never a
+    property of window (part 17 §5), so it is read by bare identifier. */
+ function fieldPending(){
+  try{return (pendingFieldStatusMedia||[]).length}catch(e){return 0}
+ }
+ function attach(name,count,nothing){
+  var base=window[name];
+  if(typeof base!=='function')return;
 
- window.portalIssueMediaChanged=function(input){
-  var files=[];
-  try{files=[].slice.call((input&&input.files)||[])}catch(e){files=[]}
-  /* removePortalIssueMedia() re-enters this function with {files:[]} purely to redraw the
-     preview. That is not an upload and must not raise a popup. */
-  if(!files.length)return base.apply(this,arguments);
+  window[name]=function(input){
+   var files=[];
+   try{files=[].slice.call((input&&input.files)||[])}catch(e){files=[]}
+   /* removePortalIssueMedia() and removeFieldStatusMedia() re-enter with {files:[]} purely to
+      redraw the preview. That is not an upload and must not raise a popup. */
+   if(!files.length)return base.apply(this,arguments);
 
-  var before=pending(),picked=files.length;
-  open(files);
-  window.imodeMediaProgress=onProgress;
+   var before=count(),picked=files.length;
+   open(files);
+   window.imodeMediaProgress=onProgress;
 
-  function failed(){
-   release();
-   finish({bad:true,msg:tl('เกิดข้อผิดพลาดระหว่างเพิ่มไฟล์ ลองใหม่อีกครั้ง',
-                           'Something went wrong while adding the file. Please try again.')});
-  }
-  function settled(){
-   release();
-   var added=pending()-before;
-   if(added>0){
-    finish({msg:tl('เพิ่มไฟล์แล้ว '+added+' ไฟล์'+(added<picked?' (ข้าม '+(picked-added)+' ไฟล์)':''),
-                   'Added '+added+' file'+(added>1?'s':'')+(added<picked?' ('+(picked-added)+' skipped)':''))});
-   }else{
-    finish({bad:true,msg:tl('ยังไม่ได้เพิ่มไฟล์ — ไฟล์อาจใหญ่เกิน 3 MB หรือแนบครบ 4 ไฟล์แล้ว ลองเลือกไฟล์ที่เล็กลง',
-                            'Nothing was added — the file may be over 3 MB, or four files are already attached.')});
+   function failed(){
+    release();
+    finish({bad:true,msg:tl('เกิดข้อผิดพลาดระหว่างเพิ่มไฟล์ ลองใหม่อีกครั้ง',
+                            'Something went wrong while adding the file. Please try again.')});
    }
-  }
+   function settled(){
+    release();
+    var added=count()-before;
+    if(added>0){
+     finish({msg:tl('เพิ่มไฟล์แล้ว '+added+' ไฟล์'+(added<picked?' (ข้าม '+(picked-added)+' ไฟล์)':''),
+                    'Added '+added+' file'+(added>1?'s':'')+(added<picked?' ('+(picked-added)+' skipped)':''))});
+    }else{
+     finish({bad:true,msg:nothing()});
+    }
+   }
 
-  var out;
-  try{out=base.apply(this,arguments)}
-  catch(err){failed();throw err}
-  if(out&&typeof out.then==='function')out.then(settled,failed);
-  else settled();
-  return out;
- };
+   var out;
+   try{out=base.apply(this,arguments)}
+   catch(err){failed();throw err}
+   if(out&&typeof out.then==='function')out.then(settled,failed);
+   else settled();
+   return out;
+  };
+ }
+
+ attach('portalIssueMediaChanged',pending,function(){
+  return tl('ยังไม่ได้เพิ่มไฟล์ — ไฟล์อาจใหญ่เกิน 3 MB หรือแนบครบ 4 ไฟล์แล้ว ลองเลือกไฟล์ที่เล็กลง',
+            'Nothing was added — the file may be over 3 MB, or four files are already attached.');
+ });
+ /* js/30 already wraps addFieldStatusMedia and reports through window.imodeMediaProgress, so
+    this path gets a real percentage for free — and js/30's own toast stands down by itself
+    while the hook is installed, so nothing is said twice. This file loads after js/30, so the
+    promise received here covers the shrink and the preview together. */
+ attach('addFieldStatusMedia',fieldPending,function(){
+  return tl('ยังไม่ได้เพิ่มไฟล์ — วิดีโอสูงสุด 2 ไฟล์ต่อสถานะ และขนาดไม่เกิน 2.5 MB ต่อไฟล์',
+            'Nothing was added — up to 2 videos per status, each under 2.5 MB.');
+ });
 })();

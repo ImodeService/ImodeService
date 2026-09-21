@@ -256,6 +256,21 @@ a{color:var(--imode-blue)}
   font:inherit;font-size:12px;padding:3px 12px;cursor:pointer;color:var(--muted)}
 .sd-fentry+.sd-fentry{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line-2)}
 .sd-fnote{margin:8px 0 0;font-size:13.5px;line-height:1.6;color:#22304a;white-space:pre-wrap}
+.sd-fcrew{display:flex;flex-wrap:wrap;gap:6px}
+.sd-fcrew-chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;
+  color:var(--imode-navy);background:#eef4fd;border:1px solid var(--line-2);
+  border-radius:999px;padding:3px 10px}
+.sd-fcrew-chip.is-lead{background:#e6f0ff;border-color:#bcd6fb}
+.sd-fcrew-chip.is-off{background:#f4f5f7;color:#7b8798}
+.sd-fcrew-chip i{font-style:normal;font-size:10px;font-weight:700;color:#5b6d8c;opacity:.9}
+.sd-fcrew-chip.is-off i{color:#94a0b2}
+.sd-fedited{margin:6px 0 0;font-size:11.5px;color:#8a5200}
+.sd-frevs{margin-top:6px}
+.sd-frevs summary{cursor:pointer;font-size:11.5px;font-weight:700;color:#8a5200}
+.sd-frevlist{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.sd-frevlist li{border:1px solid #eadfcc;background:#fffaf1;border-radius:10px;padding:6px 9px}
+.sd-frevlist small{display:block;font-size:10.5px;color:#8d7a5e}
+.sd-frevlist span{display:block;font-size:12.5px;color:#2a3550;white-space:pre-wrap;word-break:break-word}
 @media (prefers-reduced-motion:reduce){.sd-fdetail{transition:opacity .18s ease}
   .sd-fdetail.is-open{max-height:none}.sd-fbtn:hover .fdot{transform:none}}
 
@@ -528,8 +543,14 @@ body.scd-modal-open{overflow:hidden}
 .qs-both{grid-column:1/-1;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .qs-both small{color:var(--muted);font-size:11.5px;margin-right:auto}
 .qs-both-btn{padding:12px 20px}
+.qs-print{height:auto;padding:12px 18px;font-size:14px}
+/* the row that carries the print button when this account may not sign */
+.qs-bar{display:flex;justify-content:flex-end;margin-top:12px}
 @media (max-width:640px){.qs-wrap{grid-template-columns:minmax(0,1fr)}
-  .qs-both small{margin-right:0;order:2}.qs-both-btn{width:100%;order:1}}
+  .qs-both small{margin-right:0;order:3}
+  .qs-print{width:100%;order:2}
+  .qs-both-btn{width:100%;order:1}
+  .qs-bar .qs-print{width:100%}}
 /* ใบเสนอราคาของเคสนี้ — the section in step 2 */
 .sd-qt{margin-top:16px;padding-top:14px;border-top:1px dashed var(--line-2)}
 .sd-qt-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;margin-bottom:10px}
@@ -1333,6 +1354,11 @@ var CaseWrite=(function(){
    show the technician's progress without asking the application for anything. */
 var FIELD_STEPS=['กำลังเดินทาง','ถึงหน้างาน','เริ่มตรวจเช็ก','กำลัง PM / Maintenance',
                  'กำลังซ่อม Service','รออะไหล่','ทดสอบเครื่อง','รอลูกค้าตรวจรับ','จบงาน'];
+/* รออะไหล่ is a branch, not a stage every job must pass. The ordered main path is kept
+   separately so a finished legacy/stale-cache case can still show the work it necessarily
+   passed, without falsely claiming that it waited for parts. */
+var FIELD_HOLD='รออะไหล่';
+var FIELD_MAIN=FIELD_STEPS.filter(function(x){return x!==FIELD_HOLD});
 function fieldLog(m){
   var log=(m&&m.raw&&m.raw.fieldStatusLog)||[];
   return Array.isArray(log)?log:[];
@@ -1342,6 +1368,13 @@ function fieldReached(m){
   fieldLog(m).forEach(function(e){if(e&&e.status)hit[e.status]=e.createdAt||e.timestamp||''});
   var now=(m&&m.raw&&m.raw.fieldStatus)||(m&&m.case&&m.case.subStatus)||'';
   if(now&&!Object.prototype.hasOwnProperty.call(hit,now))hit[now]='';
+  /* fieldStatus is the current ordered position even when an older case did not write one
+     fieldStatusLog row per press. Infer only the main path up to that position. The hold
+     branch remains reached solely when it is current or has its own recorded entry. */
+  var at=FIELD_MAIN.indexOf(now);
+  if(at>=0)FIELD_MAIN.slice(0,at+1).forEach(function(fs){
+    if(!Object.prototype.hasOwnProperty.call(hit,fs))hit[fs]='';
+  });
   return hit;
 }
 /* The name behind fieldStatusLog's techId. saveFieldStatus() writes `c.assignee||fieldTechId`,
@@ -1354,6 +1387,41 @@ function fieldTechName(id){
   for(var i=0;i<list.length;i++)if(list[i]&&list[i].id===raw)return list[i].name||raw;
   return raw;
 }
+/* 2026-09-21 — THE ช่าง ROW LISTS EVERYONE ASSIGNED TO THE CASE, not one name.
+   The entry itself only ever records ONE id: saveFieldStatus() writes `c.assignee||fieldTechId`,
+   and js/38 keeps c.assignee as the LEAD with the crew in c.assignees (part 17 §2). So the
+   crew has to come from the case — m.assignment.crew, which loadCrew() has already resolved to
+   real technician records, reading c.assignees first and the comma list in c.assignee second.
+
+   Whoever the entry recorded is added on the end if they are no longer on the case: a technician
+   taken off it afterwards still did that step, and dropping their name would rewrite history. */
+function fieldCrewFor(m,e){
+  var out=[],seen={};
+  var crew=(m&&m.assignment&&Object.prototype.toString.call(m.assignment.crew)==='[object Array]')
+    ? m.assignment.crew : [];
+  crew.forEach(function(t,i){
+    if(!t||!t.id||seen[t.id])return;
+    seen[t.id]=1;
+    out.push({name:t.name||t.id,lead:i===0,off:false});
+  });
+  String((e&&e.techId)||'').split(',').forEach(function(raw){
+    var id=String(raw||'').trim();
+    if(!id||seen[id])return;
+    seen[id]=1;
+    out.push({name:fieldTechName(id),lead:false,off:true});
+  });
+  return out;
+}
+function fieldCrewHTML(m,e){
+  var list=fieldCrewFor(m,e);
+  if(!list.length)return '-';
+  return '<span class="sd-fcrew">'+list.map(function(x){
+    return '<span class="sd-fcrew-chip'+(x.lead?' is-lead':'')+(x.off?' is-off':'')+'">'
+      +esc(x.name)+(x.lead?'<i>หัวหน้างาน</i>':'')
+      +(x.off?'<i>ไม่ได้อยู่ในเคสแล้ว</i>':'')+'</span>';
+  }).join('')+'</span>';
+}
+
 /* What the technician recorded at one field status: the time, who, the note, and the photos
    and clips attached through the บันทึกสถานะพร้อมรูป button - all of it already stored on the case as
    fieldStatusLog[], and until now shown nowhere on this page except as an anonymous thumbnail
@@ -1371,9 +1439,12 @@ function fieldStepDetailHTML(m,k){
     +'<button type="button" class="sd-fdetail-x" data-fstep-close="1">ปิด</button></div>';
   if(!entries.length){
     var isNow=String((m.raw&&m.raw.fieldStatus)||'')===fs;
+    var wasReached=Object.prototype.hasOwnProperty.call(fieldReached(m),fs);
     return head+'<p class="sd-empty">'+(isNow
       ? 'ช่างอยู่ที่ขั้นนี้ แต่ยังไม่ได้บันทึกรายละเอียดหรือรูปจากหน้างาน'
-      : 'ยังไม่ถึงขั้นนี้ - ยังไม่มีข้อมูลจากหน้างาน')+'</p>';
+      : wasReached
+        ? 'ผ่านขั้นนี้แล้ว แต่ไม่มีรายละเอียดหรือรูปที่บันทึกจากหน้างาน'
+        : 'ยังไม่ถึงขั้นนี้ - ยังไม่มีข้อมูลจากหน้างาน')+'</p>';
   }
   return head+entries.map(function(e){
     var tiles=[];
@@ -1384,9 +1455,25 @@ function fieldStepDetailHTML(m,k){
       }
     });
     var missing=(e.media||[]).length-tiles.length;
+    /* js/91 lets a technician correct what was written at a step, keeping the version it
+       replaced on the entry as revisions[]. It rides in field_status_log, a real jsonb column,
+       so the office sees the same history the technician does. Read only here — restoring a
+       version belongs where the correction is made. */
+    var revs=Array.isArray(e.revisions)?e.revisions:[];
+    var histHTML=e.editedAt
+      ? '<p class="sd-fedited">✎ แก้ไขล่าสุด '+esc(fmtDateTime(e.editedAt))
+        +(e.editedBy?' โดย '+esc(e.editedBy):'')+'</p>'
+        +(revs.length?'<details class="sd-frevs"><summary>🕐 ประวัติการแก้ไข ('+revs.length+')</summary>'
+          +'<ol class="sd-frevlist">'+revs.map(function(r){
+             return '<li><small>'+esc(fmtDateTime(r.at))+(r.by?' · '+esc(r.by):'')
+               +(r.media?(' · ไฟล์ '+(r.media.length||0)):' · ไม่ได้เปลี่ยนรูป')+'</small>'
+               +'<span>'+(r.note?esc(r.note):'<i>ไม่มีรายละเอียด</i>')+'</span></li>';
+            }).join('')+'</ol></details>':'')
+      : '';
     return '<div class="sd-fentry">'
       +'<dl class="sd-kv"><dt>เวลา</dt><dd>'+esc(fmtDateTime(e.createdAt))+'</dd>'
-      +'<dt>ช่าง</dt><dd>'+esc(fieldTechName(e.techId))+'</dd></dl>'
+      +'<dt>ช่าง</dt><dd>'+fieldCrewHTML(m,e)+'</dd></dl>'
+      +histHTML
       +(e.note?'<p class="sd-fnote">'+esc(e.note)+'</p>'
               :'<p class="sd-empty">ไม่ได้บันทึกรายละเอียดเพิ่มเติม</p>')
       +(tiles.length?'<div class="cmp-grid" style="margin-top:10px">'+mediaTiles(tiles)+'</div>':'')
@@ -1999,6 +2086,76 @@ function qsShrink(c){
   o.getContext('2d').drawImage(c,0,0,w,h);
   return o.toDataURL('image/png');
 }
+/* 2026-09-21 — พิมพ์ / PDF.
+   THE PAPER IS PRINTED FROM THE LIVE DOM, not from settings.quoteDocs[id].html. js/80 strips
+   every data URL out of the stored copy on purpose ("the signature rides in quoteApprovals
+   already"), and qsFillCell() stamps the three signatures back in when the panel opens — so
+   printing the stored HTML would come out with three empty boxes. A clone of what is on screen
+   is what the person is asking to print.
+
+   This page does not load js/03, so printQuotation() is not available here and the styling has
+   to travel with it. Only the rules that actually dress the paper are taken — the `.scd-qdoc`
+   selectors and `:root`, for the custom properties they resolve against — rather than the whole
+   stylesheet, which would drag the modal, the drawers and the app chrome into a print window
+   that has none of those elements.
+
+   Relative URLs inside a window.open('') document resolve against about:blank, which is how
+   js/18's QR sheet once printed a broken logo (part 12), so every src is made absolute first. */
+function quoteDocCss(){
+  var keep=[];
+  try{
+    [].forEach.call(document.styleSheets,function(sh){
+      var rules;
+      try{rules=sh.cssRules}catch(e){return}      /* a cross-origin sheet throws */
+      if(!rules)return;
+      [].forEach.call(rules,function(r){
+        var sel=r.selectorText||'';
+        if(!sel)return;                            /* @media, @font-face and friends */
+        if(sel.indexOf('.scd-qdoc')<0&&sel.indexOf(':root')<0)return;
+        /* `#scdPanel.is-open .scd-modal-card:has(.scd-qdoc)` widens the MODAL for a paper; it
+           names the paper but is not about it, and there is no modal in a print window. */
+        if(sel.indexOf('#scdPanel')>=0||sel.indexOf('.scd-modal')>=0)return;
+        keep.push(r.cssText);
+      });
+    });
+  }catch(e){}
+  return keep.join('\n');
+}
+function printQuoteDoc(){
+  var host=document.querySelector('#scdPanel .scd-qdoc');
+  if(!host){toast('ยังไม่มีใบเสนอราคาให้พิมพ์');return}
+  var q=caseQuote();
+  var clone=host.cloneNode(true);
+  [].forEach.call(clone.querySelectorAll('img[src]'),function(im){
+    try{im.setAttribute('src',new URL(im.getAttribute('src'),location.href).href)}catch(e){}
+  });
+  var w=null;
+  try{w=window.open('','_blank')}catch(e){}
+  if(!w){toast('เบราว์เซอร์บล็อกหน้าต่างพิมพ์ — อนุญาต pop-up แล้วลองใหม่');return}
+  var title=(q&&q.id)?('ใบเสนอราคา '+q.id):'ใบเสนอราคา';
+  w.document.write('<!doctype html><html lang="th"><head><meta charset="utf-8">'
+    +'<title>'+esc(title)+'</title><style>'+quoteDocCss()+'</style>'
+    /* after the page's own rules, so these win: the paper is the whole document now, it must
+       not keep the 720px floor it needs inside a narrow modal, and it must not print the
+       panel's frame around itself. */
+    +'<style>@page{size:A4;margin:10mm}'
+    +'html,body{margin:0;padding:0;background:#fff}'
+    +'.scd-qdoc{min-width:0;width:100%}'
+    +'.scd-qdoc .quote-doc.official{border:0;padding:0}'
+    +'</style></head><body>'
+    +'<div class="scd-qdoc">'+clone.innerHTML+'</div></body></html>');
+  w.document.close();
+  var fired=false;
+  var go=function(){
+    if(fired)return;
+    fired=true;
+    try{w.focus();w.print()}catch(e){}
+  };
+  try{w.onload=go}catch(e){}
+  setTimeout(go,900);      /* onload can have gone by already on a document.write page */
+}
+window.imodePrintQuoteDoc=printQuoteDoc;
+
 function openQuoteDoc(){
   var q=caseQuote();
   if(!q){toast('เคสนี้ยังไม่มีใบเสนอราคา');return}
@@ -2013,9 +2170,14 @@ function openQuoteDoc(){
     +(mayEdit?'<div class="qs-wrap"><div class="qs-head">ลายเซ็นฝั่งบริษัท</div>'
       +QS_ROLES.map(function(r){return qsPadHTML(r,q,signs[r.key])}).join('')
       +'<div class="qs-both"><small>เซ็นทั้งสองช่องแล้วกดปุ่มนี้ครั้งเดียว — หรือกดบันทึกแยกทีละช่องก็ได้</small>'
+      +'<button type="button" class="scd-chip-btn qs-print" data-qs-print="1">'
+      +'🖨 พิมพ์ / PDF</button>'
       +'<button type="button" class="scd-ce-save qs-both-btn" data-qs-save-all="1">'
       +'💾 บันทึกลายเซ็นทั้งสอง</button></div>'
-      +'</div>':''));
+      +'</div>'
+      /* an account that may not sign still gets to print */
+      :'<div class="qs-bar"><button type="button" class="scd-chip-btn qs-print" data-qs-print="1">'
+      +'🖨 พิมพ์ / PDF</button></div>'));
   var cells=document.querySelectorAll('#scdPanel .quote-sign-cell');
   QS_ROLES.forEach(function(r,i){
     var rec=signs[r.key]||{};
@@ -3876,6 +4038,9 @@ document.addEventListener('click',function(e){
   if(e.target.closest('[data-media-close]')){closeMediaView();return}
   var tile=e.target.closest('[data-media]');
   if(tile){e.preventDefault();openMediaView(tile.getAttribute('data-media'));return}
+  if(e.target.closest('[data-qs-print]')){
+    e.preventDefault();printQuoteDoc();return;
+  }
   if(e.target.closest('[data-qs-save-all]')){
     e.preventDefault();
     saveStaffSigns(QS_ROLES.map(function(r){return r.key}));
@@ -4021,13 +4186,31 @@ var CaseLive=(function(){
 
   function caseId(){return getCaseIdFromUrl()}
 
+  /* 2026-09-21 — A CORRECTION CHANGES NOTHING ABOUT THE LENGTH OF THE LOG.
+     This compared `(fieldStatusLog||[]).length`, so a technician fixing a note through js/91 —
+     or restoring an earlier version — arrived here, was written onto `hit`, and was then thrown
+     away: before===after, so the function returned false, the array was never saved to
+     localStorage and nothing repainted. The office saw the old wording until it reloaded.
+
+     The fingerprint is deliberately NOT JSON.stringify(log): an entry carries base64 photos, so
+     that would stringify hundreds of KB twice on every realtime event. These six small fields
+     are what an edit actually moves — the note itself (notes are short), the edit stamp, and the
+     counts of media and revisions. */
+  function logPrint(log){
+    if(!Array.isArray(log))return '';
+    return log.map(function(e){
+      e=e||{};
+      return [e.id||'',e.status||'',e.note||'',e.editedAt||'',
+              (e.media||[]).length,(e.revisions||[]).length].join('');
+    }).join('');
+  }
   function applyCase(row){
     if(!row||!row.id)return false;
     var list=readJ(K.cases,[])||[],hit=null;
     for(var i=0;i<list.length;i++)if(list[i]&&list[i].id===row.id){hit=list[i];break}
     if(!hit)return false;                       /* a case this device has never seen */
     var before=JSON.stringify([hit.status,hit.assignee,hit.appointment,hit.fieldStatus,
-                               (hit.fieldStatusLog||[]).length]);
+                               logPrint(hit.fieldStatusLog)]);
     if('status' in row)hit.status=row.status||'';
     if('appointment' in row)hit.appointment=row.appointment||'';
     if('field_status' in row)hit.fieldStatus=row.field_status||'';
@@ -4042,7 +4225,7 @@ var CaseLive=(function(){
       hit.assignees=crew;
     }
     var after=JSON.stringify([hit.status,hit.assignee,hit.appointment,hit.fieldStatus,
-                              (hit.fieldStatusLog||[]).length]);
+                              logPrint(hit.fieldStatusLog)]);
     if(before===after)return false;
     writeJ(K.cases,list);
     return true;
@@ -4107,6 +4290,27 @@ var CaseLive=(function(){
     return true;
   }
 
+  /* Realtime delivers changes made AFTER the subscription starts; it is not an initial
+     read. This standalone document boots from localStorage, so a case opened before the
+     application's latest sync could otherwise keep an old/empty fieldStatusLog forever
+     even while Supabase already held the complete track. Subscribe first, then pull this
+     one row once so there is no gap between the snapshot and later events. */
+  function pullCurrentCase(sb,mine){
+    if(!sb||!mine)return;
+    var cols='id,ticket,status,assignee,appointment,field_status,field_status_log,updated_at';
+    function findBy(col){
+      try{return Promise.resolve(sb.from('service_cases').select(cols).eq(col,mine).maybeSingle())}
+      catch(e){return Promise.resolve({error:e,data:null})}
+    }
+    findBy('id').then(function(r){
+      if(r&&!r.error&&r.data)return r;
+      return findBy('ticket');
+    }).then(function(r){
+      if(!r||r.error||!r.data)return;
+      if(applyCase(r.data))repaint();
+    },function(){});
+  }
+
   function start(){
     var sb=null;
     try{sb=CaseWrite.client()}catch(e){}
@@ -4132,6 +4336,7 @@ var CaseLive=(function(){
       channel.subscribe(function(st){
         state.status=String(st||'');
         state.on=(state.status==='SUBSCRIBED');
+        if(state.on)pullCurrentCase(sb,mine);
       });
     }catch(e){state.status='error'}
   }

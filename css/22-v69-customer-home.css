@@ -252,6 +252,50 @@
 .chome-grid > button:nth-child(7) i::before{background:#07b154}
 .chome-grid > button:nth-child(8) i::before{background:#4b5fd6}
 .chome-grid > button:nth-child(9) i::before{background:#f2911c}
+/* 2026-09-21 — แจ้งปัญหาเครื่อง IS THE ONE BUTTON A CUSTOMER IS LOOKING FOR when something is
+   wrong, so it wears the same red as the หมดประกัน pill above it (.chome-warranty.expired):
+   #fdeceb on #f5c9c6 with #9d2b26 type. Addressed by CLASS, not by :nth-child — the colours
+   below it are positional and would follow the order if the buttons were ever rearranged;
+   this one has to follow the meaning.
+
+   css/21 is loaded AFTER this file and dresses every .portal-action-grid > button, so these
+   rules carry one extra class to outrank it (0,2,1 against 0,1,1) rather than !important.
+
+   THE WHOLE BLOCK SITS AFTER THE :nth-child COLOURS ABOVE, and has to: the stripe rule is
+   (0,2,2) either way, so on equal specificity the later one wins. Measured — placed before
+   them the stripe stayed #2b7bf0 blue. */
+.chome-grid > button.chome-report{
+  background:linear-gradient(180deg,#fff6f5 0%,#fdeceb 60%,#fbe0de 100%);
+  border-color:#f0b9b5;
+  border-bottom-color:#e3a5a0;
+  box-shadow:
+    0 5px 0 #f3c8c4,
+    0 13px 22px rgba(157,43,38,.16),
+    inset 0 1px 0 rgba(255,255,255,.9);
+}
+.chome-grid > button.chome-report:hover{
+  border-color:#e79a94;
+  box-shadow:
+    0 7px 0 #f0bdb8,
+    0 18px 30px rgba(157,43,38,.22),
+    inset 0 1px 0 rgba(255,255,255,.9);
+}
+.chome-grid > button.chome-report:active{
+  box-shadow:
+    0 1px 0 #f0bdb8,
+    0 6px 12px rgba(157,43,38,.18),
+    inset 0 1px 0 rgba(255,255,255,.9);
+}
+.chome-grid > button.chome-report b{color:#9d2b26}
+.chome-grid > button.chome-report i{color:#b4635e}
+.chome-grid > button.chome-report i::before{background:#e31b2f}
+.chome-grid > button.chome-report > span:first-child{
+  background:linear-gradient(180deg,#fff2f1 0%,#fbdcda 100%);
+  border-color:#f0b9b5;
+  box-shadow:0 3px 0 #f0bdb8, inset 0 1px 0 rgba(255,255,255,.95);
+}
+/* the chevron gutter mark, so the whole card reads as one colour */
+.chome-grid > button.chome-report::after{color:#c4736d}
 /* THE CHEVRON GUTTER.
 
    css/20 line 334 is

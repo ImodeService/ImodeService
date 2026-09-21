@@ -60,11 +60,23 @@
   technician:[
    {page:'my-work',      icon:'🧾',th:'งานของฉัน', en:'My Work',  perm:'mywork.view'},
    {page:'field-service',icon:'🧰',th:'หน้างาน',   en:'Field',    perm:'field.view'},
-   {page:'qc',           icon:'✅',th:'QC',         en:'QC',       perm:'qc.view'},
+   /* 2026-09-21: this slot was QC — "เปลี่ยนปุ่ม QC ตรงนี้ เป็นปุ่มหน้าหลัก และพอกดไปจะไปที่ home Page".
+      It goes to #page-home, the module board, exactly like the staff bar's own หน้าหลัก.
+      THE PERMISSION IS NOT dashboard.view, which that one uses: a technician does not hold it
+      (part 12 — goPage('dashboard') bounces them to their first allowed page), so gating on it
+      here would hide the button from the only people this bar is built for. 'home' has no
+      PAGE_PERMISSION key of its own, so this string is read by nothing but the filter three
+      lines below; mywork.view is simply a key every technician role certainly has — it is what
+      งานของฉัน above is gated on, so if it were missing this bar would already be wrong. */
+   {page:'home',         icon:'⌂', th:'หน้าหลัก',   en:'Home',     perm:'mywork.view'},
    {page:'calendar',     icon:'📅',th:'ปฏิทิน',    en:'Calendar', perm:'calendar.view'},
    {page:'notifications',icon:'🔔',th:'แจ้งเตือน',  en:'Alerts',   perm:'notifications.view'},
    {page:'machines',     icon:'⚙', th:'เครื่องจักร',en:'Machines', perm:'machine.view'},
-   {page:'documents',    icon:'📁',th:'เอกสาร',    en:'Documents',perm:'documents.view'}
+   {page:'documents',    icon:'📁',th:'เอกสาร',    en:'Documents',perm:'documents.view'},
+   /* kept at the end, the way the staff list keeps its own spares: QC only comes back into the
+      bar for a technician role that cannot open one of the five above it. It is still on the
+      Home board and in เมนูเพิ่มเติม for everyone else. */
+   {page:'qc',           icon:'✅',th:'QC',         en:'QC',       perm:'qc.view'}
   ],
   staff:[
    /* 2026-09-18: หน้าหลัก means the Home board (#page-home), not the dashboard — "ปุ่มหน้าหลัก

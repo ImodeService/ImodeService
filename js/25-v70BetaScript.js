@@ -72,11 +72,11 @@
    {page:'calendar',     icon:'📅',th:'ปฏิทิน',    en:'Calendar', perm:'calendar.view'},
    {page:'notifications',icon:'🔔',th:'แจ้งเตือน',  en:'Alerts',   perm:'notifications.view'},
    {page:'machines',     icon:'⚙', th:'เครื่องจักร',en:'Machines', perm:'machine.view'},
-   {page:'documents',    icon:'📁',th:'เอกสาร',    en:'Documents',perm:'documents.view'},
-   /* kept at the end, the way the staff list keeps its own spares: QC only comes back into the
-      bar for a technician role that cannot open one of the five above it. It is still on the
-      Home board and in เมนูเพิ่มเติม for everyone else. */
-   {page:'qc',           icon:'✅',th:'QC',         en:'QC',       perm:'qc.view'}
+   {page:'documents',    icon:'📁',th:'เอกสาร',    en:'Documents',perm:'documents.view'}
+   /* QC is deliberately NOT a candidate here any more — "QC ก็ย้ายไปตรงเพิ่มเติมที่อยู่ขวาสุดไง
+      เพราะอันนี้เป็นหน้าของช่างอะ". Left at the end of this list it would have climbed back into
+      the bar for any role that could not open one of the five above it. It now lives in
+      เมนูเพิ่มเติม, where js/06 had never actually listed it, and on the Home board. */
   ],
   staff:[
    /* 2026-09-18: หน้าหลัก means the Home board (#page-home), not the dashboard — "ปุ่มหน้าหลัก

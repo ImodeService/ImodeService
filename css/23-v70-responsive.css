@@ -216,3 +216,29 @@
 /* Quotation: company signatures */
 .quote-staff-sign-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.quote-staff-sign-card{padding:12px;border:1px solid var(--line);border-radius:14px;background:#f7faff}.quote-staff-sign-card .signature-title{font-size:13px}.quote-staff-sign-card .signature-title small{font-weight:400;color:var(--muted)}.quote-staff-sign-card .signature-pad{height:130px;margin-top:2px;background:#fff}.quote-staff-sign-actions,.quote-staff-sign-footer,.quote-staff-sign-footer>div{display:flex;align-items:center;justify-content:space-between;gap:8px}.quote-staff-sign-actions{margin-top:8px}.quote-staff-save{display:block;margin:8px 0 0 auto}.quote-staff-sign-footer{margin-top:12px}.quote-staff-sign-footer small{color:var(--muted)}
 @media(max-width:700px){.quote-staff-sign-grid{grid-template-columns:1fr}.quote-staff-sign-footer{align-items:stretch;flex-direction:column}.quote-staff-sign-footer>div{display:grid;grid-template-columns:1fr 1fr}.quote-staff-sign-footer button{width:100%}}
+
+/* 2026-09-24 — flex/grid sweep at phone widths, every module.
+   ONE real finding on a page, measured at 390px and again at 360px: the quotation machine
+   line. css/01 line 93 narrows its grid to `28px minmax(0,1fr) 48px 76px 34px` below 640px,
+   but .quote-remove is a fixed 36x36 square (css/01 line 65), so the x button sat 2px outside
+   its own 34px track and the row reported 2px of overflow. The button is what is oversized,
+   not the grid, so the button is what gives — the track keeps its width and the 1fr column
+   keeps every pixel it had. */
+@media(max-width:640px){
+  .quote-machine-line .quote-remove,
+  .quote-part-line .quote-remove{width:100%;min-width:0;padding-left:0;padding-right:0}
+}
+
+/* Same sweep, the only finding inside the 29 popups a button can reach: the font-size slider
+   in ตั้งค่า → ขนาดตัวอักษร. css/01 gives .font-range width:100%, and Chrome's UA stylesheet
+   adds `margin:2px` to every input[type=range] — so 346px of track plus 2px each side sat 2px
+   outside its 346px grid column. Measured, at 390px and at 360px. */
+.font-range{margin-left:0;margin-right:0;box-sizing:border-box}
+
+/* The drawer's first group header was 17px tall while every other one was 26px, measured with
+   the drawer genuinely open at 390px. js/36 gives `.nav-group:first-child{padding-top:2px}` to
+   keep the list tight at the top, which is right — but it also shrank the only thing you can
+   tap to fold that group. A min-height restores the hit area and leaves the spacing alone.
+   css/23 is a <link> in <body> and js/36 injects its <style> into <head>, so at equal
+   specificity this one wins on document order (CLAUDE.md, css/21). */
+.side-nav .nav-group:first-child{min-height:26px}

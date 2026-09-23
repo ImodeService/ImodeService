@@ -7028,6 +7028,201 @@ network off — the site opens, the technician is still signed in, 26 sidebar it
 8. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its
    serial or QR.
 
+---
+
+## Session Change Log — 2026-09-24 (part 33): the documents are A4 at every width, every account is on ทีมงาน, and a flex/grid sweep of every module
+
+Three requests, in the order they arrived. Two new JS files, one new block in the case page,
+three additions to `css/23`. No storage key renamed, no Supabase setting touched, no schema
+change, version untouched.
+
+| File | What |
+|---|---|
+| `js/112-v70A4DocViewScript.js` | **new** — every document you open is an A4 page, scaled to fit |
+| `js/113-v70TeamAccountsScript.js` | **new** — every login account is listed on ทีมงาน |
+| `service-case-detail.html` | its own A4 copy, since it loads nothing from `js/` |
+| `css/23-v70-responsive.css` | the three real findings of the flex/grid sweep |
+| `index.html` | two `<script src>` tags |
+
+### 1. FLEX AND GRID, every module, measured at phone widths
+
+Asked for: "ลองเทสดูเรื่องพวก Flex และ grid ของโทรศัพท์หน่อยสิ ของทุกโมดุลเลย".
+
+A CDP probe walked **every sidebar page as admin and as technician, plus the whole shell —
+topbar, bottom bar and drawer — plus all 29 popups a button can reach**, at 390px and 360px,
+using `Emulation.setDeviceMetricsOverride` (part 17 §7: `--window-size` does not give the
+viewport you ask for). Per element it measured five things: content wider than its own box, a
+box wider than the screen, a flex or grid child escaping its container's content box, two
+siblings in the same flex or grid overlapping, and a tap target under 30px.
+
+**Three real findings, all fixed in `css/23`:**
+
+| where | what was measured | fix |
+|---|---|---|
+| quotation machine line | below 640px css/01 narrows the grid to `28px minmax(0,1fr) 48px 76px 34px`, but `.quote-remove` is a fixed **36×36** — the × sat **2px outside its own 34px track** | the button gives, not the grid: `width:100%;min-width:0` so the 1fr column keeps every pixel |
+| ตั้งค่า → ขนาดตัวอักษร | `.font-range` is `width:100%` and Chrome's UA sheet adds `margin:2px` to every `input[type=range]`, so 346px of track plus 2px each side sat **2px outside** its 346px column | `margin-left:0;margin-right:0;box-sizing:border-box` |
+| the drawer's first group header | **17px tall** where every other one is 26px — js/36's `.nav-group:first-child{padding-top:2px}` keeps the list tight at the top and shrank the only thing you can tap to fold that group | `min-height:26px`; css/23 is a `<link>` in `<body>` and js/36 injects into `<head>`, so it wins on document order at equal specificity |
+
+**Four findings were FALSE and each one taught the probe something.** They are written down
+because the next sweep will hit them again:
+
+1. **`.field-hero` "clipped by 22px".** `.hero-digital::after` is a decorative 240px circle at
+   `right:-26px`, clipped on purpose by `overflow:hidden` — and an absolutely positioned
+   pseudo-element counts towards `scrollWidth`. The probe now reports an overflow only when
+   something **in flow** is really outside the content box.
+2. **The notification bell "clipped by 5px".** Its badge is the element's only child and is
+   absolutely positioned, so "every child was skipped" was being read as "a text-only box whose
+   own label is cut". Only a box with **no element children at all** is judged on its own text
+   now. Part 17 §8 had already recorded the same overhang on the case page.
+3. **`nav-group` 17px on 26 pages.** A closed drawer sits at `left:-270px` and still has a
+   rect, so the probe was measuring the collapsed geometry of something nobody can see. It now
+   skips anything entirely outside the viewport — which left the one genuine 17px finding above,
+   measured with the drawer really open.
+4. **The machines pager "missing".** With one page js/07 renders a summary and no numbered
+   buttons, by design.
+
+**Two more things the measurement settled rather than assumed:** at 390px `body.rhome-mode`
+hides the sidebar entirely (js/10 line 740), so an admin who has just signed in has no drawer to
+open — the test has to leave the Home board first; and above 900px there is no drawer at all,
+`#menuBtn` collapses a permanent sidebar, so those assertions are scoped to phone widths.
+
+**Result: 0 findings on 27 pages × 2 roles × 2 widths, and 0 in 29 popups.**
+
+### 2. EVERY DOCUMENT IS AN A4 PAGE — "เวลากดดูในมือถือขนาดมันเพี้ยน"
+
+Asked for: "แบบฟอร์มอะผมอยากให้เวลากดดูให้มันเป็น A4 เสมอ น่ะ ทุกแบบฟอร์มเลยนะ", then
+"เวลากดดูในมือถือขนาดมันเพี้ยน". The owner chose **documents** (not the data-entry popups) and
+**scale the page down to fit** (not side-scroll, not reflow).
+
+**Measured first, at a 390px viewport, where A4 at 96dpi is 794px:**
+
+```
+ใบตรวจ / Service Report   paper 346px wide, own content 882px   -> CUT OFF
+เอกสาร QC                  paper 346px, min-height:auto          -> not A4 at all
+ใบเสนอราคา                  fluid, never A4 on screen
+```
+
+The papers were A4 only inside the print window. On screen they were fluid, so a phone squeezed
+a six-column table and a three-cell signature row into 346px — and css/05 even carries
+`.qc-a4{width:min(100%,210mm)!important}`, which is the rule that un-A4s the QC document below
+794px.
+
+**`js/112`** wraps `openModal()` — the one funnel every on-screen document goes through — and
+for each of the five paper roots (`#quotePreviewDoc`, `#serviceReportPrint`, `#qcPrintDoc`,
+`#salesQuotePrintDoc`, `#warrantyCertificateDoc`) forces `width:210mm`, puts it in a
+window + stage pair, and applies `transform:scale(available/794)` with the window reserving the
+**scaled** height. A พอดีจอ / 100% toggle is there for the small print, and at 100% the page
+scrolls instead of reflowing.
+
+Things that matter if this is touched:
+
+- **The print path is untouched, and that was checked rather than assumed.** Every print
+  function does `window.open` + `outerHTML` of the paper root and writes its own CSS. The A4
+  width is applied through a **class**, never an inline style, so what travels into the print
+  window is a class name that document has never heard of. Inline would have followed it in.
+  The wrapper sits outside the paper, so it does not travel either.
+- **`table{min-width:860px}` (css/01 line 21) is why two documents were being cut.** It is a
+  global rule so the app's data tables stay readable inside `.table-wrap{overflow:auto}` — and
+  impossible inside a 794px page. Reset to `min-width:0` **only inside `.imode-a4-page`**, which
+  outranks both it and `.wide-table` without `!important`. Measured after: `contentOverflowsA4`
+  went 90 → 0 on the quotation and 88 → 0 on the ใบตรวจ.
+- A transform, not a media query: reflowing is what was wrong before, because the layout then
+  stops matching the paper and nobody can tell from the screen what will print.
+- `ResizeObserver` plus an `img` `load` listener per image, because a document's height changes
+  after it is wrapped.
+
+**`service-case-detail.html` carries its own short copy**, since it loads nothing from `js/`.
+One thing there needed its own fix: `.scd-qdoc` has `min-width:720px` so the restated
+`.quote-paper-*` grids had something to lay out against — and with the fit wrapper inside it,
+**720px became the width the scale was computed against**: measured 0.907 and a 720px page on a
+390px phone, still needing a sideways drag. The floor is cleared on the element that really
+holds a page, which took it to 0.398 / 316px.
+
+**Measured after, at 390px:** all four reachable documents are 794px A4, nothing cut
+(`contentOverflowsA4: 0`), scaled to 44% and fitting the screen with no sideways scroll; at
+1440px they sit at 100%. The case page: 794px A4 at 39.8%.
+
+`salesQuoteDocHTML` is in `PAPERS` and was **not** exercised: its opener
+(`openSalesQuotePreviewRecord`) is inside an IIFE and is not on `window`, so no test could reach
+it. It will be wrapped the same way whenever the UI opens it.
+
+### 3. EVERY LOGIN ACCOUNT IS ON ทีมงาน
+
+Asked for: "ตรงบัญชีผู้ใช้อะ อยากให้บัญชีทุกบัญชีขึ้นที่ทีมงานครับ".
+
+The page showed **technician records**, which is a different set from **accounts**. Of the nine
+on the roster only four hold a record — `lead_technician`, `lead_rd`, `samak`, `narongsak` — so
+rungarun, apichat, pannawit, phimu and admin appeared nowhere on it, and no screen outside
+Settings answered "who can sign in".
+
+**`js/113`** wraps `renderTechnicians()` and appends one block: every account, with its name,
+username, role, team, and whether it holds a field-technician record.
+
+**What is deliberately NOT done, and it is the whole design decision:** no technician record is
+created for the five. A technician record is what cases, field logs, service reports and QC are
+attributed **by**, and it feeds the Field Service picker, the calendar rows, the assignment
+lists and every team headcount — so giving the CEO one, just to make a card appear, would put
+him in the queue to be assigned jobs. Asserted: `technicians.length` is still 4 and the field
+picker still has 4 options while 9 cards are on screen.
+
+It also says something nothing else in the app reports: an account pointing at a technician
+record that **no longer exists** is flagged, because every screen that resolves work through
+`currentUser.technicianId` comes back empty for that person — exactly the state `tech_test1` and
+`R&D_test1` were in before part 29.
+
+One button, gated on `users.manage` and checked with `canPermission` rather than `data-perm`
+(`applyRoleVisibility()` has already run by the time this block exists), opens
+`openAccountAdminModal()` — the account screen that already exists, not a second copy of the form.
+
+### Tests
+
+**164 assertions across eight suites, 0 failures, 0 page errors**, plus the sweeps above:
+
+- the three requests asserted at 390px (31) and 1440px (27) — the drawer measured with it really
+  open, all four documents A4 with the toggle working both ways, 9/9 account cards, and
+  `technicians` untouched;
+- the case page's own A4 at 390px (7) and 1440px (7), driven through the real step-2 drawer;
+- regression at 1440 and 390 (22 each): all nine accounts sign in, 26/26 sidebar pages open,
+  version strings, the machines pager, the cases KPI, the customer page, no overflow;
+- the four offline suites re-run because two script tags were added (11 + 14 + 10 + 13).
+
+`node --check` passes on all **118** files in `js/`, `auth/`, `pages/` and `sw.js`; both inline
+blocks of the case page parse; `css/23`'s braces balance.
+
+### Harness notes worth keeping
+
+- **A bare `s.replace('</body>', …)` on `service-case-detail.html` lands inside a print-window
+  template string** — there are two `</body>` in that file and the first one is JavaScript. It
+  broke the whole inline script in one edit. Use `lastIndexOf`, and splice by index.
+- **Writing a JS file with `node -e` and escaped `\n` inside a string literal** produced a real
+  newline inside a `console.log("…")` and a regex `/[ \t\n\r]+/` with literal whitespace in it —
+  two syntax errors from the same cause. Write the block to a file with a file tool and splice
+  it, rather than building it inside a shell-quoted `node -e`.
+- **Do not click every `[data-step]` circle to find a drawer.** A circle one ahead of the case
+  has role `next` and MOVES the case (part 30). Click the one you mean.
+- A control matched by its visible words can be the wrong control: a button reading
+  ทำใบเสนอราคา **navigates to the application** and killed a suite mid-run
+  ("Inspected target navigated or closed"). Match `data-action`.
+
+### Open / risk
+
+1. **The printed sheet is still laid out at the print window's own width**, not at 210mm — 
+   `printQuotation` uses `max-width:1020px`, `printServiceReport` 950px — so the on-screen A4 and
+   the printed A4 differ in column widths, and Chrome scales the print to fit the page. Nothing
+   is cut either way. Making the print windows 210mm too would make the two identical; it changes
+   printed output, so it is the owner's call rather than something to slip in.
+2. `salesQuoteDocHTML` is covered by `js/112` but was never opened by a test, because its opener
+   is not on `window`.
+3. The A4 view is per-device: the พอดีจอ / 100% choice is kept in `imode_v70_a4_zoom`, a new
+   localStorage key. Losing it returns to พอดีจอ.
+4. The ทีมงาน block lists accounts and is **not** filtered by the team segment above it — the
+   line under the heading says so. Accounts have a `team` field but no membership of the
+   technician teams that filter drives.
+5. Unchanged from part 15: `04-anon-uat.sql` means anyone on the internet can read and write this
+   database.
+6. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its
+   serial or QR.
+
 ### Still outstanding from part 31
 
 `docs/MIGRATION.md` has **not** been written. The DECISION section above is the plan for moving

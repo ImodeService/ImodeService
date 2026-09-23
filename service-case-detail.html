@@ -4610,5 +4610,132 @@ load().then(function(res){
 });
 })();
 </script>
+<script>
+/* 2026-09-24 — the quotation on this page is an A4 page too.
+
+   The owner asked for every document to be A4 whenever it is opened to be looked at, and for a
+   phone to show the whole page scaled down rather than a squashed or side-scrolling one.
+   index.html gets that from js/112; this file is a separate document that loads nothing from
+   js/, so it carries its own short copy — the same two-element wrapper and the same
+   transform:scale(). Deliberately duplicated rather than shared, because sharing would make
+   this page depend on a file it does not load.
+
+   The paper is the stored quotationDocHTML markup baked by js/80. .scd-qdoc keeps its
+   min-width:720px for anything that is not the paper; the paper itself becomes 210mm.
+   Printing is unaffected — the print path clones the paper and writes its own stylesheet, and
+   this wrapper sits outside the paper. */
+(function(){
+ 'use strict';
+ var A4=210*96/25.4;
+ var KEY='imode_v70_a4_zoom';        /* the same per-device choice js/112 stores */
+ function zoom(){try{return localStorage.getItem(KEY)==='full'?'full':'fit'}catch(e){return 'fit'}}
+ function css(){
+  if(document.getElementById('scdA4Style'))return;
+  var st=document.createElement('style');st.id='scdA4Style';
+  st.textContent=[
+   '.scd-a4-fit{position:relative;overflow:hidden;margin:0 0 10px}',
+   '.scd-a4-fit.is-full{overflow:auto;-webkit-overflow-scrolling:touch}',
+   '.scd-a4-stage{transform-origin:top left}',
+   '.scd-qdoc .quote-doc.official.scd-a4-page{width:210mm!important;max-width:none!important;'
+    + 'min-height:297mm;box-sizing:border-box;margin:0!important;background:#fff}',
+   /* the app's global table{min-width:860px} cannot fit a 794px page; see js/112 */
+   '.scd-qdoc .scd-a4-page table{min-width:0}',
+   '.scd-a4-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 9px;'
+    + 'font-size:11px;color:#5a6b86}',
+   '.scd-a4-bar .scd-a4-size{font-weight:700;color:#274a8c}',
+   '.scd-a4-bar button{border:1px solid #ccd8ea;background:#fff;color:#274a8c;border-radius:999px;'
+    + 'padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;min-height:32px}',
+   '.scd-a4-bar button[aria-pressed="true"]{background:#1d55c9;border-color:#1d55c9;color:#fff}'
+  ].join('');
+  document.head.appendChild(st);
+ }
+ function measure(fit){
+  var stage=fit.firstElementChild;if(!stage)return;
+  var paper=stage.firstElementChild;if(!paper)return;
+  var full=zoom()==='full';
+  fit.classList.toggle('is-full',full);
+  var avail=fit.clientWidth||fit.getBoundingClientRect().width;
+  var w=paper.offsetWidth||A4;
+  var sc=full?1:Math.min(1,avail/w);
+  if(!isFinite(sc)||sc<=0)sc=1;
+  stage.style.transform='scale('+sc+')';
+  /* offsetHeight is unscaled, so the window has to reserve the scaled height or the panel
+     ends with a tall empty area under the page. */
+  fit.style.height=full?'':Math.max(40,Math.round(paper.offsetHeight*sc))+'px';
+  var bar=fit.previousElementSibling;
+  if(bar&&bar.classList.contains('scd-a4-bar')){
+   var lab=bar.querySelector('.scd-a4-size');
+   if(lab)lab.textContent='A4 · 210 × 297 mm · '+Math.round(sc*100)+'%';
+   var a=bar.querySelector('[data-scda4="fit"]'),b=bar.querySelector('[data-scda4="full"]');
+   if(a)a.setAttribute('aria-pressed',String(!full));
+   if(b)b.setAttribute('aria-pressed',String(full));
+  }
+ }
+ function fitAll(){var l=document.querySelectorAll('.scd-a4-fit');for(var i=0;i<l.length;i++)measure(l[i])}
+ function apply(){
+  css();
+  var papers=document.querySelectorAll('.scd-qdoc .quote-doc.official');
+  var n=0;
+  for(var i=0;i<papers.length;i++){
+   var p=papers[i];
+   if(p.closest('.scd-a4-stage')){n++;continue}
+   p.classList.add('scd-a4-page');
+   /* .scd-qdoc carries min-width:720px so the restated .quote-paper-* grids had something to
+      lay out against. The paper is a fixed 210mm now, so that floor is obsolete for it — and
+      left in place it became the width the scale was computed AGAINST: measured 0.907 and a
+      720px page on a 390px phone, still needing a sideways drag inside .scd-qdoc-wrap.
+      Cleared on the element rather than through :has(), so it cannot depend on selector
+      support, and only on a .scd-qdoc that really holds a page. */
+   var host=p.closest('.scd-qdoc');
+   if(host)host.style.minWidth='0';
+   var fit=document.createElement('div');fit.className='scd-a4-fit';
+   var stage=document.createElement('div');stage.className='scd-a4-stage';
+   var bar=document.createElement('div');bar.className='scd-a4-bar';
+   bar.innerHTML='<span class="scd-a4-size">A4 · 210 × 297 mm</span>'
+    + '<button type="button" data-scda4="fit" aria-pressed="true">พอดีจอ</button>'
+    + '<button type="button" data-scda4="full" aria-pressed="false">100%</button>';
+   p.parentNode.insertBefore(bar,p);
+   p.parentNode.insertBefore(fit,p);
+   stage.appendChild(p);fit.appendChild(stage);
+   var imgs=p.querySelectorAll('img');
+   for(var k=0;k<imgs.length;k++){
+    if(imgs[k].complete)continue;
+    imgs[k].addEventListener('load',fitAll,{once:true});
+    imgs[k].addEventListener('error',fitAll,{once:true});
+   }
+   n++;
+  }
+  if(n)requestAnimationFrame(function(){fitAll();requestAnimationFrame(fitAll)});
+  return n;
+ }
+ window.imodeScdA4=apply;
+ window.imodeScdA4Fit=fitAll;
+ document.addEventListener('click',function(e){
+  var b=e.target&&e.target.closest?e.target.closest('[data-scda4]'):null;
+  if(!b)return;
+  try{localStorage.setItem(KEY,b.getAttribute('data-scda4')==='full'?'full':'fit')}catch(x){}
+  fitAll();
+ });
+ /* openQuoteDoc() rebuilds the panel, and so does every staff signature save, so the paper
+    arrives more than once. An observer is the one choke point all of those share. It is
+    disconnected around our own writes, so the insertions above are never recorded rather than
+    recorded and filtered — the loop that locked a tab up in part 17 §11. */
+ var mo=new MutationObserver(function(){
+  mo.disconnect();
+  try{apply()}catch(e){}
+  start();
+ });
+ function start(){
+  var host=document.getElementById('scdPanel')||document.body;
+  try{mo.observe(host,{childList:true,subtree:true})}catch(e){}
+ }
+ function boot(){apply();start()}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);
+ else boot();
+ window.addEventListener('resize',function(){clearTimeout(window.__scdA4T);
+  window.__scdA4T=setTimeout(fitAll,120)});
+ window.addEventListener('orientationchange',function(){setTimeout(fitAll,260)});
+})();
+</script>
 </body>
 </html>

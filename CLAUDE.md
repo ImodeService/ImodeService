@@ -6986,6 +6986,17 @@ customer page with 0 action cards.
   Another false failure.
 - Node on Windows cannot `require` an MSYS `/c/...` path; give it `C:/...`.
 
+### Verified on the live site, not only locally
+
+Pushed as `b739c17` and GitHub Pages confirmed serving it, then the offline run was repeated
+against `https://imodeservice.github.io/ImodeService/` itself with the live database blocked two
+ways (the app's own opt-out set before js/23 runs, and `*supabase.co*` blocked at the network
+layer), so nothing touched it. **13 assertions, 0 failures**: a secure context, the nine accounts
+live, `narongsak` signing in with the hashed password on the deployed build, the worker taking
+control at the `/ImodeService/` sub-path scope with **147 files cached**, and then with the
+network off — the site opens, the technician is still signed in, 26 sidebar items, no overflow,
+0 page errors, and the customer page opens with its nine action cards from the kept shell.
+
 ### Open / risk
 
 1. **The hashes are still unsalted SHA-256 and still world-readable** through
@@ -7009,7 +7020,9 @@ customer page with 0 action cards.
    requests are still replaced wholesale by a sync, so an **edit** to one of those made offline is
    still lost. Each one is a decision about delete propagation, not a free win.
 6. **Not tested on a real phone.** Everything above is headless Chrome with
-   `Network.emulateNetworkConditions`. The owner is checking the GitHub Pages build on a device.
+   `Network.emulateNetworkConditions`, including the live-site run. A real device adds things a
+   desktop cannot show: iOS Safari's own service-worker behaviour, the browser evicting the tab,
+   and airplane mode rather than an emulated offline flag. The owner is checking that.
 7. Unchanged from part 15: `04-anon-uat.sql` means anyone on the internet can read and write this
    database.
 8. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its

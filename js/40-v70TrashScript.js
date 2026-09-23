@@ -115,6 +115,7 @@
  /* The key the customer's requests ride under inside a binned case's payload. Reserved:
     a real case never carries it, and it is stripped again on restore. */
  var REQ_KEY='__imodeRequests';
+ var MACHINE_RELATED_KEY='__imodeMachineRelated';
 
  /* ------------------------------------------------------------------- the types -- */
  /* Each type knows how to describe itself, how to put its record back, and which cloud
@@ -189,9 +190,23 @@
    restore:function(p){
     try{
      if(!Array.isArray(machines))return false;
-     if(machines.some(function(m){return m.id===p.id}))return true;
-     machines.unshift(p);
-     if(typeof cloudUpsertMachine==='function'){try{cloudUpsertMachine(p)}catch(e){}}
+     var related=p&&p[MACHINE_RELATED_KEY]||{},m={};
+     Object.keys(p||{}).forEach(function(k){if(k!==MACHINE_RELATED_KEY)m[k]=p[k]});
+     if(!machines.some(function(x){return x.id===m.id}))machines.unshift(m);
+     if(typeof cloudUpsertMachine==='function'){try{cloudUpsertMachine(m)}catch(e){}}
+     function restoreRows(target,rows,upsert){
+      if(!Array.isArray(target))return;
+      (rows||[]).forEach(function(row){
+       if(!row||target.some(function(x){return x.id===row.id}))return;
+       target.unshift(row);
+       if(typeof upsert==='function')try{upsert(row)}catch(e){}
+      });
+     }
+     restoreRows(cases,related.cases,typeof cloudUpsertCase==='function'?cloudUpsertCase:null);
+     restoreRows(quotations,related.quotations,typeof cloudUpsertQuotation==='function'?cloudUpsertQuotation:null);
+     restoreRows(warranties,related.warranties,typeof cloudUpsertWarranty==='function'?cloudUpsertWarranty:null);
+     restoreRows(qcRecords,related.qcRecords,null);
+     restoreRows(lineRequests,related.lineRequests,typeof cloudUpsertLineRequest==='function'?cloudUpsertLineRequest:null);
      return true;
     }catch(e){return false}
    }
@@ -633,7 +648,7 @@
  function detailRows(payload){
   var out='',n=0;
   Object.keys(payload||{}).forEach(function(k){
-   if(k===REQ_KEY||SKIP_FIELDS[k])return;
+   if(k===REQ_KEY||k===MACHINE_RELATED_KEY||SKIP_FIELDS[k])return;
    var v=readable(payload[k]);
    if(v===''||v==null)return;
    n++;
@@ -641,6 +656,25 @@
   });
   return n?'<dl class="trash-kv">'+out+'</dl>'
           :'<p class="empty">'+esc2(tl('ไม่มีรายละเอียดที่แสดงได้','Nothing further to show'))+'</p>';
+ }
+ function machineRelatedHTML(payload){
+  var rel=payload&&payload[MACHINE_RELATED_KEY];
+  if(!rel)return '';
+  var groups=[
+   ['cases',tl('เคสงานบริการ','Service cases'),function(x){return [x.ticket||x.id,x.status,x.issue].filter(Boolean).join(' · ')}],
+   ['quotations',tl('ใบเสนอราคา','Quotations'),function(x){return [x.quoteNo||x.id,x.status,x.grand?Number(x.grand).toLocaleString()+' THB':''].filter(Boolean).join(' · ')}],
+   ['warranties',tl('ข้อมูลประกัน','Warranties'),function(x){return [x.warrantyNo||x.id,x.endDate].filter(Boolean).join(' · ')}],
+   ['qcRecords',tl('รายการ QC','QC records'),function(x){return [x.qcNo||x.id,x.status].filter(Boolean).join(' · ')}],
+   ['lineRequests',tl('คำขอจากลูกค้า','Customer requests'),function(x){return [x.status,x.message].filter(Boolean).join(' · ')}]
+  ];
+  var html='';
+  groups.forEach(function(g){
+   var rows=Array.isArray(rel[g[0]])?rel[g[0]]:[];
+   if(!rows.length)return;
+   html+='<div class="trash-detail-sub">'+esc2(g[1]+' ('+rows.length+')')+'</div>'
+    +'<ul class="trash-related">'+rows.map(function(x){return '<li>'+esc2(g[2](x)||x.id||'-')+'</li>'}).join('')+'</ul>';
+  });
+  return html;
  }
  function openEntry(id){
   var e=bin().filter(function(x){return x.id===id})[0];
@@ -658,6 +692,9 @@
   var reqs=(payload&&Array.isArray(payload[REQ_KEY]))?payload[REQ_KEY]:[];
   var body=payload
    ? detailRows(payload)
+     +(e.type==='account'&&typeof window.imodeAccountHistoryHTML==='function'
+       ?window.imodeAccountHistoryHTML(payload):'')
+     +machineRelatedHTML(payload)
      +(reqs.length?'<div class="trash-detail-sub">'+esc2(tl('คำขอจากลูกค้าที่ลบไปพร้อมกัน ('+reqs.length+')',
         'Customer requests binned with it ('+reqs.length+')'))+'</div>'
         +reqs.map(function(r){return detailRows(r)}).join(''):'')
@@ -808,6 +845,17 @@
  +'.trash-btn.is-danger{color:#c02626;border-color:#f3cdcd}'
  +'.trash-btn.is-danger:hover{background:#fdeeee}'
  +'.trash-del-btn{color:#c02626;border-color:#f3cdcd}'
+ +'.trash-detail-head{display:flex;align-items:center;gap:11px;margin-bottom:10px}'
+ +'.trash-detail-ico{font-size:22px;width:40px;height:40px;border-radius:12px;background:#eef4ff;display:grid;place-items:center;flex:none}'
+ +'.trash-detail-head b{display:block;font-size:15px;color:#0c225e}'
+ +'.trash-detail-head small{display:block;font-size:11.5px;color:#5b6b88;margin-top:2px}'
+ +'.trash-kv{display:grid;grid-template-columns:minmax(96px,34%) 1fr;gap:6px 12px;margin:0 0 12px;font-size:12.5px}'
+ +'.trash-kv dt{color:#5b6b88;overflow-wrap:anywhere}'
+ +'.trash-kv dd{margin:0;color:#0c225e;font-weight:600;overflow-wrap:anywhere}'
+ +'.trash-kv.is-meta{padding:10px 12px;border:1px solid #e3ecfa;border-radius:12px;background:#f8fbff}'
+ +'.trash-detail-sub{margin:12px 0 8px;font-size:12px;font-weight:800;color:#5b6b88}'
+ +'.trash-related{margin:0 0 12px;padding:0;list-style:none;display:grid;gap:6px}'
+ +'.trash-related li{padding:8px 10px;border:1px solid #e3ecfa;border-radius:9px;background:#f8fbff;color:#0c225e;font-size:12px;overflow-wrap:anywhere}'
  +'@media (max-width:640px){'
  +'.trash-row{grid-template-columns:28px minmax(0,1fr) 52px;row-gap:8px}'
  +'.trash-row[role="button"]{cursor:pointer}'

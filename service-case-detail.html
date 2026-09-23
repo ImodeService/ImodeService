@@ -29,6 +29,7 @@
   so rather than inventing a value.
 -->
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&display=swap');
 :root{
   --imode-blue:#0b63e5; --imode-navy:#0c225e; --imode-navy-2:#123a80;
   --imode-orange:#f27a1a; --imode-orange-dark:#d2620c;
@@ -42,7 +43,7 @@
 html,body{margin:0;padding:0}
 body{
   background:var(--bg); color:var(--ink); font-size:14px; line-height:1.5;
-  font-family:"Sarabun","Noto Sans Thai","Segoe UI",system-ui,-apple-system,sans-serif;
+  font-family:"Anuphan","Noto Sans Thai","Segoe UI",system-ui,-apple-system,sans-serif;
   -webkit-text-size-adjust:100%;
 }
 button{font:inherit;color:inherit}
@@ -215,7 +216,7 @@ a{color:var(--imode-blue)}
 .sd-go:focus-visible{outline:2px solid var(--imode-blue);outline-offset:2px}
 
 /* the technician's own nine-status track, under step 4 */
-.sd-field{list-style:none;margin:0;padding:0;display:flex;gap:0;overflow-x:auto;min-width:0}
+.sd-field{list-style:none;margin:0;padding:6px 4px 8px;display:flex;gap:0;overflow-x:auto;min-width:0}
 .sd-field li{flex:1 0 108px;position:relative;text-align:center;padding:0 4px}
 .sd-field li::before{content:"";position:absolute;top:13px;left:-50%;width:100%;height:3px;background:#e3ecfa}
 .sd-field li:first-child::before{display:none}
@@ -513,6 +514,7 @@ body.scd-modal-open{overflow:hidden}
 .scd-ol-toggle{display:flex;align-items:flex-start;gap:9px;padding:11px 12px;border:1px solid var(--line-2);border-radius:12px;background:#f7faff;cursor:pointer;font-size:13px;color:var(--imode-navy)}
 .scd-ol-toggle input{width:18px;height:18px;margin:1px 0 0;accent-color:var(--imode-blue);flex:0 0 auto}
 .scd-ol-box{display:flex;flex-direction:column;gap:9px;padding:12px;border:1px solid #cfe0fb;border-radius:12px;background:#fbfdff}
+.scd-ol-box[hidden]{display:none}
 .scd-ol-files{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .scd-ol-files small{color:var(--muted);font-size:11.5px}
 .scd-ol-add{display:inline-flex;align-items:center;cursor:pointer}
@@ -526,6 +528,7 @@ body.scd-modal-open{overflow:hidden}
 .scd-ol-banner b{display:block;color:#0b4fb8;font-size:14px}
 .scd-ol-banner small{display:block;color:var(--muted);font-size:12px;margin-top:2px;overflow-wrap:anywhere}
 .scd-ol-close{border:0;border-radius:11px;background:#d92d20;color:#fff;font:inherit;font-size:13.5px;font-weight:800;padding:10px 16px;cursor:pointer;box-shadow:0 4px 0 #a51f15}
+.scd-ol-reset{border:0;border-radius:11px;background:#f79009;color:#fff;font:inherit;font-size:13.5px;font-weight:800;padding:10px 16px;cursor:pointer;box-shadow:0 4px 0 #c46900}
 /* company signatures under the quotation paper */
 .qs-wrap{margin-top:14px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .qs-head{grid-column:1/-1;font-size:14px;font-weight:800;color:var(--imode-navy)}
@@ -599,8 +602,11 @@ body.scd-modal-open{overflow:hidden}
 #scdPanel.is-open .scd-modal-card:has(.scd-qdoc){width:min(900px,100%)}
 /* ลงรายละเอียดเคส popup */
 .scd-ce{display:flex;flex-direction:column;gap:10px}
-.scd-ce-sec{font-size:12.5px;font-weight:800;color:var(--imode-navy);margin-top:4px;padding-top:8px;border-top:1px solid var(--line)}
-.scd-ce-sec:first-child{border-top:0;padding-top:0}
+.scd-ce-section{display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid #cfe0fb;border-radius:14px;background:#fbfdff}
+.scd-ce-section.is-selected{border-color:#0b63e5;box-shadow:0 0 0 1px #0b63e5;background:#f7faff}
+.scd-ce-sec{font-size:13px;font-weight:800;color:var(--imode-navy);margin:0;padding:0 0 9px;border-bottom:1px solid var(--line)}
+.scd-mode-choice{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:var(--imode-navy);cursor:pointer}
+.scd-mode-choice input{width:18px;height:18px;margin:0;accent-color:var(--imode-blue)}
 .scd-ce-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .scd-ce-grid.is-3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .scd-ce-f{display:flex;flex-direction:column;gap:5px;min-width:0;font-size:12px;font-weight:700;color:var(--imode-navy)}
@@ -608,6 +614,7 @@ body.scd-modal-open{overflow:hidden}
 .scd-ce-f input,.scd-ce-f select,.scd-ce-f textarea{width:100%;box-sizing:border-box;min-width:0;border:1px solid var(--line-2);border-radius:11px;
   background:#f8fbff;padding:10px 11px;font:inherit;font-size:14px;font-weight:400;color:var(--imode-navy)}
 .scd-ce-f textarea{resize:vertical;min-height:76px}
+.scd-note-locked{display:block;margin:2px 0 3px;padding:9px 11px;border:1px solid #cfe0fa;border-radius:10px;background:#f3f7fd;color:#12356f;font-size:12px;line-height:1.5}
 .scd-ce-f :focus{outline:2px solid var(--imode-blue);outline-offset:1px}
 .scd-ce .is-missing{border-color:#d92d20;box-shadow:0 0 0 3px rgba(217,45,32,.15)}
 .scd-ce-hint{margin:0;font-size:11.5px;color:var(--muted);line-height:1.5}
@@ -717,6 +724,17 @@ body.scd-modal-open{overflow:hidden}
 .scd-fb-note{margin:0;padding:10px 12px;border-left:3px solid #0b63e5;background:#f4f8ff;
   border-radius:0 10px 10px 0;font-size:14px;color:#25324d}
 .scd-fb-by{margin:0;font-size:12px;color:#6b7d9e}
+.qca-form{display:grid;gap:12px}.qca-form label{display:grid;gap:6px;font-size:13px;font-weight:700;color:var(--imode-navy)}
+.qca-form label.scd-chip-btn{align-items:center;justify-content:center;line-height:1}
+.qca-form input,.qca-form select,.qca-form textarea{width:100%;box-sizing:border-box;border:1px solid var(--line-2);border-radius:10px;padding:10px 11px;font:inherit;background:#fff}
+.qca-form textarea{min-height:76px;resize:vertical}.qca-preview{display:none;padding:10px;border:1px solid var(--line);border-radius:11px;background:#f7faff}
+.qca-preview.show{display:flex;align-items:center;gap:10px}.qca-preview img{width:92px;height:64px;object-fit:contain;background:#fff;border-radius:7px}
+.qca-proof{margin:10px 0;padding:10px 12px;border:1px solid #bfe5d1;border-radius:11px;background:#f1fbf6;color:#12643d;font-size:13px}
+.qca-proof img{display:block;max-width:220px;max-height:140px;object-fit:contain;margin-top:8px;border-radius:8px;background:#fff}
+.qca-upload{position:fixed;inset:0;z-index:13000;display:grid;place-items:center;background:rgba(9,18,38,.55);padding:20px}
+.qca-upload-card{width:min(360px,100%);background:#fff;border-radius:16px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.28);text-align:center}
+.qca-upload-card b{display:block;color:var(--imode-navy);margin-bottom:12px}.qca-upload-bar{height:9px;border-radius:99px;background:#e4ebf6;overflow:hidden}.qca-upload-bar i{display:block;width:0;height:100%;background:#0b63e5;transition:width .15s}
+.qca-upload-card small{display:block;color:var(--muted);margin-top:9px}
 </style>
 </head>
 <body>
@@ -778,6 +796,7 @@ var K={
   tech:'imode_v5_tech',
   warranties:'imode_test_v532_warranties',
   reports:'imode_test_v532_service_reports',
+  qc:'imode_v66_qc_records',
   lineRequests:'imode_test_v532_line_requests',
   quotes:'imode_test_v532_quotes',
   notifications:'imode_test_v532_notifications',
@@ -919,6 +938,7 @@ var CaseDetailData=(function(){
       technicians:readJSON(K.tech,[])||[],
       warranties:readJSON(K.warranties,[])||[],
       reports:readJSON(K.reports,[])||[],
+      qc:readJSON(K.qc,[])||[],
       lineRequests:readJSON(K.lineRequests,[])||[],
       quotes:readJSON(K.quotes,[])||[],
       notifications:readJSON(K.notifications,[])||[],
@@ -991,6 +1011,9 @@ var CaseDetailData=(function(){
     },
     loadReports:function(caseId){
       return Promise.resolve(all().reports.filter(function(r){return r.caseId===caseId}));
+    },
+    loadQc:function(caseId){
+      return Promise.resolve(all().qc.filter(function(q){return q&&q.caseId===caseId}));
     },
     loadAttachments:function(c){
       /* Case evidence lives in three places, and all three are read so the card shows what
@@ -1164,7 +1187,8 @@ function buildModel(c){
     CaseDetailData.loadReports(c.id),
     /* Appended LAST on purpose: everything below reads r[] by index, so a new entry in the
        middle would silently re-point twelve fields. */
-    CaseDetailData.loadCrew(c)
+    CaseDetailData.loadCrew(c),
+    CaseDetailData.loadQc(c.id)
   ]).then(function(r){
     var cu=r[0],ma=r[1],te=r[2],wa=r[3];
     m.customer={id:cu&&cu.id||c.customerId||'',name:cu&&cu.name||c.customer||'-',
@@ -1200,6 +1224,7 @@ function buildModel(c){
     /* The reports themselves, not just the fact that one exists — เอกสาร & รูปภาพ shows the
        ใบตรวจ, and only the record has its contents. Read only. */
     m.reports=reports.slice();
+    m.qcRecords=(Object.prototype.toString.call(r[14])==='[object Array]')?r[14].slice():[];
     m.closing={
       qcCompleted:false,
       customerSignature:reports.some(function(x){return !!x.customerSignature}),
@@ -1733,10 +1758,12 @@ function statusLogHTML(m){
 
 /* Which step is open underneath the track. null = none. */
 var openStep=null;
+var stepSlideDir=0; /* 1 = next enters from right, -1 = previous enters from left */
 /* Which circle on the technician's field track is expanded, or null. Same shape as openStep:
    repaintProgress() redraws the block, so this is read while rendering rather than toggled
    on a live node. */
 var openField=null;
+var fieldSlideDir=0;
 
 function renderProgress(m){
   var idx=stepIndex(m.case.status),closed=m.case.status==='ปิดเคส';
@@ -1890,6 +1917,9 @@ function quoteFacts(q){
   var s=readJSON(K.settings,{})||{};
   var a=(s.quoteApprovals||{})[q.id]||null;
   var doc=(s.quoteDocs||{})[q.id]||null;
+  var created=Date.parse(q.createdAt||''),signed=Date.parse(a&&a.at||''),baked=Date.parse(doc&&doc.at||'');
+  if(a&&Number.isFinite(created)&&Number.isFinite(signed)&&signed<created)a=null;
+  if(doc&&Number.isFinite(created)&&Number.isFinite(baked)&&baked<created)doc=null;
   var list=Array.isArray(s.quotationStatuses)?s.quotationStatuses:[];
   var draft=String(q.status||'ร่าง')===(list[0]||'ร่าง');
   /* 0 not sent · 1 waiting for the signature · 2 signed, not sent back · 3 sent back · 4 done */
@@ -1920,12 +1950,17 @@ function quoteSectionHTML(){
       +'<span class="fdot">'+(done?'✔':String(k+1))+'</span><b>'+esc(label)+'</b>'
       +(sub?'<small>'+esc(sub)+'</small>':'')+'</li>';
   }).join('');
+  var via=a&&a.by==='staff-other-channel'?' · อนุมัติผ่านช่องทางอื่น ('+esc(a.channel||'ไม่ระบุ')+')':'';
   var note=f.state===1?'<p class="sd-wait">⏳ รอลูกค้าเปิดใบเสนอราคาและเซ็นอนุมัติ</p>'
-    :f.state===2?'<p class="sd-wait">✍ ลูกค้าเซ็นแล้ว'+(a.name?' ('+esc(a.name)+')':'')+' — รอลูกค้ากดส่งกลับมา</p>'
-    :f.state===3?'<p class="sd-wait">📥 ลูกค้าส่งใบเสนอราคาที่เซ็นแล้วกลับมา — ตรวจสอบแล้วกดยืนยัน</p>'
+    :f.state===2?'<p class="sd-wait">✍ ลูกค้าเซ็นแล้ว'+(a.name?' ('+esc(a.name)+')':'')+via+' — รอลูกค้ากดส่งกลับมา</p>'
+    :f.state===3?'<p class="sd-wait">📥 '+(a&&a.by==='staff-other-channel'?'ลูกค้าอนุมัติผ่านช่องทางอื่น ('+esc(a.channel||'ไม่ระบุ')+')':'ลูกค้าส่งใบเสนอราคาที่เซ็นแล้วกลับมา')+' — ตรวจสอบแล้วกดยืนยัน</p>'
     :'<p class="sd-ok">✔ ใบเสนอราคาเสร็จสิ้น — ไปขั้นตอนนัดหมายได้เลย</p>';
   var acts='<button type="button" class="sd-go" data-action="open-quote-doc">ดูใบเสนอราคาเต็ม ›</button>';
   if(f.state===1||f.state===2)acts+='<button type="button" class="sd-go" data-action="open-line-message">📋 ส่งลิงก์ให้ลูกค้าเซ็นทาง LINE</button>';
+  if(can('quotation.create')&&f.state<4){
+    acts+='<button type="button" class="sd-go" data-action="approve-other-channel">✓ อนุมัติผ่านช่องทางอื่น</button>'
+      +'<button type="button" class="sd-go" data-action="upload-customer-sign">✍ เพิ่มลายเซ็นลูกค้า</button>';
+  }
   if(f.state===3)acts+='<button type="button" class="sd-go is-primary" data-action="confirm-quote">✔ ยืนยันใบเสนอราคา</button>';
   if(f.state===4)acts+='<button type="button" class="sd-go is-primary" data-action="assign-technician">ไปขั้นตอนนัดหมาย ›</button>';
   return head+'<ol class="sd-field sd-qt-track">'+dots+'</ol>'+note+'<div class="sd-acts">'+acts+'</div></div>';
@@ -1949,9 +1984,14 @@ function qsThaiDate(v){
   if(isNaN(d))return String(v);
   return d.toLocaleDateString('th-TH',{day:'2-digit',month:'long',year:'numeric'});
 }
-function qsSigns(qid){
+function qsSigns(qid,q){
   var s=readJSON(K.settings,{})||{};
-  return ((s.quoteStaffSigns||{})[qid])||{};
+  var raw=((s.quoteStaffSigns||{})[qid])||{},created=Date.parse(q&&q.createdAt||'');
+  function current(rec){
+    var signed=Date.parse(rec&&rec.at||'');
+    return rec&&(!Number.isFinite(created)||!Number.isFinite(signed)||signed>=created)?rec:null;
+  }
+  return {authorized:current(raw.authorized),prepared:current(raw.prepared)};
 }
 function qsFillCell(cell,name,date,sig){
   if(!cell)return;
@@ -2165,11 +2205,17 @@ function openQuoteDoc(){
       +' หรือเปิดดูในระบบหลักได้เลย</p><div class="sd-acts"><button type="button" class="sd-go" data-action="open-quotation">เปิดในระบบหลัก ›</button></div>');
     return;
   }
-  var signs=qsSigns(q.id),mayEdit=can('quotation.create');
-  panel('ใบเสนอราคา '+q.id,'<div class="scd-qdoc-wrap"><div class="scd-qdoc">'+f.doc.html+'</div></div>'
+  var signs=qsSigns(q.id,q),mayEdit=can('quotation.create');
+  var approvalNote=f.approval&&f.approval.by==='staff-other-channel'
+    ?'<div class="qca-proof"><b>✓ ลูกค้าอนุมัติผ่านช่องทางอื่น</b> · '+esc(f.approval.channel||'ไม่ระบุ')
+      +(f.approval.note?'<br>'+esc(f.approval.note):'')
+      +(f.approval.evidence?'<img src="'+esc(f.approval.evidence)+'" alt="หลักฐานการอนุมัติ">':'')+'</div>':'';
+  panel('ใบเสนอราคา '+q.id,'<div class="scd-qdoc-wrap"><div class="scd-qdoc">'+f.doc.html+'</div></div>'+approvalNote
     +(mayEdit?'<div class="qs-wrap"><div class="qs-head">ลายเซ็นฝั่งบริษัท</div>'
       +QS_ROLES.map(function(r){return qsPadHTML(r,q,signs[r.key])}).join('')
       +'<div class="qs-both"><small>เซ็นทั้งสองช่องแล้วกดปุ่มนี้ครั้งเดียว — หรือกดบันทึกแยกทีละช่องก็ได้</small>'
+      +'<button type="button" class="scd-chip-btn" data-action="approve-other-channel">✓ อนุมัติช่องทางอื่น</button>'
+      +'<button type="button" class="scd-chip-btn" data-action="upload-customer-sign">✍ เพิ่มลายเซ็นลูกค้า</button>'
       +'<button type="button" class="scd-chip-btn qs-print" data-qs-print="1">'
       +'🖨 พิมพ์ / PDF</button>'
       +'<button type="button" class="scd-ce-save qs-both-btn" data-qs-save-all="1">'
@@ -2184,9 +2230,84 @@ function openQuoteDoc(){
     qsFillCell(cells[i],rec.name||q[r.nameKey]||'',qsThaiDate(q[r.dateKey]),rec.sig||'');
   });
   var a=f.approval;
-  if(cells[2]&&a)qsFillCell(cells[2],a.name||q.purchaserName||'',qsThaiDate(a.at||q.purchaserDate),a.sig||'');
+  if(cells[2]&&a){
+    qsFillCell(cells[2],a.name||q.purchaserName||'',qsThaiDate(a.at||q.purchaserDate),a.sig||'');
+    if(a.by==='staff-other-channel'){
+      var customerArea=cells[2].querySelector('.quote-sign-area');
+      if(customerArea)customerArea.innerHTML='<div style="font-size:11px;font-weight:700;color:#087a45;text-align:center;padding:8px">✓ ลูกค้าอนุมัติช่องทางอื่น<br>'+esc(a.channel||'')+'</div>';
+    }
+  }
   if(mayEdit)QS_ROLES.forEach(function(r){qsInitPad('qsPad_'+r.key)});
 }
+
+function qcaProgress(pct,label){
+  var box=el('qcaUploadProgress');
+  if(!box){
+    box=document.createElement('div');box.id='qcaUploadProgress';box.className='qca-upload';
+    box.innerHTML='<div class="qca-upload-card"><b>กำลังโหลดไฟล์</b><div class="qca-upload-bar"><i></i></div><small></small></div>';
+    document.body.appendChild(box);
+  }
+  var bar=box.querySelector('i'),small=box.querySelector('small');
+  if(bar)bar.style.width=Math.max(0,Math.min(100,pct||0))+'%';
+  if(small)small.textContent=label||Math.round(pct||0)+'%';
+}
+function qcaProgressDone(){var box=el('qcaUploadProgress');if(box&&box.parentNode)box.parentNode.removeChild(box)}
+function qcaReadFile(input,kind){
+  var file=input&&input.files&&input.files[0];if(!file)return;
+  if(!/^image\//.test(file.type||'')||file.size>10*1024*1024){toast('กรุณาเลือกไฟล์รูปภาพขนาดไม่เกิน 10 MB');input.value='';return}
+  qcaProgress(4,'กำลังอ่าน '+file.name);
+  var reader=new FileReader();
+  reader.onprogress=function(e){if(e.lengthComputable)qcaProgress(5+(e.loaded/e.total)*55,'กำลังอ่านไฟล์ '+Math.round(e.loaded/e.total*100)+'%')};
+  reader.onerror=function(){qcaProgressDone();toast('อ่านไฟล์ไม่สำเร็จ')};
+  reader.onload=function(){
+    qcaProgress(68,'กำลังเตรียมรูปภาพ');
+    var img=new Image();
+    img.onerror=function(){qcaProgressDone();toast('ไฟล์รูปภาพไม่ถูกต้อง')};
+    img.onload=function(){
+      var max=kind==='signature'?700:1200,scale=Math.min(1,max/Math.max(img.width,img.height));
+      var c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.width*scale));c.height=Math.max(1,Math.round(img.height*scale));
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      input._qcaData=c.toDataURL(kind==='signature'?'image/png':'image/jpeg',.82);
+      var preview=el('qcaFilePreview');
+      if(preview){preview.classList.add('show');preview.innerHTML='<img src="'+input._qcaData+'" alt="ตัวอย่างไฟล์"><span>'+esc(file.name)+'</span>'}
+      qcaProgress(100,'โหลดไฟล์เรียบร้อย');setTimeout(qcaProgressDone,350);
+    };img.src=reader.result;
+  };reader.readAsDataURL(file);
+}
+function openExternalApproval(kind){
+  if(!can('quotation.create')){toast('บัญชีนี้ไม่มีสิทธิ์บันทึกการอนุมัติ');return}
+  var q=caseQuote();if(!q)return;
+  var sign=kind==='signature';
+  panel(sign?'เพิ่มลายเซ็นลูกค้า':'ลูกค้าอนุมัติผ่านช่องทางอื่น',
+    '<div class="qca-form"><label>ชื่อผู้อนุมัติ *<input id="qcaName" value="'+esc((quoteFacts(q).approval||{}).name||caseDetailModel.customer.contactName||'')+'"></label>'
+    +'<label>ช่องทางที่ลูกค้าอนุมัติ<select id="qcaChannel"><option>LINE</option><option>Email</option><option>โทรศัพท์</option><option>เอกสาร</option><option>อื่นๆ</option></select></label>'
+    +(!sign?'<label>รายละเอียด / ข้อความอ้างอิง<textarea id="qcaNote" placeholder="เช่น ลูกค้ายืนยันอนุมัติใน LINE วันที่..."></textarea></label>':'')
+    +'<label class="scd-chip-btn" style="display:inline-flex;width:max-content">📎 '+(sign?'เลือกรูปลายเซ็นลูกค้า':'แนบรูปหลักฐานการอนุมัติ')
+      +'<input id="qcaFile" type="file" accept="image/*" hidden onchange="qcaReadFile(this,\''+(sign?'signature':'evidence')+'\')"></label>'
+    +'<div id="qcaFilePreview" class="qca-preview"></div>'
+    +'<div class="scd-ce-actions"><button type="button" class="scd-chip-btn" data-action="close-panel">ยกเลิก</button>'
+      +'<button type="button" class="scd-ce-save" onclick="saveExternalApproval(\''+kind+'\')">บันทึกการอนุมัติ</button></div></div>');
+}
+function saveExternalApproval(kind){
+  var q=caseQuote(),name=(el('qcaName')&&el('qcaName').value||'').trim(),file=el('qcaFile');
+  if(!q||!name){toast('กรุณาระบุชื่อผู้อนุมัติ');return}
+  if(!file||!file._qcaData){toast(kind==='signature'?'กรุณาแนบรูปลายเซ็นลูกค้า':'กรุณาแนบรูปหลักฐานการอนุมัติ');return}
+  var now=new Date().toISOString(),channel=(el('qcaChannel')&&el('qcaChannel').value)||'LINE';
+  var s=readJSON(K.settings,{})||{};s.quoteApprovals=s.quoteApprovals||{};
+  s.quoteApprovals[q.id]={at:now,sentAt:now,by:kind==='signature'?'staff-uploaded-signature':'staff-other-channel',
+    staff:(CaseDetailData.currentUser()||{}).name||'',name:name,channel:channel,
+    note:kind==='signature'?'แนบลายเซ็นลูกค้าที่ได้รับผ่าน '+channel:((el('qcaNote')&&el('qcaNote').value)||'').trim(),
+    sig:kind==='signature'?file._qcaData:'',evidence:kind==='signature'?'':file._qcaData};
+  try{localStorage.setItem(K.settings,JSON.stringify(s))}catch(e){toast('บันทึกไม่สำเร็จ — พื้นที่ในเครื่องเต็ม');return}
+  var finish=function(cloud){try{CaseDetailData.refresh()}catch(e){}closePanel();repaintProgress();toast(cloud?'บันทึกการอนุมัติแล้ว':'บันทึกแล้ว · ยังอยู่เฉพาะเครื่องนี้ ยังไม่ได้ส่งขึ้นระบบกลาง')};
+  var sb=CaseWrite.client();if(!sb){finish(false);return}
+  Promise.resolve(sb.from('system_settings').select('data').eq('id','main').maybeSingle()).then(function(res){
+    if(!res||res.error||!res.data||!res.data.data){finish(false);return}
+    var data=res.data.data;data.quoteApprovals=data.quoteApprovals||{};data.quoteApprovals[q.id]=s.quoteApprovals[q.id];
+    return sb.from('system_settings').update({data:data,updated_at:now}).eq('id','main').then(function(r){finish(!(r&&r.error))});
+  },function(){finish(false)});
+}
+window.qcaReadFile=qcaReadFile;window.saveExternalApproval=saveExternalApproval;
 /* 2026-09-21 — ONE BUTTON FOR BOTH PADS, on top of the two per-role buttons.
    saveStaffSign(key) is now saveStaffSigns([key]): one function saves any number of roles in
    ONE pass, which is not only tidier but safer. Two separate saves meant two separate
@@ -2681,10 +2802,12 @@ function customerServiceType(raw,entry){
   if(entry&&entry.prevServiceType)return entry.prevServiceType;
   return 'เข้าบริการหน้างาน';
 }
-function onlineSectionHTML(raw){
+function onlineSectionHTML(raw,pair){
   var st=onlineState(raw),e=st.entry||{};
   var files=st.on?(e.media||[]):[];
-  return '<div class="scd-ce-sec">3. แก้ไขทางออนไลน์</div>'
+  return '<section class="scd-ce-section" data-mode-section="online"><div class="scd-ce-sec">5. Online · แก้ไขทางออนไลน์</div>'
+    +'<label class="scd-mode-choice"><input type="radio" name="ceMode" value="online"'+(pair.category===CC_ONLINE?' checked':'')+'> เลือกหมวด Online</label>'
+    +'<label class="scd-ce-f">ประเภทงาน<select id="ceOnlineWork">'+ccWorkOptions(CC_ONLINE,pair.category===CC_ONLINE?pair.workType:'Service')+'</select></label>'
     +'<label class="scd-ol-toggle"><input type="checkbox" id="ceOnline"'+(st.on?' checked':'')+'>'
     +'<span><b>แก้ไขทางออนไลน์</b> — ลูกค้าเช็คตามที่แนะนำแล้วปัญหาหาย ไม่ต้องส่งช่าง</span></label>'
     +'<div class="scd-ol-box" id="ceOnlineBox"'+(st.on?'':' hidden')+'>'
@@ -2696,7 +2819,7 @@ function onlineSectionHTML(raw){
     +'<small>สูงสุด '+ONLINE_FILE_COUNT+' ไฟล์ · ไฟล์ละไม่เกิน 2.5 MB</small></div>'
     +'<ul class="scd-ol-list" id="ceOnlineList">'
     +files.map(function(f){return '<li class="is-saved">'+onlineFileIcon(f.type)+' '+esc(f.name||'ไฟล์แนบ')+' <em>บันทึกแล้ว</em></li>'}).join('')
-    +'</ul></div>';
+    +'</ul></div></section>';
 }
 function onlineFileIcon(type){
   var t=String(type||'');
@@ -2832,13 +2955,43 @@ function closeOnline(){
     });
   });
 }
+function resetOnlineCase(){
+  var c=caseDetailModel.case,raw=caseDetailModel.raw||{};
+  if(!c||!c.id)return;
+  if(!mayCloseOnline()){toast('รีเซ็ตเคสออนไลน์ได้เฉพาะแอดมินและหัวหน้าช่าง');return}
+  if(!onlineState(raw).on){toast('เคสนี้ไม่ได้อยู่ในสถานะแก้ไขออนไลน์');return}
+  var e=onlineState(raw).entry||{},log=(raw.fieldStatusLog||[]).slice();
+  var next=(raw.assignee||(raw.assignees||[]).length)?'มอบหมายแล้ว':'เคสใหม่';
+  scdAsk({
+    title:'รีเซ็ตเคสออนไลน์',
+    message:'ลูกค้าแจ้งว่าแก้ไขออนไลน์แล้วไม่หาย\nเปิดเคส '+(c.caseNo||c.id)+' กลับเป็น “'+next+'” โดยใช้เคสเดิม',
+    okText:'รีเซ็ตและเปิดเคสอีกครั้ง'
+  }).then(function(ok){
+    if(!ok)return;
+    log.push({id:'OL-'+Date.now().toString(36),online:false,status:'แก้ไขออนไลน์แล้วไม่หาย · เปิดเคสอีกครั้ง',
+      note:'ลูกค้าติดต่อกลับว่าแก้ไขออนไลน์แล้วไม่หาย',media:[],prevServiceType:e.prevServiceType||'',
+      createdAt:new Date().toISOString(),by:wsWho()});
+    toast('กำลังรีเซ็ตเคส…');
+    CaseWrite.patch(c.id,{status:next,serviceType:customerServiceType(raw,e),fieldStatusLog:log},'แก้ไขออนไลน์แล้วไม่หาย').then(function(r){
+      if(!r||!r.ok){toast('รีเซ็ตเคสไม่สำเร็จ');return}
+      openStep=null;
+      try{CaseDetailData.refresh()}catch(x){}
+      load().then(function(res){
+        if(res&&!res.error)renderPage(res);
+        toast(r.cloud?'เปิดเคสเดิมกลับมาดำเนินการแล้ว':'เปิดเคสเดิมแล้ว · ยังอยู่เฉพาะเครื่องนี้ ยังไม่ได้ส่งขึ้นระบบกลาง');
+      });
+    });
+  });
+}
 function onlineBannerHTML(m){
   var raw=m.raw||{};
-  if(!onlineState(raw).on||m.case.status==='ปิดเคส')return '';
+  if(!onlineState(raw).on)return '';
   var e=onlineState(raw).entry||{};
   return '<div class="scd-ol-banner"><div><b>🌐 แก้ไขทางออนไลน์แล้ว</b>'
     +(e.note?'<small>ที่แนะนำลูกค้า: '+esc(e.note)+'</small>':'')+'</div>'
-    +(mayCloseOnline()?'<button type="button" class="scd-ol-close" data-action="close-online">ปิดเคส (แก้ไขทางออนไลน์)</button>'
+    +(m.case.status==='ปิดเคส'
+      ?(mayCloseOnline()?'<button type="button" class="scd-ol-reset" data-action="reset-online">รีเซ็ต · ลูกค้าแจ้งว่ายังไม่หาย</button>':'<small>ปิดเคสด้วยการแก้ไขออนไลน์</small>')
+      :mayCloseOnline()?'<button type="button" class="scd-ol-close" data-action="close-online">ปิดเคส (แก้ไขทางออนไลน์)</button>'
                       :'<small>รอแอดมินหรือหัวหน้าช่างกดปิดเคส</small>')+'</div>';
 }
 /* ---------- งาน Workshop (2026-09-17) ----------
@@ -2938,6 +3091,14 @@ function wireCaseCategory(){
   var cat=el('ceCat'),work=el('ceWork'),type=el('ceType');
   if(!cat||!work||!type)return;
   var self=false;
+  function modeWork(c){return el(c===CC_FIELD?'ceFieldWork':c===CC_WORKSHOP?'ceWorkshopWork':'ceOnlineWork')}
+  function paint(){
+    var modes=document.querySelectorAll('input[name="ceMode"]');
+    for(var j=0;j<modes.length;j++)modes[j].checked=modes[j].value===cat.value;
+    var sections=document.querySelectorAll('[data-mode-section]');
+    for(var k=0;k<sections.length;k++)sections[k].classList.toggle('is-selected',sections[k].getAttribute('data-mode-section')===cat.value);
+    var visible=modeWork(cat.value);if(visible)visible.value=work.value;
+  }
   function push(){
     var want=ccServiceTypeFor(cat.value,work.value);
     if(type.value===want)return;
@@ -2952,11 +3113,27 @@ function wireCaseCategory(){
   }
   function pull(){
     var c=ccCategoryOf(type.value);
-    if(c===cat.value)return;
-    cat.value=c;
-    work.innerHTML=ccWorkOptions(c,work.value);
+    if(c!==cat.value){cat.value=c;work.innerHTML=ccWorkOptions(c,modeWork(c)&&modeWork(c).value)}
+    paint();
   }
-  cat.addEventListener('change',function(){work.innerHTML=ccWorkOptions(cat.value,work.value);push()});
+  [].forEach.call(document.querySelectorAll('input[name="ceMode"]'),function(r){
+    r.addEventListener('change',function(){
+      if(!r.checked)return;
+      var online=el('ceOnline');
+      if(r.value!==CC_ONLINE&&online&&online.checked){
+        online.checked=false;
+        online.dispatchEvent(new Event('change',{bubbles:true}));
+      }
+      cat.value=r.value;
+      var v=modeWork(r.value);
+      work.innerHTML=ccWorkOptions(r.value,v&&v.value);
+      if(v)work.value=v.value;
+      push();paint();
+    });
+  });
+  [CC_FIELD,CC_WORKSHOP,CC_ONLINE].forEach(function(c){
+    var s=modeWork(c);if(s)s.addEventListener('change',function(){if(cat.value===c){work.value=s.value;push();paint()}});
+  });
   work.addEventListener('change',push);
   type.addEventListener('change',function(){if(!self)pull()});
   /* wireOnlineSection() ASSIGNS type.value, and assigning fires no change event, so listening on
@@ -2964,6 +3141,7 @@ function wireCaseCategory(){
      same element, so by the time it runs type.value already holds แก้ไขออนไลน์. */
   var onlineBox=el('ceOnline');
   if(onlineBox)onlineBox.addEventListener('change',function(){pull();setTimeout(pull,0)});
+  paint();
 }
 
 var WS_TYPE='ลูกค้าส่งเครื่องเข้าบริษัท';
@@ -3196,18 +3374,20 @@ function wsReturn(){
 }
 /* The form section: shown when ประเภทงาน is the Workshop type, so a field job can be turned into
    a Workshop job in the same case. */
-function wsFormHTML(raw){
+function wsFormHTML(raw,pair){
   var l=wsLast(raw,'logistics')||{},on=isWorkshopCase(raw);
   var radio=function(name,v,text,cur){
     return '<label><input type="radio" name="'+name+'" value="'+v+'"'+(cur===v?' checked':'')+'> '+esc(text)+'</label>';
   };
-  return '<div id="ceWorkshop" class="scd-ol-box"'+(on?'':' hidden')+'>'
-    +'<div class="scd-ce-sec" style="border:0;padding:0;margin:0">งาน Workshop · ส่งซ่อมที่บริษัท</div>'
+  return '<section class="scd-ce-section" data-mode-section="workshop"><div class="scd-ce-sec">4. Workshop · ส่งซ่อมที่บริษัท</div>'
+    +'<label class="scd-mode-choice"><input type="radio" name="ceMode" value="workshop"'+(pair.category===CC_WORKSHOP?' checked':'')+'> เลือกหมวด Workshop</label>'
+    +'<label class="scd-ce-f">ประเภทงาน<select id="ceWorkshopWork">'+ccWorkOptions(CC_WORKSHOP,pair.category===CC_WORKSHOP?pair.workType:'Service')+'</select></label>'
+    +'<div id="ceWorkshop" class="scd-ol-box"'+(on?'':' hidden')+'>'
     +'<div class="scd-ce-f"><span>การนำเครื่องเข้าบริษัท</span><div class="ws-radio">'
     +radio('ceWsIn','send','ลูกค้าส่งเครื่องมาเอง',l.inbound)+radio('ceWsIn','pickup','บริษัทไปรับ (คิดค่ารับตามระยะทาง)',l.inbound)+'</div></div>'
     +'<div class="scd-ce-f"><span>การรับเครื่องคืน</span><div class="ws-radio">'
     +radio('ceWsOut','self','ลูกค้ามารับเอง',l.outbound)+radio('ceWsOut','deliver','บริษัทไปส่งคืน (คิดค่าส่งตามระยะทาง)',l.outbound)+'</div></div>'
-    +'</div>';
+    +'</div></section>';
 }
 function wireWorkshopForm(){
   var type=el('ceType'),box=el('ceWorkshop');
@@ -3303,6 +3483,10 @@ function ceMachineOptions(customerId,cur){
       +esc([ceMachineName(m),m.model,m.serial?'S/N '+m.serial:''].filter(Boolean).join(' · '))+'</option>';
   }).join('');
 }
+function protectedCaseNote(note){
+  var text=String(note||''),m=/^(รับแจ้งจาก Customer Portal \/ Machine QR(?:\s*·\s*ลูกค้าเลือกประเภทเคส:\s*(?:Service|Maintenance|PM|Online|Workshop))?)(?:\s*·\s*|\n)?([\s\S]*)$/.exec(text);
+  return m?{fixed:m[1],extra:m[2]||''}:{fixed:'',extra:text};
+}
 function editCase(){
   if(!can('case.edit')){toast('บัญชีนี้ไม่มีสิทธิ์แก้ไขเคส');return}
   var c=caseDetailModel.raw||{};
@@ -3311,34 +3495,42 @@ function editCase(){
   var custOpts='<option value="">— เลือกลูกค้า —</option>'+customers.map(function(cu){
     return '<option value="'+esc(cu.id)+'"'+(cu.id===c.customerId?' selected':'')+'>'+esc(cu.name||cu.id)+'</option>';
   }).join('');
-  var ccPair=ccRead(c);
+  var ccPair=ccRead(c),protectedNote=protectedCaseNote(c.note);
   panel('ลงรายละเอียดเคส · '+(c.ticket||c.id),
     '<form id="scdEditForm" class="scd-ce" novalidate>'
-    +'<div class="scd-ce-sec">1. ลูกค้าและเครื่องจักร</div>'
+    +'<section class="scd-ce-section"><div class="scd-ce-sec">1. ลูกค้าและเครื่องจักร</div>'
     +'<div class="scd-ce-grid">'
     +'<label class="scd-ce-f"><span>ลูกค้า <b>*</b></span><select id="ceCustomer">'+custOpts+'</select></label>'
     +'<label class="scd-ce-f"><span>เครื่องจักร <b>*</b></span><select id="ceMachine">'+ceMachineOptions(c.customerId,c.machineId)+'</select></label>'
     +'<label class="scd-ce-f">ผู้ติดต่อ<input id="ceContact" value="'+esc(c.contact||'')+'"></label>'
     +'<label class="scd-ce-f">โทรศัพท์<input id="cePhone" inputmode="tel" value="'+esc(c.phone||'')+'"></label>'
-    +'</div>'
-    +'<div class="scd-ce-sec">2. รายละเอียดเคส</div>'
+    +'</div></section>'
+    +'<section class="scd-ce-section"><div class="scd-ce-sec">2. รายละเอียดเคส</div>'
     +'<div class="scd-ce-grid">'
     +'<label class="scd-ce-f">ช่องทางรับแจ้ง<select id="ceChannel">'+ceOptions(CE_CHANNELS,c.channel)+'</select></label>'
     +'<label class="scd-ce-f">ระดับความเร่งด่วน<select id="cePriority">'+ceOptions(ceList('priorities',CE_PRIORITIES),c.priority)+'</select></label>'
-    +'<label class="scd-ce-f">หมวดหมู่งาน<select id="ceCat">'+CC_CATS.map(function(x){
-        return '<option value="'+x.v+'"'+(x.v===ccPair.category?' selected':'')+'>'+esc(x.th)+'</option>';
-      }).join('')+'</select></label>'
-    +'<label class="scd-ce-f">ประเภทงาน<select id="ceWork">'+ccWorkOptions(ccPair.category,ccPair.workType)+'</select></label>'
     +'</div>'
+    +'<label class="scd-ce-f"><span>อาการ / รายละเอียดเพิ่มเติมหลังติดต่อลูกค้า <b>*</b></span><textarea id="ceIssue" rows="3">'+esc(c.issue||'')+'</textarea></label>'
+    +'<label class="scd-ce-f">หมายเหตุภายในเพิ่มเติม'
+    +(protectedNote.fixed?'<span class="scd-note-locked" aria-label="ข้อความจากระบบ แก้ไขไม่ได้">🔒 '+esc(protectedNote.fixed)+'</span>':'')
+    +'<textarea id="ceNote" rows="3" placeholder="พิมพ์หมายเหตุเพิ่มเติมได้ที่นี่">'+esc(protectedNote.extra)+'</textarea></label>'
+    +'</section>'
+    +'<section class="scd-ce-section" data-mode-section="field"><div class="scd-ce-sec">3. หน้างาน Field Service</div>'
+    +'<label class="scd-mode-choice"><input type="radio" name="ceMode" value="field"'+(ccPair.category===CC_FIELD?' checked':'')+'> เลือกหมวด Field Service</label>'
+    +'<label class="scd-ce-f">ประเภทงาน<select id="ceFieldWork">'+ccWorkOptions(CC_FIELD,ccPair.category===CC_FIELD?ccPair.workType:'Service')+'</select></label>'
+    +'</section>'
+    +'<div style="display:none" aria-hidden="true">'
+    +'<select id="ceCat">'+CC_CATS.map(function(x){
+        return '<option value="'+x.v+'"'+(x.v===ccPair.category?' selected':'')+'>'+esc(x.th)+'</option>';
+      }).join('')+'</select>'
+    +'<select id="ceWork">'+ccWorkOptions(ccPair.category,ccPair.workType)+'</select></div>'
     /* #ceType IS KEPT, with its id and its full option list. wireOnlineSection(),
        wireWorkshopForm() and saveCaseDetails() all read it, and the online tick writes to it.
        display:none inline rather than [hidden], because .scd-ce-f has an author display rule
        that beats the UA [hidden] rule and this page does not load css/23's !important reset. */
     +'<label class="scd-ce-f" style="display:none" aria-hidden="true">ประเภทงาน (ระบบ)<select id="ceType" tabindex="-1">'+ceOptions(ceList('serviceTypes',CE_TYPES),c.serviceType)+'</select></label>'
-    +'<label class="scd-ce-f"><span>อาการ / รายละเอียดเพิ่มเติมหลังติดต่อลูกค้า <b>*</b></span><textarea id="ceIssue" rows="3">'+esc(c.issue||'')+'</textarea></label>'
-    +'<label class="scd-ce-f">หมายเหตุภายในเพิ่มเติม<textarea id="ceNote" rows="3">'+esc(c.note||'')+'</textarea></label>'
-    +wsFormHTML(c)
-    +onlineSectionHTML(c)
+    +wsFormHTML(c,ccPair)
+    +onlineSectionHTML(c,ccPair)
     +'<p class="scd-ce-hint">ช่างและวันนัดหมายเปลี่ยนได้จากปุ่ม <b>นัดหมาย</b> · สถานะเปลี่ยนจากวงกลมขั้นตอนด้านบน</p>'
     +'<div class="scd-ce-actions"><button type="button" class="scd-chip-btn" data-action="close-panel">ยกเลิก</button>'
     +'<button type="submit" class="scd-ce-save">บันทึกเคส</button></div>'
@@ -3378,9 +3570,10 @@ function saveCaseDetails(customers){
     if(on){try{on.focus()}catch(x){}on.classList.add('is-missing');setTimeout(function(){on.classList.remove('is-missing')},1800)}
     return;
   }
+  var noteParts=protectedCaseNote(c.note),extraNote=el('ceNote').value.trim();
   var changes={contact:el('ceContact').value.trim(),phone:el('cePhone').value.trim(),
     channel:el('ceChannel').value,serviceType:el('ceType').value,priority:el('cePriority').value,
-    issue:issue,note:el('ceNote').value.trim()};
+    issue:issue,note:[noteParts.fixed,extraNote].filter(Boolean).join(' · ')};
   /* Customer and machine identity is copied from the master records only when it changed, the
      way saveCase() builds it — an unchanged case keeps exactly what it already had. */
   if(cid!==c.customerId){
@@ -3531,6 +3724,7 @@ function stepPressed(i,role){
     /* Opening from closed slides. Moving from one step to another swaps the content where it
        stands: sliding out and back in for a single press costs .7s and reads as sluggish. */
     if(openStep==null)slideNext='sdStepDrawer';
+    else stepSlideDir=i>openStep?1:-1;
     openStep=i;
     openField=null;          /* a different step: start with the field track collapsed */
     repaintProgress();
@@ -3559,12 +3753,48 @@ function repaintProgress(){
   /* slideNext is read while rendering, so it is cleared after, and cleared on the early
      return too — a stale one would render the next block collapsed with nothing to open it. */
   if(!host||!host.parentNode){slideNext=null;return}
-  var id=slideNext;
+  var id=slideNext,dir=stepSlideDir,oldDrawer=host&&host.querySelector('#sdStepDrawer');
+  var oldInner=dir&&oldDrawer&&oldDrawer.querySelector('.scd-stepdrawer-in');
+  var oldLayer=oldInner?oldInner.cloneNode(true):null;
+  var oldHeight=oldDrawer?oldDrawer.getBoundingClientRect().height:0;
+  var fieldDir=fieldSlideDir,oldField=host&&host.querySelector('#sdFieldDetail');
+  var oldFieldInner=fieldDir&&oldField&&oldField.querySelector('.sd-fdetail-in');
+  var oldFieldLayer=oldFieldInner?oldFieldInner.cloneNode(true):null;
+  var oldFieldHeight=oldField?oldField.getBoundingClientRect().height:0;
   var wrap=document.createElement('div');
   wrap.innerHTML=renderProgress(caseDetailModel);
-  host.parentNode.replaceChild(wrap.firstChild,host);
+  var fresh=wrap.firstChild;
+  host.parentNode.replaceChild(fresh,host);
   slideNext=null;
+  stepSlideDir=0;
+  fieldSlideDir=0;
   if(id)slideOpen(id);
+  if(dir&&oldLayer){
+    var box=fresh.querySelector('#sdStepDrawer'),next=box&&box.querySelector('.scd-stepdrawer-in');
+    var reduce=false;try{reduce=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)}catch(e){}
+    if(box&&next&&!reduce){
+      var nextHeight=box.getBoundingClientRect().height;
+      box.style.cssText+=';position:relative;overflow:hidden;height:'+oldHeight+'px;max-height:'+oldHeight+'px;transition:height .4s cubic-bezier(.22,.9,.3,1),max-height .4s cubic-bezier(.22,.9,.3,1)';
+      [oldLayer,next].forEach(function(el){el.style.cssText+=';position:absolute;inset:0;width:100%;transition:transform .4s cubic-bezier(.22,.9,.3,1),opacity .28s ease'});
+      oldLayer.setAttribute('aria-hidden','true');oldLayer.style.transform='translateX(0)';
+      next.style.transform='translateX('+(dir*100)+'%)';next.style.opacity='0';box.appendChild(oldLayer);
+      requestAnimationFrame(function(){requestAnimationFrame(function(){oldLayer.style.transform='translateX('+(-dir*100)+'%)';oldLayer.style.opacity='0';next.style.transform='translateX(0)';next.style.opacity='1';box.style.height=nextHeight+'px';box.style.maxHeight=nextHeight+'px'})});
+      setTimeout(function(){if(oldLayer.parentNode)oldLayer.remove();next.style.position='';next.style.inset='';next.style.width='';next.style.transition='';next.style.transform='';next.style.opacity='';box.style.position='';box.style.overflow='';box.style.height='';box.style.maxHeight='none';box.style.transition=''},430);
+    }
+  }
+  if(fieldDir&&oldFieldLayer){
+    var fieldBox=fresh.querySelector('#sdFieldDetail'),fieldNext=fieldBox&&fieldBox.querySelector('.sd-fdetail-in');
+    var fieldReduce=false;try{fieldReduce=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)}catch(e){}
+    if(fieldBox&&fieldNext&&!fieldReduce){
+      var fieldNextHeight=fieldBox.getBoundingClientRect().height;
+      fieldBox.style.cssText+=';position:relative;overflow:hidden;height:'+oldFieldHeight+'px;max-height:'+oldFieldHeight+'px;transition:height .4s cubic-bezier(.22,.9,.3,1),max-height .4s cubic-bezier(.22,.9,.3,1)';
+      [oldFieldLayer,fieldNext].forEach(function(el){el.style.cssText+=';position:absolute;inset:0;width:100%;transition:transform .4s cubic-bezier(.22,.9,.3,1),opacity .28s ease'});
+      oldFieldLayer.setAttribute('aria-hidden','true');oldFieldLayer.style.pointerEvents='none';
+      fieldNext.style.transform='translateX('+(fieldDir*100)+'%)';fieldNext.style.opacity='0';fieldBox.appendChild(oldFieldLayer);
+      requestAnimationFrame(function(){requestAnimationFrame(function(){oldFieldLayer.style.transform='translateX('+(-fieldDir*100)+'%)';oldFieldLayer.style.opacity='0';fieldNext.style.transform='translateX(0)';fieldNext.style.opacity='1';fieldBox.style.height=fieldNextHeight+'px';fieldBox.style.maxHeight=fieldNextHeight+'px'})});
+      setTimeout(function(){if(oldFieldLayer.parentNode)oldFieldLayer.remove();fieldNext.style.position='';fieldNext.style.inset='';fieldNext.style.width='';fieldNext.style.transition='';fieldNext.style.transform='';fieldNext.style.opacity='';fieldBox.style.position='';fieldBox.style.overflow='';fieldBox.style.height='';fieldBox.style.maxHeight='none';fieldBox.style.transition=''},430);
+    }
+  }
 }
 /* ลบเคส. Moving the record into ถังขยะ, dropping the Supabase row and re-rendering the lists
    is still the application's job — only it owns settings.trash — so the case is handed over
@@ -3887,12 +4117,27 @@ function reportDocsHTML(){
      }).join('')+'</div>';
 }
 
+function qcDocsHTML(){
+  var list=caseDetailModel.qcRecords||[];
+  if(!list.length)return '';
+  return '<div class="cmp-block"><small>✅ เอกสาร QC ของเคสนี้ '+list.length+' ฉบับ</small>'
+    +list.map(function(q){
+      return '<article class="rp-card"><header><b>'+esc(q.qcNo||q.id||'QC')+'</b>'
+        +'<span>'+esc(q.qcDate?fmtDay(q.qcDate):fmtDateTime(q.updatedAt||q.createdAt))+'</span></header>'
+        +'<dl class="rp-kv"><div class="rp-line"><dt>ประเภท QC</dt><dd>'+esc(q.type||'-')+'</dd></div>'
+        +'<div class="rp-line"><dt>ผล QC</dt><dd>'+esc(q.status||'Draft')+'</dd></div>'
+        +'<div class="rp-line"><dt>ผู้ตรวจ</dt><dd>'+esc(q.inspector||'-')+'</dd></div></dl>'
+        +'<div class="rp-acts"><button type="button" class="sd-go" data-qc-open="'+esc(q.id)+'">ดู / พิมพ์ในหน้า QC ›</button></div>'
+        +'</article>';
+    }).join('')+'</div>';
+}
+
 function attachmentsHTML(){
   var a=caseDetailModel.attachments||[];
   var indexed=a.map(function(x,i){return {a:x,i:i}}).slice(0,24);
   /* The report's own photos are drawn inside the ใบตรวจ card above, so they are left out of
      the field block here — otherwise the same picture appears twice in one panel. */
-  return reportDocsHTML()
+  return qcDocsHTML()+reportDocsHTML()
     +mediaBlock('📎 ไฟล์ที่ลูกค้าแนบมากับเคส',indexed.filter(function(x){return x.a.from==='customer'}))
     +mediaBlock('🖼 รูปและวิดีโอจากหน้างาน',indexed.filter(function(x){
        return x.a.from!=='customer'&&x.a.from!=='report';
@@ -3982,12 +4227,15 @@ var HANDLERS={
   'open-quotation':openQuotation,
   'open-quote-doc':openQuoteDoc,
   'close-online':closeOnline,
+  'reset-online':resetOnlineCase,
   'ws-receive':wsReceive,
   'ws-qc':wsQc,
   'ws-return':wsReturn,
   'open-line-message':openLineMessage,
   'copy-line-message':copyLineMessage,
   'confirm-quote':confirmQuote,
+  'approve-other-channel':function(){openExternalApproval('evidence')},
+  'upload-customer-sign':function(){openExternalApproval('signature')},
   'open-field-service':openFieldService,
   'change-status':changeCaseStatus,
   'edit-case':editCase,
@@ -4038,6 +4286,9 @@ document.addEventListener('click',function(e){
   if(e.target.closest('[data-media-close]')){closeMediaView();return}
   var tile=e.target.closest('[data-media]');
   if(tile){e.preventDefault();openMediaView(tile.getAttribute('data-media'));return}
+  var qcOpen=e.target.closest('[data-qc-open]');
+  if(qcOpen){e.preventDefault();goApp('qc','&caseId='+encodeURIComponent(caseDetailModel.case.id)
+    +'&intent=qc-record&qcId='+encodeURIComponent(qcOpen.getAttribute('data-qc-open')));return}
   if(e.target.closest('[data-qs-print]')){
     e.preventDefault();printQuoteDoc();return;
   }
@@ -4068,7 +4319,8 @@ document.addEventListener('click',function(e){
        straight back in — sliding out and in again for one press would cost .7s and read as
        sluggish rather than as an answer. */
     if(openField===fk){closeFieldDetail();return}
-    if(openField==null)slideNext='sdFieldDetail';   /* switching circles swaps in place */
+    if(openField==null)slideNext='sdFieldDetail';
+    else fieldSlideDir=fk>openField?1:-1;
     openField=fk;
     repaintProgress();
     return;

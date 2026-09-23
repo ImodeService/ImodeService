@@ -102,23 +102,42 @@
    if(typeof requirePermission==='function')requirePermission('machine.edit');
    return {ok:false};
   }
-  /* A machine is referenced by cases, warranties, QC and documents. None of those are
-     deleted with it — they would be orphaned rather than wrong, and deleting them silently
-     is not something a bin can undo cleanly — so the count is stated and the choice is the
-     admin's. */
-  var n=0;
-  try{n=(cases||[]).filter(function(c){return c.machineId===mid}).length}catch(e){}
-  if(n&&!confirm(tl('เครื่องนี้มี ','This machine has ')+n+tl(' เคสผูกอยู่ ประวัติเหล่านั้นจะยังอยู่แต่จะไม่มีเครื่องให้อ้างอิง ต้องการลบต่อหรือไม่?',
-    ' case(s) linked. Those records stay but will point at a machine that is gone. Continue?')))return {ok:false};
-  var label=[m.name,m.model,m.serial].filter(Boolean).join(' · ')||mid;
+  /* Active records travel with the machine as one restorable bundle. Service reports are the
+     machine history and machine documents are retained, as requested. */
+  var related={cases:[],quotations:[],warranties:[],qcRecords:[],lineRequests:[]},caseIds={};
+  try{related.cases=(cases||[]).filter(function(c){return c.machineId===mid})}catch(e){}
+  related.cases.forEach(function(c){caseIds[c.id]=true});
+  try{related.quotations=(quotations||[]).filter(function(q){
+    return q.machineId===mid||(q.machineIds||[]).indexOf(mid)>=0||!!caseIds[q.caseId];
+  })}catch(e){}
+  try{related.warranties=(warranties||[]).filter(function(w){return w.machineId===mid})}catch(e){}
+  try{related.qcRecords=(qcRecords||[]).filter(function(q){return q.machineId===mid||!!caseIds[q.caseId]})}catch(e){}
+  try{related.lineRequests=(lineRequests||[]).filter(function(r){return r.machineId===mid||!!caseIds[r.caseId]})}catch(e){}
+  var n=related.cases.length+related.quotations.length+related.warranties.length+related.qcRecords.length+related.lineRequests.length;
+  if(n&&!confirm(tl('เครื่องนี้มีข้อมูลที่เกี่ยวข้อง ','This machine has ')+n+tl(' รายการ ระบบจะย้ายทั้งหมดไปถังขยะพร้อมเครื่อง โดยคงประวัติบริการและเอกสารเครื่องไว้ ดำเนินการต่อหรือไม่?',
+    ' related record(s). They will move to the bin with the machine; service history and machine documents will remain. Continue?')))return {ok:false};
+  var machineName=m.nameTh||m.name||m.nameEn||mid;
+  var label=[machineName,m.model,m.serial].filter(Boolean).join(' · ')||mid;
   if(!confirmBin(tl('เครื่องจักร ','machine ')+label))return {ok:false};
-  window.imodeTrashPut('machine',m,{title:m.name||mid,sub:[m.model,m.serial].filter(Boolean).join(' · ')});
+  var payload={};Object.keys(m).forEach(function(k){payload[k]=m[k]});
+  payload.__imodeMachineRelated=related;
+  var trashEntry=window.imodeTrashPut('machine',payload,{title:machineName,sub:[m.model,m.serial,n?tl('ข้อมูลเกี่ยวข้อง ','related ')+n:''].filter(Boolean).join(' · ')});
+  if(!trashEntry){toast(tl('พื้นที่ถังขยะไม่พอ จึงยังไม่ได้ลบเครื่องจักร','The bin has insufficient space; the machine was not deleted'));return {ok:false}}
   try{machines=machines.filter(function(x){return x.id!==mid})}catch(e){}
+  try{cases=cases.filter(function(x){return x.machineId!==mid})}catch(e){}
+  try{quotations=quotations.filter(function(x){return !related.quotations.some(function(r){return r.id===x.id})})}catch(e){}
+  try{warranties=warranties.filter(function(x){return x.machineId!==mid})}catch(e){}
+  try{qcRecords=qcRecords.filter(function(x){return !related.qcRecords.some(function(r){return r.id===x.id})})}catch(e){}
+  try{lineRequests=lineRequests.filter(function(x){return !related.lineRequests.some(function(r){return r.id===x.id})})}catch(e){}
   cloudDelete('machines',mid);
+  related.cases.forEach(function(x){cloudDelete('service_cases',x.id)});
+  related.quotations.forEach(function(x){cloudDelete('quotations',x.id)});
+  related.warranties.forEach(function(x){cloudDelete('machine_warranties',x.id)});
+  related.lineRequests.forEach(function(x){cloudDelete('line_customer_requests',x.id)});
   try{if(typeof saveLocal==='function')saveLocal()}catch(e){}
   try{if(typeof closeModal==='function')closeModal()}catch(e){}
   try{if(typeof renderAll==='function')renderAll()}catch(e){}
-  toast(tl('ย้ายเครื่องจักรไปถังขยะแล้ว','Machine moved to the bin'));
+  toast(tl('ย้ายเครื่องจักรและข้อมูลที่เกี่ยวข้องไปถังขยะแล้ว','Machine and related records moved to the bin'));
   return {ok:true};
  };
 

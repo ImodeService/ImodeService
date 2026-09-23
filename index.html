@@ -216,7 +216,7 @@
         <button class="module-kpi" onclick="filterLineRequests('warranty_quote')"><span class="kpi-ico purple">฿</span><div><small>ขอราคา Warranty</small><b id="lineWarrantyRequests">0</b></div></button>
       </div>
       <div class="panel">
-        <div class="panel-head toolbar-head machine-master-head"><div class="machine-head-copy"><div class="machine-title-line"><div class="machine-list-meta"><label class="machine-display-control">แสดง <select id="customersDisplayLimit" onchange="setListLimit('customers',this.value)"><option value="10">10</option><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option><option value="all">ทั้งหมด</option></select> ราย</label><span class="machine-total-chip">ทั้งหมด <b id="customersTotalCount">0</b> ราย</span></div></div></div><div class="button-row"><button class="soft-btn module-utility-btn action-3d-orange-soft" onclick="openLineOASettingModal()">⚙ ตั้งค่า LINE OA</button><button class="orange-btn module-portal-btn action-3d-orange" onclick="previewCustomerPortal()">▦ ดูหน้าหลักลูกค้า ›</button><button class="primary-btn action-3d-orange ui-emphasis-action" onclick="openCustomerModal()">＋ เพิ่มลูกค้า</button></div></div>
+        <div class="panel-head toolbar-head machine-master-head"><div class="machine-head-copy"><div class="machine-title-line"><div class="machine-list-meta"><label class="machine-display-control">แสดง <select id="customersDisplayLimit" onchange="setListLimit('customers',this.value)"><option value="10">10</option><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option><option value="all">ทั้งหมด</option></select> ราย</label><span class="machine-total-chip">ทั้งหมด <b id="customersTotalCount">0</b> ราย</span></div></div></div><div class="button-row"><button class="soft-btn module-utility-btn action-3d-orange-soft" onclick="openLineOASettingModal()">⚙ ตั้งค่า LINE OA</button><button class="orange-btn module-portal-btn action-3d-orange" onclick="imodeOpenCustomerEntry()">▦ ดูหน้าหลักลูกค้า ›</button><button class="primary-btn action-3d-orange ui-emphasis-action" onclick="openCustomerModal()">＋ เพิ่มลูกค้า</button></div></div>
         <div class="toolbar demo-master-toolbar"><input id="customerMasterSearch" placeholder="ค้นหาบริษัท ผู้ติดต่อ โทรศัพท์ หรือที่อยู่..." oninput="renderCustomers()"><select id="customerServiceFilter" onchange="renderCustomers()"><option value="all">ทุกสถานะ Service</option><option value="มี Service">มี Service</option><option value="ไม่มี Service">ไม่มี Service</option><option value="Mixed">Mixed</option></select></div>
         <div class="table-wrap"><table><thead><tr><th>บริษัท</th><th>ผู้ติดต่อ</th><th>โทรศัพท์</th><th>LINE</th><th>สถานที่</th><th>เครื่อง</th><th>เคส</th><th>จัดการ</th></tr></thead><tbody id="customerTable"></tbody></table></div>
         <div id="customerCards" class="mobile-card-list"></div>
@@ -468,6 +468,38 @@
               </div>
             </div>
           </div>
+
+          <div class="panel quote-section">
+            <div class="panel-head"><div><h3>7. หมายเหตุเพิ่มเติม</h3><p>ข้อความนี้จะแสดงในช่องหมายเหตุของใบเสนอราคาและแก้ไขได้</p></div></div>
+            <div class="panel-body">
+              <div class="field"><label>หมายเหตุเพิ่มเติม</label><textarea id="qNote" rows="4" oninput="calcQuote()">ราคาในใบเสนอราคานี้ไม่รวมอะไหล่
+รับประกันหลังงานซ่อม 30 วัน</textarea></div>
+              <input id="qDelivery" type="hidden" value="ราคาในใบเสนอราคานี้ไม่รวมอะไหล่&#10;รับประกันหลังงานซ่อม 30 วัน">
+            </div>
+          </div>
+
+          <div class="panel quote-section quote-staff-sign-section">
+            <div class="panel-head"><div><h3>8. ลายเซ็นฝั่งบริษัท</h3><p>บันทึกใบเสนอราคาก่อน แล้วจึงลงลายเซ็นผู้อนุมัติและผู้จัดทำ</p></div></div>
+            <div class="panel-body">
+              <div class="quote-staff-sign-grid">
+                <div class="quote-staff-sign-card">
+                  <div class="signature-title">✍️ ลายเซ็นผู้อนุมัติ <small>Authorized by</small></div>
+                  <div class="field"><label>ชื่อผู้อนุมัติ *</label><input id="quoteAuthorizedSignName" placeholder="ชื่อ-นามสกุล"></div>
+                  <canvas id="quoteAuthorizedSignPad" class="signature-pad" width="560" height="180"></canvas>
+                  <div class="quote-staff-sign-actions"><label class="soft-btn">แนบรูปลายเซ็น<input type="file" accept="image/*" hidden onchange="attachQuoteStaffSign('authorized',this)"></label><button type="button" class="soft-btn" onclick="clearQuoteStaffSign('authorized')">ล้างลายเซ็น</button></div>
+                  <button type="button" class="primary-btn quote-staff-save" onclick="saveQuoteStaffSign('authorized')">บันทึกลายเซ็นผู้อนุมัติ</button>
+                </div>
+                <div class="quote-staff-sign-card">
+                  <div class="signature-title">✍️ ลายเซ็นผู้จัดทำ <small>Prepared by</small></div>
+                  <div class="field"><label>ชื่อผู้จัดทำ *</label><input id="quotePreparedSignName" placeholder="ชื่อ-นามสกุล"></div>
+                  <canvas id="quotePreparedSignPad" class="signature-pad" width="560" height="180"></canvas>
+                  <div class="quote-staff-sign-actions"><label class="soft-btn">แนบรูปลายเซ็น<input type="file" accept="image/*" hidden onchange="attachQuoteStaffSign('prepared',this)"></label><button type="button" class="soft-btn" onclick="clearQuoteStaffSign('prepared')">ล้างลายเซ็น</button></div>
+                  <button type="button" class="primary-btn quote-staff-save" onclick="saveQuoteStaffSign('prepared')">บันทึกลายเซ็นผู้จัดทำ</button>
+                </div>
+              </div>
+              <div class="quote-staff-sign-footer"><small id="quoteStaffSignHint">บันทึกใบเสนอราคาก่อนลงลายเซ็น</small><div><button type="button" class="soft-btn" onclick="previewSignedQuotation()">🖨 พิมพ์ / PDF</button><button type="button" class="primary-btn" onclick="saveQuoteStaffSigns()">💾 บันทึกลายเซ็นทั้งสอง</button></div></div>
+            </div>
+          </div>
         </div>
 
         <aside class="panel quote-summary">
@@ -494,7 +526,6 @@
             <details class="quote-footer-editor">
               <summary>✎ แก้ไขข้อมูลท้ายใบเสนอราคา</summary>
               <div class="quote-footer-editor-body">
-                <div class="field"><label>Delivery</label><input id="qDelivery" value="ตามตกลง" oninput="calcQuote()"></div>
                 <div class="field"><label>Payment</label><input id="qPayment" value="ตามเงื่อนไข" oninput="calcQuote()"></div>
                 <div class="field"><label>Purchaser / ผู้ซื้อ</label><input id="qPurchaserName" placeholder="ชื่อผู้ลงนาม / ผู้ซื้อ" oninput="calcQuote()"></div>
                 <div class="field"><label>วันที่ผู้ซื้อ</label><input id="qPurchaserDate" type="date" oninput="calcQuote()"></div>
@@ -1021,6 +1052,29 @@
 <script src="./js/90-v70SettingsMergeScript.js"></script>
 <script src="./js/91-v70FieldStepEditScript.js"></script>
 <script src="./js/92-v70CaseUpdatedScript.js"></script>
+<!-- 2026-09-21: silently buffers browser errors and sends them to the optional
+     client_errors table. Last so it observes the complete patch chain. -->
+<script src="./js/93-v70ClientErrorScript.js"></script>
+<script src="./js/94-v70RequestedUxScript.js"></script>
+<script src="./js/95-v70QuoteStaffSignatureScript.js"></script>
+<!-- 2026-09-22: create and link the eight real employee accounts. Technical/R&D staff get
+     stable technician records; office staff stay office accounts. -->
+<script src="./js/96-v70EmployeeAccountScript.js"></script>
+<script src="./js/97-v70ProfileManageScript.js"></script>
+<script src="./js/98-v70TechAccountScript.js"></script>
+<script src="./js/99-v70TechColorScript.js"></script>
+<script src="./js/100-v70ModalMotionScript.js"></script>
+<script src="./js/101-v70CustomerEntryPreviewScript.js"></script>
+<script src="./js/102-v70WarrantyPortalScript.js"></script>
+<script src="./js/103-v70QuoteModeScript.js"></script>
+<script src="./js/104-v70TestTeamScript.js"></script>
+<script src="./js/105-v70TestAccountToggleScript.js"></script>
+<script src="./js/106-v70TechCasesScript.js"></script>
+<script src="./js/107-v70RosterScript.js"></script>
+<script src="./js/108-v70LoginHardenScript.js"></script>
+<script src="./js/109-v70CheckInSyncScript.js"></script>
+<script src="./js/110-v70OfflineOutboxScript.js"></script>
+<script src="./js/111-v70OfflineShellScript.js"></script>
 
 </body>
 </html>

@@ -30,9 +30,6 @@
 
  var TYPES=[
   {v:'Service',     th:'Service · ซ่อม / แก้ไขอาการเสีย', st:'เข้าบริการหน้างาน'},
-  {v:'Maintenance', th:'Maintenance · บำรุงรักษา / ปรับตั้ง', st:'เข้าบริการหน้างาน'},
-  {v:'PM',          th:'PM · บำรุงรักษาตามรอบ',            st:'PM / Preventive Maintenance'},
-  {v:'Online',      th:'Online · ให้ช่างช่วยแก้ไขออนไลน์',   st:'แก้ไขออนไลน์'},
   {v:'Workshop',    th:'Workshop · ส่งเครื่องซ่อมที่บริษัท',  st:'ลูกค้าส่งเครื่องเข้าบริษัท'}
  ];
  /* 2026-09-17, Workshop: the customer also says how the machine gets to us and back. Kept as

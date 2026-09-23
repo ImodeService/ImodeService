@@ -75,7 +75,7 @@
  function fingerprint(q){
   var a=approvals()[q.id]||{},ss={};
   try{ss=(settings.quoteStaffSigns&&settings.quoteStaffSigns[q.id])||{}}catch(e){}
-  return [q.status||'',q.updatedAt||'',a.at||'',a.sentAt||'',q.grand||'',
+  return ['sig-id-v2',q.status||'',q.updatedAt||'',a.at||'',a.sentAt||'',q.grand||'',
    (ss.authorized&&ss.authorized.at)||'',(ss.prepared&&ss.prepared.at)||''].join('|');
  }
  function renderPaper(q){

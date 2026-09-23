@@ -224,6 +224,7 @@
   try{delete window.imodeMediaProgress}catch(e){window.imodeMediaProgress=undefined}
  }
  window.imodeUploadProgressClose=close;
+ window.imodeUploadProgressPopup={open:open,setPct:setPct,phase:phase,finish:finish,close:close};
 
  /* ------------------------------------------------------------- the wrappers ---- */
  /* The two forms keep their pending files in different places, so the counter is passed in:

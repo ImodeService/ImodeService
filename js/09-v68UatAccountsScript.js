@@ -38,8 +38,12 @@
   {username:'technician_test2',hash:'6511f2de08ccfc63e9ab23e6304147dbb715ceabfa988b844af75181df9930d8',accountType:'technician',technicianId:'T002',role:'Technician',team:'Technical'},
   /* Team leads. v69TeamScopeScript creates the two placeholder technician records these
      point at, and the two lead roles. Password follows the same UAT convention. */
-  {username:'lead_technical',hash:'ce542514170e4e614884d486436664ec3c3ed92197b3609772f45c171ed9c80f',accountType:'technician',technicianId:'T-LEAD-TECH',role:'Technical Lead',team:'Technical'},
-  {username:'lead_rd',hash:'004ea2bba79120446757cc6c80353031afd496f86352c34402884e007b06c938',accountType:'technician',technicianId:'T-LEAD-RD',role:'R&D Lead',team:'R&D'},
+  {username:'lead_technician',hash:'80346b1d171f20e1ac0803325a25ec38b16e96d4431144e109becccb02a28c74',accountType:'technician',technicianId:'T-LEAD-TECH',userId:'USR-003',name:'Artivara Polsri',role:'Technical Lead',team:'Technical'},
+  /* 2026-09-23, on the owner's own mapping: พี่หนุ่ม = Chaichana Photaya (USR-004), and he is
+     to hold ONE account. lead_rd is that account, linked the same way lead_technician is
+     linked to พี่ย้ง; the duplicate `chaichana` account js/96 had created is removed by the
+     dedupe there, which also merges its technician record into T-LEAD-RD. */
+  {username:'lead_rd',hash:'004ea2bba79120446757cc6c80353031afd496f86352c34402884e007b06c938',accountType:'technician',technicianId:'T-LEAD-RD',userId:'USR-004',name:'Chaichana Photaya',role:'R&D Lead',team:'R&D'},
   /* Beta test accounts. R&D holds exactly the technician module set — the role name is the
      only difference, which is why it points at the existing 'Technician - R&D' role rather
      than at a new permission list. The two technician records they point at are seeded by

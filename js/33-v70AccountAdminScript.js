@@ -128,6 +128,14 @@
  function switchHTML(){
   var list=accounts(),me=currentUsername();
   if(!list.length)return '';
+  /* 2026-09-23: with nobody signed in this popup IS the front door, and a door must not
+     publish the list of everyone who can open it — there is also nothing to "switch" from.
+     currentUser is a top-level let in js/03, a lexical global that is never on window, so it
+     is read by bare identifier; window.currentUser would be undefined and the block would
+     stay hidden for everybody. */
+  var signedIn=false;
+  try{signedIn=!!(currentUser&&(currentUser.username||currentUser.name))}catch(e){}
+  if(!signedIn)return '';
   var rows=list.map(function(a){
    var sub=a.accountType==='technician'
     ? esc2(tl('ช่าง','Technician'))+' · '+esc2(a.technicianId||'')

@@ -61,7 +61,7 @@
  function spendUrl(){
   try{
    var u=new URL(location.href),had=false;
-   ['page','caseId','intent'].forEach(function(k){
+   ['page','caseId','intent','qcId'].forEach(function(k){
     if(u.searchParams.has(k)){u.searchParams.delete(k);had=true}
    });
    if(!had)return;
@@ -77,6 +77,7 @@
   if(typeof goPage!=='function')return;
   var cid=String(p.get('caseId')||'').trim();
   var intentEarly=String(p.get('intent')||'').trim();
+  var qcIdEarly=String(p.get('qcId')||'').trim();
   spendUrl();                                        /* read everything first, then spend it */
   goPage(page);
   if(!cid)return;
@@ -126,6 +127,7 @@
     /* 2026-09-17: Workshop — ทำ QC ก่อนส่งคืน on the case page. js/81 opens a Pre-Delivery QC
        already linked to this case and machine. */
     else if(intent==='qc-predelivery'&&typeof window.imodeOpenCaseQc==='function')window.imodeOpenCaseQc(cid);
+    else if(intent==='qc-record'&&qcIdEarly&&typeof previewQc==='function')previewQc(qcIdEarly);
     else if(page==='quotation'&&typeof prepareQuotation==='function')prepareQuotation(cid);
    }catch(e){}
   },260);

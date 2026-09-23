@@ -33,6 +33,30 @@
   var names=accountNames();
   return names.indexOf(u.name)>=0;
  }
+ /* The account behind a person, so the row can show that ACCOUNT's role and sign in as it.
+    Matched by the account's own userId first (js/09 carries one on the linked accounts) and
+    by display name second — the same test hasAccount() has always used. */
+ function accountFor(u){
+  if(!u)return null;
+  try{
+   if(!window.uatAuth||typeof window.uatAuth.allAccounts!=='function')return null;
+   var list=window.uatAuth.allAccounts()||[];
+   var byId=list.filter(function(a){return a.userId&&a.userId===u.id})[0];
+   if(byId)return byId;
+   return list.filter(function(a){
+    var nm;
+    try{nm=(window.uatAuth.accountToUser(a)||{}).name||a.name||a.username}
+    catch(e){nm=a.name||a.username}
+    return nm===u.name;
+   })[0]||null;
+  }catch(e){return null}
+ }
+ /* The chip used to print u.team — a team, not a permission — so changing an account's role
+    in การจัดการบัญชีผู้ใช้ never showed here. It reads the account's role now. */
+ function roleOf(u){
+  var a=accountFor(u);
+  return (a&&a.role)||(u&&u.team)||'';
+ }
  function accountlessPeople(){return visiblePeople().filter(function(u){return !hasAccount(u)})}
 
  function persist(){
@@ -86,6 +110,14 @@
  if(typeof baseChoose==='function'){
   window.chooseUser=function(id){
    if(isHidden(id))return;
+   /* 2026-09-23: one click used to sign straight in with NO password. A person who has an
+      account now goes through js/46's imodeQuickSwitch — the same password door as the
+      account switcher, so lockout, expiry and the audit trail all still apply. Someone with
+      no account keeps the old name-only behaviour; there is no password to ask for. */
+   var u=allPeople().filter(function(x){return x.id===id})[0];
+   var acc=accountFor(u);
+   if(acc&&acc.username&&typeof window.imodeQuickSwitch==='function')
+    return window.imodeQuickSwitch(acc.username);
    return baseChoose.apply(this,arguments);
   };
  }
@@ -95,8 +127,10 @@
   var none=!hasAccount(u);
   return '<div class="login-user-item'+(none?' is-accountless':'')+'">'
    +'<div class="left" onclick="chooseUser(\''+esc2(u.id)+'\')">'+avatar
-   +'<div><b>'+esc2(u.name)+'</b><small>'+esc2(u.role||'')+'</small></div></div>'
-   +'<span class="login-chip">'+esc2(u.team||'')+'</span>'
+   +'<div><b>'+esc2(u.name)+'</b>'
+   +(u.nameTh?'<small class="login-user-th">'+esc2(u.nameTh)+'</small>':'')
+   +'<small>'+esc2(u.role||'')+'</small></div></div>'
+   +'<span class="login-chip" title="'+esc2(roleOf(u))+'">'+esc2(roleOf(u))+'</span>'
    +(none?'<span class="login-noaccount">'+esc2(tl('ไม่มีบัญชี','no account'))+'</span>':'')
    +'<button type="button" class="login-user-del" title="'+esc2(tl('ลบออกจากรายชื่อ','Remove from the list'))+'"'
    +' aria-label="'+esc2(tl('ลบ','Remove'))+' '+esc2(u.name)+'"'
@@ -124,6 +158,8 @@
   if(!box)return;
   box.innerHTML=listHTML();
  }
+ /* js/97 adds and deletes profiles and needs the same list redrawn afterwards. */
+ window.imodeRedrawLoginUsers=redraw;
 
  var baseOpen=window.openUserLoginModal;
  if(typeof baseOpen==='function'){
@@ -147,6 +183,7 @@
  +'border:1px solid #f0cccc;background:#fff;color:#b32020}'
  +'.login-user-del:hover{background:#fdecec}'
  +'.login-user-del:focus-visible{outline:2px solid #b32020;outline-offset:2px}'
+ +'.login-user-th{color:#4a5d7e;font-weight:600}'
  +'.login-user-empty{padding:12px;border:1px dashed #d3e0f4;border-radius:12px;color:#5b6b88;font-size:12px;text-align:center}';
  document.head.appendChild(st);
 })();

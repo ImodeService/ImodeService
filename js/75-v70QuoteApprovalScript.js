@@ -81,7 +81,12 @@
   }catch(e){return {}}
  }
  function approvalOf(id){
-  try{var r=store()[id];return (r&&typeof r==='object')?r:null}catch(e){return null}
+  try{
+   var r=store()[id],q=quoteList().filter(function(x){return x&&x.id===id})[0];
+   if(!r||typeof r!=='object')return null;
+   var created=Date.parse(q&&q.createdAt||''),signed=Date.parse(r.at||'');
+   return Number.isFinite(created)&&Number.isFinite(signed)&&signed<created?null:r;
+  }catch(e){return null}
  }
  function isApproved(id){return !!approvalOf(id)}
  window.imodeQuoteApproval=approvalOf;
@@ -221,17 +226,17 @@
  }
 
  /* --------------------------------------------- 4. signing one quotation ---- */
- var PAD='pqaSignPad';
+ var PAD='pqaSignPad',editApprovalId='';
  function panelHTML(q){
   var a=approvalOf(q.id);
-  if(a){
+  if(a&&editApprovalId!==q.id){
    return '<div class="pqa-panel is-done">'
     +'<div class="pqa-done-head">✓ '+esc2(tl('อนุมัติใบเสนอราคาแล้ว','Quotation approved'))+'</div>'
     +'<div class="pqa-done-meta">'+esc2(tl('โดย','By'))+' <b>'+esc2(a.name||tl('ลูกค้า','the customer'))+'</b>'
     +' · '+esc2(fmtAt(a.at))+'</div>'
     +(a.sig?'<img class="pqa-done-sig" src="'+esc2(a.sig)+'" alt="'+esc2(tl('ลายเซ็นลูกค้า','Customer signature'))+'">':'')
-    +'<p class="pqa-hint">'+esc2(tl('ทีม Service ได้รับการอนุมัติของท่านแล้ว หากต้องการแก้ไข กรุณาติดต่อทีมงาน',
-        'Service has your approval. To change anything, please contact the team.'))+'</p>'
+    +'<p class="pqa-hint">'+esc2(tl('ทีม Service ได้รับการอนุมัติของท่านแล้ว','Service has your approval.'))+'</p>'
+    +'<button type="button" class="pqa-edit" data-pqa-edit="'+esc2(q.id)+'">✏️ '+esc2(tl('แก้ไขลายเซ็น','Edit signature'))+'</button>'
     +'</div>';
   }
   var pad='';
@@ -242,8 +247,10 @@
    +'<p class="pqa-hint">'+esc2(tl('กรุณาตรวจสอบรายละเอียดด้านบน แล้วลงชื่อเพื่ออนุมัติ ทีม Service จะเริ่มงานหลังได้รับการอนุมัติ',
        'Please check the details above, then sign to approve. Service starts once you have approved.'))+'</p>'
    +'<div class="pqa-field"><label for="pqaName">'+esc2(tl('ชื่อผู้อนุมัติ','Approver name'))+'</label>'
-   +'<input id="pqaName" autocomplete="name" placeholder="'+esc2(tl('ชื่อ-นามสกุล','Full name'))+'"></div>'
+   +'<input id="pqaName" autocomplete="name" value="'+esc2(a&&a.name||'')+'" placeholder="'+esc2(tl('ชื่อ-นามสกุล','Full name'))+'"></div>'
    +pad
+   +'<label class="pqa-attach">📎 '+esc2(tl('แนบรูปลายเซ็น','Attach signature image'))
+   +'<input id="pqaSignFile" type="file" accept="image/*" hidden></label>'
    +'<button type="button" class="pqa-submit" data-pqa-approve="'+esc2(q.id)+'">'
    +esc2(tl('อนุมัติใบเสนอราคา','Approve quotation'))+'</button>'
    +'<div id="pqaError" class="pqa-error" role="alert"></div>'
@@ -261,10 +268,34 @@
   var print=box.querySelector('[data-pqv-print]');
   if(print)print.insertAdjacentHTML('beforebegin',html);
   else box.insertAdjacentHTML('beforeend',html);
-  if(!approvalOf(id)){
-   try{if(typeof initSignaturePad==='function')initSignaturePad(PAD,'')}catch(e){}
+  if(!approvalOf(id)||editApprovalId===id){
+   try{if(typeof initSignaturePad==='function')initSignaturePad(PAD,(approvalOf(id)||{}).sig||'')}catch(e){}
+   var file=document.getElementById('pqaSignFile');
+   if(file)file.onchange=function(){window.imodePortalAttachApprovalSign(this)};
   }
  }
+
+ window.imodePortalAttachApprovalSign=function(input){
+  var file=input&&input.files&&input.files[0],popup=window.imodeUploadProgressPopup;
+  if(!file)return;
+  if(!/^image\//.test(file.type||'')||file.size>3*1024*1024){
+   if(popup){popup.open([file]);popup.finish({bad:true,msg:tl('กรุณาเลือกไฟล์รูปภาพขนาดไม่เกิน 3 MB','Choose an image up to 3 MB')})}
+   else toast(tl('กรุณาเลือกไฟล์รูปภาพขนาดไม่เกิน 3 MB','Choose an image up to 3 MB'));
+   input.value='';return;
+  }
+  if(popup)popup.open([file]);
+  var reader=new FileReader();
+  reader.onprogress=function(e){if(popup&&e.lengthComputable)popup.setPct(Math.min(90,e.loaded/e.total*90))};
+  reader.onerror=function(){if(popup)popup.finish({bad:true,msg:tl('อ่านไฟล์ไม่สำเร็จ กรุณาลองใหม่','Could not read the file. Please try again.')})};
+  reader.onload=function(){
+   if(popup){popup.setPct(94);popup.phase(tl('กำลังเตรียมรูปลายเซ็น…','Preparing signature image…'),true)}
+   var img=new Image();
+   img.onerror=function(){if(popup)popup.finish({bad:true,msg:tl('ไฟล์รูปภาพไม่ถูกต้อง','Invalid image file')})};
+   img.onload=function(){var c=document.getElementById(PAD);if(!c)return;var ctx=c.getContext('2d'),s=Math.min(c.width/img.width,c.height/img.height),w=img.width*s,h=img.height*s;ctx.clearRect(0,0,c.width,c.height);ctx.drawImage(img,(c.width-w)/2,(c.height-h)/2,w,h);if(popup)popup.finish({bad:false,msg:tl('แนบรูปลายเซ็นเรียบร้อย','Signature image attached')})};
+   img.src=reader.result;
+  };
+  reader.readAsDataURL(file);input.value='';
+ };
 
  var baseOpen=window.imodePortalOpenQuote;
  if(typeof baseOpen==='function'){
@@ -283,7 +314,7 @@
  window.imodePortalApproveQuote=function(id){
   var q=quoteList().filter(function(x){return x&&x.id===id})[0];
   if(!q){fail(tl('ไม่พบใบเสนอราคานี้','Quotation not found'));return}
-  if(isApproved(id)){toast(tl('ใบเสนอราคานี้อนุมัติแล้ว','Already approved'));return}
+  if(isApproved(id)&&editApprovalId!==id){toast(tl('ใบเสนอราคานี้อนุมัติแล้ว','Already approved'));return}
   var nameEl=document.getElementById('pqaName');
   var name=nameEl?String(nameEl.value||'').trim():'';
   if(!name){fail(tl('กรุณากรอกชื่อผู้อนุมัติ','Please enter the approver name'));if(nameEl)nameEl.focus();return}
@@ -292,12 +323,15 @@
    fail(tl('บันทึกการอนุมัติไม่สำเร็จ กรุณาลองใหม่','Could not save the approval — please try again'));
    return;
   }
+  editApprovalId='';
   toast(tl('อนุมัติใบเสนอราคาเรียบร้อยแล้ว ขอบคุณค่ะ','Quotation approved — thank you'));
   try{window.imodePortalOpenQuote(id)}catch(e){}
  };
 
  document.addEventListener('click',function(e){
   if(!e.target||!e.target.closest)return;
+  var edit=e.target.closest('[data-pqa-edit]');
+  if(edit){e.preventDefault();editApprovalId=edit.getAttribute('data-pqa-edit')||'';var old=document.querySelector('.pqa-panel');if(old)old.remove();attachPanel(editApprovalId);return}
   var b=e.target.closest('[data-pqa-approve]');
   if(!b)return;
   e.preventDefault();
@@ -387,6 +421,9 @@
  +'.pqa-field label{display:block;font-size:11.5px;font-weight:700;color:#3d557f;margin-bottom:4px}'
  +'.pqa-field input{width:100%;padding:10px 12px;border:1px solid #d9e4f5;border-radius:11px;font-size:13px}'
  +'.pqa-field input:focus{outline:2px solid #0b63e5;outline-offset:1px}'
+ +'.pqa-edit{margin-top:10px;padding:9px 13px;border:1px solid #9bc9ad;border-radius:10px;background:#fff;color:#07603a;font:inherit;font-size:12px;font-weight:800;cursor:pointer}'
+ +'.pqa-attach{display:inline-flex;align-items:center;margin-top:8px;padding:9px 12px;border:1px solid #d9e4f5;border-radius:10px;background:#fff;color:#0c3d91;font-size:12px;font-weight:800;cursor:pointer}'
+ +'.pqa-attach:hover{border-color:#0b63e5;background:#eef5ff}'
  +'.pqa-submit{display:block;width:100%;margin-top:11px;padding:13px;border:0;border-radius:12px;'
  +'background:linear-gradient(180deg,#14a35c,#0b8a4b);color:#fff;font-size:14px;font-weight:800;'
  +'cursor:pointer;box-shadow:0 5px 0 #086e3c}'

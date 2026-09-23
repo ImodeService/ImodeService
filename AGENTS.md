@@ -1,5 +1,37 @@
 # I-MODE Plus Service & Maintenance — Codex Project Instructions
 
+## Token Efficiency Lesson — 2026-09-22
+
+- The owner explicitly prioritizes conserving context so work can continue across many tasks.
+- On 2026-09-22, a small quotation-signature change consumed far too much context and left only 6%. Treat this as a concrete failure to avoid: for small changes, inspect only exact ranges, cap tool output aggressively, skip optional investigation/UI automation when the owner will test, and report only the result.
+- Use narrowly targeted searches and bounded output; do not dump large files or broad grep results.
+- Read only the relevant ranges after locating active definitions.
+- Keep commentary and final reports short and factual; avoid repeating completed work.
+- Test the changed behavior directly, but use the smallest focused harness and clean it up once.
+- Stop expanding investigation when the requested behavior is verified; do not pursue unrelated cleanup.
+
+## Token Efficiency Lesson — 2026-09-23
+
+- The owner reports only 9% credit remaining. Treat every remaining request as a tightly scoped task.
+- Too many tokens were spent on broad `rg` searches whose output was truncated, reading large code ranges,
+  explaining implementation details repeatedly, and running overlapping syntax checks after each small patch.
+- For follow-up fixes, inspect only the exact selector/function already identified, apply one minimal patch,
+  run one focused validation, and report the result in one or two sentences.
+- Mistake: “ข้อความในปุ่มไม่อยู่ตรงกลาง” was misread as moving the whole upload button to the center.
+  Fix: restore the button's original left position and center only its internal text/icon vertically.
+  Future rule: distinguish element position from content alignment before editing layout.
+- Mistake: Artivara Polsri was assumed to be “พี่ย้ง” without confirmation, causing `lead_technician`
+  to be linked to the wrong person and Artivara's separate account to be removed.
+  Fix pending: wait for the owner's verified real names of every technician, then repair all account/person/
+  technician links in one migration while preserving existing cases, reports, QC and work history.
+  Future rule: never infer a real person's identity from role, nickname, ordering, or an existing placeholder.
+- The account work expanded across several files before the real staff identity mapping was confirmed.
+  Future rule: when identity data is uncertain, build reversible UI/status visibility first; do not migrate,
+  merge, rename or delete identity records until the owner confirms the mapping.
+- Preserve successful work already added: account username/password administration, styled delete confirmation,
+  account-only deletion with related records retained, history visibility, QC-to-case links, and alternate-channel
+  customer approval evidence/signature upload. Do not redo these while correcting technician identities.
+
 ## Project Identity
 
 Project: I-MODE Plus Service & Maintenance

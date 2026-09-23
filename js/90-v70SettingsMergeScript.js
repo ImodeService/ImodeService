@@ -71,7 +71,10 @@
     approximate. js/75's cap is unaffected in practice because it keeps the id and only drops
     the image, and an id present on both sides is never touched here. */
  var MAP_KEYS=['quoteApprovals','quoteStaffSigns','quoteAccepts',
-               'quoteRequestLink','caseFeedback','caseStatusLog'];
+               'quoteRequestLink','caseFeedback','caseStatusLog',
+               /* 2026-09-23: the warranty package type per quotation (js/103). Same shape —
+                  {id: value}, only ever added to — so the same rule protects it. */
+               'quoteWarrantyType'];
 
  var has=function(o,k){return Object.prototype.hasOwnProperty.call(o,k)};
 

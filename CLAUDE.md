@@ -6266,3 +6266,759 @@ correction is made.
 **Verified:** bugcheck 7/7 and suite T 58/58 on the patched page, and the inline script parses.
 **Not verified end to end:** the live two-device round trip for a correction. The mapping and the
 comparison were read and reasoned about, not driven against the real database.
+
+### 2026-09-21 — Codex handoff work: production guardrails, deploy docs, diagnostics and plans
+
+The five follow-up items in `docs/CODEX-HANDOFF.md` were handled through the requested design
+boundary. **No SQL was run, no Supabase project setting was changed, no deployment was made and
+no Storage migration code was started.**
+
+#### Production RLS is prepared, with one deliberate safety correction
+
+`supabase/10-production-rls.sql` removes every `uat_anon_all` policy from the 15 application
+tables, revokes anon table access, recreates `staff_all` for active Supabase-authenticated
+staff, retains narrow authenticated-customer policies, and gives anonymous visitors only
+validated INSERT policies on `service_cases` and `line_customer_requests`. The inserts verify
+the machine/customer relationship through a SECURITY DEFINER boolean helper in a non-exposed
+`imode_private` schema; a linked request must also point at a case for that same pair.
+
+The handoff proposed anonymous SELECT on machines, warranties, documents and “the customer's own
+cases”. That cannot be implemented honestly in the current design: the portal has no Supabase
+identity, `syncCloud()` selects whole tables, and js/21 makes the token `QR-<machine id>`, which
+is predictable. RLS cannot know which QR was scanned. A `using(true)` policy would expose every
+company's rows, so the production file grants anon SELECT on **no base data table** and says why.
+It must not be run until the portal uses opaque random tokens plus a narrow RPC/Edge Function.
+
+There is a second explicit prerequisite: the portal currently calls `cloudUpsert()`; PostgreSQL
+UPSERT needs UPDATE rights, while production grants anon INSERT only. The production portal must
+use INSERT (case before linked request) or an atomic validated RPC. `supabase/README.md` now puts
+the cut-over in order: backups → production project → real Supabase staff profiles → portal
+prerequisites + SQL review/run → switch `settings.authConfig.provider` to `supabase`.
+
+#### Deployment runbook
+
+`docs/DEPLOY.md` contains the nginx static server block, mandatory HTTPS/Let's Encrypt setup,
+atomic release guidance, `no-cache, must-revalidate` for HTML/JS/CSS, 30-day image/font caching,
+post-deploy curl/browser checks, the LINE OA Public App URL change and rollback. It also records
+why `file://` is invalid: `pages/pages.js` must load `pages/customer-home.html` over HTTP(S).
+
+#### Silent client error inbox
+
+`js/93-v70ClientErrorScript.js`, loaded after js/92, captures `window.onerror` and
+`unhandledrejection`, strips token-bearing query values, de-duplicates by message, caps capture
+at 10 per tab session, keeps a bounded 20-row local queue and flushes through the existing
+lexical `supa` client when available. Every reporter path is guarded and failed inserts remain
+silent/local, so a missing table cannot create a second failure. New keys:
+
+* `imode_v70_client_errors` — bounded local queue;
+* `imode_v70_client_error_session` — session count and duplicate set.
+
+`supabase/11-client-errors.sql` prepares the table: anon/authenticated may INSERT; only an
+authenticated admin may SELECT or DELETE; nobody may UPDATE. It was written only and not run.
+
+Measured with a VM smoke harness: two identical `boom` errors produced one queued row, a
+different rejected promise produced the second, and a mocked successful Supabase insert emptied
+and persisted the empty queue. `node --check js/93-v70ClientErrorScript.js` passed.
+
+#### Current architecture and Storage boundary
+
+`docs/architecture.md` has three Mermaid diagrams derived from the active code: the important
+override chains, the Field/Workshop/Online business flow, and all 15 application tables with
+their browser/Supabase directions. It calls out `notifications` as download-only and
+`system_settings` as one shared jsonb row that is still rewritten whole.
+
+`docs/STORAGE-PLAN.md` is the requested design-only stop point. It inventories base64 in
+`c.media`, duplicated line-request media, field entries and revisions, online/workshop evidence,
+service-report before/after/video fields and signature PNGs; specifies dual-format readers,
+private immutable objects, an IndexedDB offline outbox, phased idempotent backfill, RLS/signed
+upload requirements and the exact interaction with js/72's localStorage shedding. No bucket,
+SQL policy, upload helper or record migration was created.
+
+---
+
+## Session Change Log — 2026-09-23 (part 31): accounts, the warranty flow, and three mistakes of my own
+
+Worked through the owner's list in one sitting. **Three defects in this session's own earlier
+work were found and fixed in the same session** — they are written up first, because each one
+is a trap this project can fall into again.
+
+### MY OWN MISTAKES, and what they teach
+
+**1. js/97 cleared a photo it had never been given.** `applyPhotos()` copied `account.photo`
+onto the linked technician record and demoUsers person **unconditionally**, so an account with
+no photo wrote `''` over a photo the technician record already had. It ran at every boot (so a
+photo vanished on reload) and again after every account save (so adding one photo wiped
+another) — exactly what the owner reported. An empty value in a MIRROR must mean "this side
+says nothing", never "clear the other side". Fixed: `if(!photo)return;` plus
+`inheritedPhoto()`, which shows the record's own photo in the account form without copying it
+back.
+
+**2. `settings.uatAccountEdits` is applied field by field.** js/39's `merged()` copies a named
+list of keys out of the edit patch (`username`, `hash`, `name`, `role`, `team`,
+`technicianId`, `accountType`). A key that is not named is **silently dropped on the next
+load** — which is why a photo set on one of the seven BUILT-IN accounts came back empty. Same
+shape of bug as `cloudUpsertCase`'s column whitelist (part 18). `photo` is now named there, as
+`typeof === 'string'` so that clearing one on purpose is kept too. **Any future field on an
+account has to be added to that list.**
+
+**3. Grouping at the wrong layer would have emptied the calendar.** The first version of
+js/104 wrapped `filteredTechnicians()` to hide the four UAT technician records. That function
+is shared with `renderCalendar()` and js/13's team scope, and one of those records currently
+carries five open jobs — the calendar would have lost their rows. The wrapper now only changes
+its answer while `renderTechnicians()` is the caller, which it knows because that function
+calls it synchronously and a flag around the base call is therefore exact.
+
+### What was built
+
+| File | What |
+|---|---|
+| `js/100-v70ModalMotionScript.js` | **new** — every popup opens with a bounce and closes by shrinking |
+| `js/101-v70CustomerEntryPreviewScript.js` | **new** — ดูหน้าหลักลูกค้า opens the scan / serial page |
+| `js/102-v70WarrantyPortalScript.js` | **new** — the customer side of the warranty flow, and the portal repaints itself |
+| `js/103-v70QuoteModeScript.js` | **new** — ทำใบเสนอราคา is Service or ประกัน, and the form follows |
+| `js/104-v70TestTeamScript.js` | **new** — the UAT technician records get their own group on ทีมช่าง |
+| `js/97`, `js/98`, `js/39`, `js/43`, `js/90`, `js/14`, `pages/customer-home.html` | photos, account linking, filters, the customer logo |
+
+### THE BUG UNDER THE WARRANTY FLOW: `WP` was never selectable
+
+`qService` in index.html offered **OS / WS / DG and nothing else**, but js/03's
+`prepareWarrantyQuoteFromRequest()` does `qService.value='WP'`. A browser drops an assignment
+that matches no option, so the select fell back to empty and **every warranty quotation ever
+built from a customer request was saved without the WP marker** — the marker js/43 filters on
+and js/62 matches a request against. js/03:1467 has been pricing `service==='WP'` at 0 per
+machine all along, waiting for a value it could never receive. js/103 adds the option.
+
+Two consequences, both handled: `loadQuotation()` maps WP back to `'OS'` when reopening a
+quotation (js/03:1648), so editing a warranty quote silently converted it — js/103 re-applies
+WP afterwards. And the type filter on ประวัติใบเสนอราคา also accepts a quotation built from a
+**warranty request** (`settings.quoteRequestLink`), so old rows are still grouped correctly.
+`warrantyMonths` is deliberately NOT used as evidence: js/03 stores it on every quotation with
+a default of 12.
+
+### Accounts
+
+- The person list in the account screen signed people in **with no password**: the row called
+  `chooseUser()`, the legacy one-click login. js/46 had closed that door for `imodeQuickSwitch`
+  only. The row now goes through the same password prompt.
+- The chip on each row printed `u.team` — a TEAM — so changing an account's Role never showed.
+  It reads the account's role now, matched by `userId` first and display name second.
+- The account list is **grouped by Role**, with the UAT logins in a section of their own,
+  recognised by a username ending in `_test` / `_testN`. The group is derived at render time
+  and `refresh()` rebuilds the box after every save, so changing a role moves the row with
+  nothing to keep in step.
+- **เพิ่มบัญชี is a popup** now (js/29 stacks it over the list). `history.back()` resolves on
+  popstate, a later task, so the list is waited for before it is rebuilt — what js/29 restores
+  is a snapshot of the markup and would not show the account just added.
+- **The employee form can create the login** (js/98), or now **link an existing one**, through
+  `imodeAccountSave()` — js/39 stays the only writer. `saveTech()` ends with `closeModal()`, so
+  the fields are read BEFORE it runs, and the new record is identified by diffing the ids
+  because `saveTech()` generates its own and returns nothing.
+- **Identity, on the owner's confirmed mapping:** พี่ย้ง = Artivara Polsri (`lead_technician`),
+  พี่หนุ่ม = Chaichana Photaya (`lead_rd`), ป๋าหมาก = Samak, พี่เต้ = Narongsak. Duplicate
+  records were merged with `dedupeLead()`, which repoints `cases.assignee`/`assignees`,
+  `fieldStatusLog[].techId` and `serviceReports.techId` **and pushes the changed rows to the
+  cloud** — `syncCloud()` replaces `cases` wholesale, so a merge that only saved locally would
+  be undone by the next sync. Patama / Thirapong / Thanawat were removed; a technician record
+  is only deleted when nothing points at it.
+
+### Open / risk
+
+1. **Warranty quotations already in the database carry no WP marker.** The type filter finds
+   the ones built from a request; one built by hand is invisible to it until somebody opens it
+   and saves it again. A backfill was offered and is waiting on the owner's word.
+2. `settings.quoteWarrantyType` holds the package type per quotation, because
+   `cloudUpsertQuotation()` writes an explicit column list. It is registered in js/90's
+   `MAP_KEYS` so a device that has not seen it cannot delete it on a settings push.
+3. The warranty quotation still prices as a Service quotation. No package price list exists yet.
+4. Unchanged from part 15: `04-anon-uat.sql` means anyone on the internet can read and write
+   this database.
+
+### Follow-up (2026-09-23, same session): the roster of nine, and three more traps
+
+**`js/106`** — งานหน้างาน on a ทีมช่าง card listed nothing: it called `openFieldService(id)` and
+left for the field workspace. It now opens a popup of every case that person is on, counted
+with js/03's own `caseHasTech()` so a crew member who is not the lead is included — the exact
+thing nine expressions in js/03 got wrong in part 25.
+
+**`js/107`** — the account roster the owner specified: nine accounts, everything else removed.
+Built-in logins are tombstoned in `uatAccountEdits` (js/09 defines them in code and they cannot
+be spliced out of the array); created ones are deleted outright.
+
+**The rule that keeps the deletion safe, and it is not obvious:** an account is a door and can
+go freely, but a TECHNICIAN RECORD is what cases, field logs and service reports are attributed
+by. `tidyRecords()` deletes only records that nothing points at; one that still carries work is
+kept and NAMED IN THE CONSOLE, because moving that work needs a real person's name and this
+file is not allowed to guess one (AGENTS.md). The owner asked for the work to be moved first —
+that move waits on them saying whose it is.
+
+**js/96 gained a same-name merge.** js/39's `createRecordFor()` creates a technician record for
+an account that has none, so an employee who already had one ends up with two — พี่หนุ่ม had
+T-LEAD-RD and T1790146531546, both named Chaichana Photaya. The record carrying `employeeId`
+wins and the other is emptied into it through `mergeTechInto()` first.
+
+**js/104 was classifying พี่ย้ง as a test record.** `technician_test1` and `lead_technician` both
+point at T-LEAD-TECH, and `createRecordFor()` names a record after the account username — so his
+card read "technician_test1" and a name-based test matched it. Ownership is checked first now
+(`employeeId` → a real person is never a test record), and js/105 restores the record's name from
+that employee. **A name is only replaced when the current one is an account username**; a name a
+human typed is never touched.
+
+**js/105** also adds the test-account switch (`settings.testAccountsEnabled`). It blocks
+`uatAuth.verify`, `uatAuth.findAccount`, `uatAuth.login` AND `ImodeAuth.signIn` — four doors,
+because closing one leaves the account able to sign in through another, which is how a deleted
+customer account kept working in part 19.
+
+**Open:** `technician_test1` is still linked to พี่ย้ง's record, so while test accounts are
+enabled that login sees his jobs. Unlinking it is one call and is waiting on the owner's word.
+*(Resolved by the sweep below: the roster deletes that account, so the link goes with it.)*
+
+#### The sweep finishes the job — the UAT cases go with the records
+
+The owner was shown the records `tidyRecords()` had kept because work still pointed at them, and
+answered: **"ลบพร้อมเคสได้เลยเพราะเคสนั้นไม่ใช่เคสจริง"**. So js/107 no longer keeps them.
+
+A record that is not on the roster, not linked to an account and carries no `employeeId` is now
+removed together with **its cases, their คำขอ, ใบตรวจ and QC records**, locally and in Supabase.
+
+**The one case that is NOT deleted**, and it is not hedging: a case whose crew also holds a record
+being kept belongs to a real person, whatever it was created for. Those cases stay; the dead id is
+stripped out of `assignees` and out of js/38's comma list in `assignee`, the first survivor becomes
+the lead, and the row is pushed back up. The console line says how many went each way.
+
+Two things that make it actually run, both of which the previous version would have got wrong:
+
+- **`VERSION` is bumped 1 → 2.** A device that already ran version 1 kept those records and would
+  never have looked again, because `run()` returns early on the flag.
+- **The sweep re-runs after `syncCloud()`, once per page view.** `supa` is null while this file is
+  parsed, and the sync then replaces `cases`, `technicians` and `settings` wholesale — so a tidy at
+  DOMContentLoaded reads an empty or stale device, deletes nothing, and sets the flag anyway. Same
+  trap js/96 handles with its own `afterSync()`. It is idempotent: with nothing doomed left it
+  returns on the first pass.
+
+`cloudDelete()` is a third copy of the same two lines (js/40 and js/52 have the others) for the
+same reason each time — `supa` is a top-level `let` in js/03 and never reaches `window`.
+
+**Not recoverable:** this deletes outright rather than going through js/40's bin, because the
+records and their cases are UAT data the owner asked to be gone. The cloud rows are deleted too, so
+another device cannot bring them back.
+
+#### THE BUG: every account that lives in `settings` was deleted on every page load
+
+Reported after the owner tried the list: `rungarun`, `pannawit`, `admin`, `samak` and `narongsak`
+could not sign in. `apichat` and `phimu` were not tried and were in the same state.
+
+The split is the diagnosis. **Every account js/09 defines IN CODE still worked** — `lead_technician`
+and `lead_rd`. **Every account that lives in `settings.uatAccounts` failed.** Nothing was wrong with
+the passwords, the hashes (`uatAuth.hash` is js/09's synchronous `sha256`, verified against node) or
+js/39's `verify()`.
+
+The chain, and it is the oldest trap in this file wearing new clothes:
+
+| | |
+|---|---|
+| parse time / DOMContentLoaded | js/96's `seed()` and js/107's `run()` create the accounts and set their flags |
+| the same moment | **`supa` is still null**, so their `cloudSaveSettings()` is a silent no-op |
+| a moment later | `initCloud()` → `syncCloud()` does `settings = mergeSettings(cloudCopy)` — a **wholesale replace** |
+| result | the new accounts and the flag saying they had been created are thrown away **together**, every load, for ever |
+
+js/90 protects `MAP_KEYS` against exactly this, but `uatAccounts` is an array and
+`uatAccountEdits` is not in that list — and neither belongs there, because adopting a key the
+cloud still has would undo an admin's deliberate restore of a built-in account.
+
+**The fix is the one js/96 already used for technician records and did not extend to accounts:
+re-apply on the copy the server sent.** Both files now re-seed inside their `syncCloud` wrapper,
+where `supa` exists and the push therefore lands. After one successful boot the shared row carries
+the accounts and both re-seeds become no-ops.
+
+Two details that matter:
+
+- **js/107's `afterSync()` ignores `settings.v70Roster` on purpose.** The flag lives in the object
+  that was just replaced, so trusting it there is trusting the thing that went missing.
+- **js/96's `seed()` no longer trusts its flag alone** — `specAccountsPresent()` checks that the
+  accounts SPEC names are really there, matched on `userId` rather than username. A settings copy
+  carrying the flag without the accounts is not hypothetical; it is the state the device was in.
+
+**The rule, stated plainly for the next time:** anything written into `settings` before
+`initCloud()` has run is lost unless it is written again after `syncCloud()`. A version flag stored
+beside the data it guards cannot protect that data, because both go in the same wholesale replace.
+
+#### Login audit — the two password-less doors that were left, and `js/108`
+
+Asked for a weakness hunt with the login weighted first. The method was to list **every place in
+the project that assigns `currentUser`** rather than to read the login screens, because a door
+nobody renders is still a door. Ten hits; eight are legitimate (the localStorage restore, js/09's
+`login()` after `verify()`, `setSessionUser` used by auth-integration, two sign-outs, the backup
+restore). Two were real:
+
+1. **`saveManualUser()` — type a name, pick any role, you are in.** The "กรอกชื่อเอง" form at the
+   bottom of the legacy login popup sets `currentUser` with a role taken from `settings.roles` —
+   a list that contains CEO and Service Manager. No account, no password, no audit entry. js/33
+   hides the form with an inline `display:none`, and that is all that was holding it shut: the
+   `<form>` is still in the document with a live `onsubmit`, so one line in DevTools, or any later
+   patch that re-renders that popup without js/33's hiding pass, brings it back.
+2. **`chooseUser()` for a person with no account.** js/17 sends anyone WITH an account to js/46's
+   password prompt and **falls through to the original one-click sign-in for anyone without**. That
+   was right when the picker was eight demo users; against a nine-account roster it is a way to
+   become somebody the account system has never heard of.
+
+`js/108-v70LoginHardenScript.js` refuses both, and refuses rather than removes for the reason js/33
+records: `manualLoginForm` is read as an **id global** 20 ms after the popup opens, so deleting it
+throws. It works as a wrapper because a top-level `function` declaration **is** a window property,
+so replacing `window.saveManualUser` changes what that bare identifier resolves to (part 18).
+
+Both guards are conditional on at least one account existing — a guard that locks everybody out
+when something upstream fails is worse than the hole it closes. `imodeLoginDoors()` reports state.
+
+**What the audit did NOT find, checked and clean:** the local password override is consulted in
+`auth-local.signIn()` *before* `verify()`, so an admin-set password really does win once js/39
+clears the override; js/105's test-account block wraps js/39's `verify`, not js/09's dead closure;
+nothing outside the provider calls `uatAuth.login()`; and js/11's LINE auto-login needs a LIFF ID
+and a customer `lineUserId`, neither of which exists.
+
+**Three weaknesses that code cannot close, in severity order** — they are the owner's decisions:
+
+1. **Every staff password hash is world-readable.** `settings.uatAccounts[].hash` lives in
+   `system_settings`, `04-anon-uat.sql` grants anon SELECT on it, and the publishable key ships in
+   js/23 in a public repo. The hash is **unsalted SHA-256** of a short password on an
+   obvious pattern, so it falls to a wordlist in seconds. This is not a flaw in the login code; it is what "UAT-only client-side login" has
+   always meant, now carrying real staff names. Only moving to Supabase Auth plus
+   `10-production-rls.sql` fixes it.
+2. **The lockout is client-side** (`imode_v69_auth_lock`), so it slows a person at a keyboard and
+   nothing else. Unchanged since part 4 and correctly described there.
+3. **`settings.authConfig` is still the fair's setting** — `sessionHours 24`, `idleMinutes 1440`
+   (part 17 §9). A shared office PC stays signed in for a day. The code defaults are 12 h / 240
+   min; putting them back is a settings change, not a code change.
+
+**Low, then fixed anyway on the owner's instruction** — see `js/109` below. `c.checkInAt` is not in
+`cloudUpsertCase()`'s column list so it does not travel, and `saveServiceReport()` only rescues it
+once the report is filed.
+
+#### `js/109` — the check-in time, derived instead of transported
+
+Adding `check_in_at` to the payload without adding the column would make PostgREST reject the row,
+and that is the **whole** upsert — every case would stop syncing. So the column was not added, and
+it turned out not to be needed: `c.checkInAt`, `c.checkInLat` and `c.checkInLng` are written into
+the **same `fieldStatusLog` entry** that records the arrival, in both paths that set them
+(js/03:1015 reads that entry; js/03:1031 writes both in one statement) — and `field_status_log` is
+a real jsonb column already in the whitelist. The value therefore does not have to travel; it is
+read back out of the thing that already travels.
+
+js/109 backfills it from the first `ถึงหน้างาน` entry, at boot and after every sync. It derives and
+never invents: no entry means no value, and a value already present is never overwritten. Nothing
+is pushed, because the log is the source of truth and the case carries it by itself.
+
+**The general lesson:** before adding a column for a field that will not travel, check whether the
+value is already inside one of the jsonb columns that do. `field_status_log` carries per-step notes,
+media, technician, coordinates and (since part 27) the case category.
+
+#### `js/110` — work done with no signal is no longer thrown away by the next sync
+
+Asked what happens when a technician is on site with no data connection. Measured against the code
+rather than assumed, and the answer had a hole in it that js/24's own comment denies.
+
+js/24 returns `{ok:true, offline:true}` for a write made with no client, commented *"the record is
+saved locally and the next sync carries it"*. **That is true for a NEW row and false for an EDIT.**
+`syncCloud()` replaces `cases` and `serviceReports` wholesale, and js/71's rescue begins with
+`if(here[r.id])return` — a case the cloud already knows about is "still present", so the server's
+older copy wins silently and the field statuses, notes and photos recorded on site are gone. A
+ใบตรวจ is not covered by js/71 at all.
+
+js/110 remembers what this device changed and could not push (`imode_v70_pending_push`, device-local
+by definition — it is a note about what THIS device owes the server), keeps the local copy through
+the sync and re-uploads it.
+
+- **The guard that makes it safe: a kept row must be NEWER than the server's.** Without it, a device
+  reconnecting after two days would overwrite everything done since, turning "last write wins" into
+  "last device to find signal wins". When the server copy is newer the offline edit is dropped and
+  said so in the console — losing one offline edit to a later real one is the right way round.
+- Scope is `cases` and `serviceReports`. **The four operational tables are already safe** — js/41
+  merges them by id with the newer `updatedAt` winning, which is what this is doing by hand for the
+  two that are replaced wholesale.
+- It wraps `cloudUpsert`, the one funnel every table write passes through, and must stay **outside**
+  js/24's wrapper to see its return value — so it loads after it, as the numbering enforces.
+  A build without js/24 marks nothing rather than marking every write pending for ever.
+- `imodeOutbox()` reports what is still owed.
+
+#### `sw.js` + `js/111` — the app opens with no signal
+
+The bigger half of the offline question, done on the owner's instruction. Everything except the
+data was fetched from the server on every load, so an open tab kept working offline and a **reload
+got a blank screen**. `js/03` used to register a worker at this path and there has never been a
+file there — that was the 404 part 28 removed.
+
+**`sw.js` is deliberately NOT the fast strategy.** Same-origin files are **network-first**, and the
+cache is only the fallback:
+
+| | |
+|---|---|
+| same-origin | network first, cache on failure |
+| `./assets/` `./vendor/` | cache first — they do not change and they are the big ones |
+| cross-origin (CDN, Google Fonts) | network, then cache, then an **empty 200** |
+| `supabase.co` / `/rest/v1/` | never touched, never stored |
+
+Cache-first for scripts would be faster and is the wrong trade **here**: this application is
+patch-over-patch, and a page running some `js/NN` files from a previous deploy and some from the
+current one is not a slower app, it is a broken one — an override applied to a function that
+changed underneath it. Network-first guarantees one consistent set whenever there is a network.
+The empty 200 for a cross-origin miss exists because a request that *hangs* stops the HTML parser
+dead, which this project has hit before (part 19, Google Fonts in headless Chrome).
+
+**The precache list is not in `sw.js`.** A hard-coded list of ~146 paths in a project that adds a
+script almost every session is wrong within a week, and the symptom — a file that works online and
+is missing offline — is the kind nobody finds, because testing online never shows it. `js/111`
+reads `script[src]` and `link[rel=stylesheet]` off the document after `load` and posts what the
+page really used. It cannot drift, because it is not a copy of anything. `sw.js` keeps a short
+`EXTRA` list only for what the document never references: `pages/customer-home.html` (read by XHR),
+`vendor/jsQR.min.js` (lazy) and `service-case-detail.html` (a separate document).
+
+Details that matter if this is touched:
+
+- **`./sw.js`, relative.** The live site is served from a sub-path; an absolute `/sw.js` 404s
+  there, and a worker only controls the scope it is served from.
+- `install` adds each file separately with the failure tolerated — `cache.addAll` rejects the
+  whole install if one path 404s, so one renamed asset would cost every device its offline copy.
+- **`imodeDisableOffline()` is the way out and had to exist.** A service worker serving the wrong
+  thing is otherwise hard to get rid of from a phone. `imodeOfflineStatus()` reports what is held.
+- Bump `VERSION` in `sw.js` to force every device to rebuild; old caches go on activate.
+- `docs/DEPLOY.md` has a section on serving it, including that **`sw.js` itself must stay
+  `no-cache`**.
+
+**A device still needs one online visit before it can work offline.** With no stored copy the
+fallback is a plain Thai page saying exactly that, rather than the browser's error.
+
+**Not driven in a browser this session.** The files parse and the strategy is reasoned from the
+code, but a real offline reload on a phone has not been done — that is the test that matters here.
+
+---
+
+## DECISION — 2026-09-23: the system moves to the company's own VPS
+
+**Nothing has been built for this yet.** This is the decision and its reasoning, recorded so the
+next session starts from it instead of re-deriving it. The owner chose it at the end of the day
+after an analysis of four options.
+
+### What was bought, and the constraint it creates
+
+A Thai Cloud VPS: **4 vCore / 8 GB RAM / 80 GB SSD / 100 Mbps**, already provisioned with
+**Windows Server 2025 Standard** (+860 THB/month on top of 1,190; 2,193.50 THB/month with VAT).
+
+Windows is the wrong OS for this stack and that was said plainly — nginx, Docker and the whole
+Supabase self-hosting story are Linux-native, and `docs/DEPLOY.md` is written for nginx on Linux.
+The licence is billed **monthly**, so switching costs at most one month, and a reinstall to Ubuntu
+was the first recommendation. The owner chose to keep the machine as it is, so the plan below is
+built around Windows rather than around a reinstall.
+
+### THE CHOSEN ARCHITECTURE — PostgreSQL + PostgREST, native on Windows, no Docker
+
+```
+browser  ->  IIS / nginx (HTTPS)  ->  /rest/v1/*  ->  PostgREST.exe  ->  PostgreSQL
+```
+
+**Why this and not the alternatives:**
+
+- **Supabase IS PostgreSQL.** Moving to Postgres is not a migration to a different engine, it is
+  taking the same engine in-house: all 55 `jsonb` columns work unchanged, every SQL file in
+  `supabase/` runs as-is including `10-production-rls.sql`, and the data moves with a plain
+  `pg_dump -Fc` / `pg_restore` with no conversion of any kind.
+- **PostgREST is the piece that makes a browser able to talk to it at all**, and it ships a
+  **Windows binary**. Routing `/rest/v1/` to it is exactly what Supabase's own Kong does, so
+  `supabase-js` keeps working against it **with no change beyond the URL and the key**.
+- **MySQL was considered and rejected.** A browser cannot talk to MySQL at all, so it means writing
+  and then maintaining a REST API forever; the 55 jsonb columns would have to be rebuilt; and **RLS
+  does not exist in MySQL**, so the entire security design would move into hand-written API code.
+  More work than Postgres for strictly less capability.
+- **Docker/WSL2 was avoided on purpose.** Supabase self-hosting needs Linux containers, which on a
+  Windows VPS needs WSL2, which needs **nested virtualization the provider may simply not allow**.
+  Native `.exe` installs remove that risk entirely.
+
+### The measured surface — why this is a small change, not a rewrite
+
+| | |
+|---|---|
+| files that touch `supa.` at all | **6** |
+| `supa.from(...)` call sites | **25** |
+| realtime subscriptions | **8** |
+| `jsonb` columns in the schema | **55** |
+
+Everything else — over a hundred `js/NN` files — has no idea a database exists.
+
+### The four code changes, and one of them is a bug this move CREATES
+
+1. **`js/23-v69CloudConfigScript.js`** — the URL and key. The key becomes a JWT with role `anon`
+   signed with our own secret, which is what Supabase's key already is.
+2. **`sw.js` → `bypass()`** — it recognises live data by the string **`supabase.co`**. Point the app
+   at our own domain without changing this and the service worker **starts caching database
+   responses**: a technician would be shown yesterday's jobs on a screen that looks entirely
+   normal. This is not a pre-existing fault, it is one the move introduces, and it must ship in the
+   same change.
+3. **`js/85` and `CaseLive` in `service-case-detail.html`** — 8 subscriptions. See below.
+4. **Vendor `supabase-js` locally** instead of the jsDelivr CDN, so our own server does not depend
+   on someone else's and the offline shell is complete.
+
+### What is actually lost: realtime, and nothing else that is in use
+
+The realtime server is **Elixir and has no Windows build**. Auth (GoTrue) and Storage are also left
+behind and **neither matters today**: `settings.authConfig.provider` is `local`, and every file is
+base64 inside the rows rather than in object storage.
+
+So the one real loss is the live update — the case page going from a customer's signature to the
+office in 0.5 s (part 29 §3). The replacement is **polling**, which will read as roughly 10–15 s.
+A full `syncCloud()` on a timer is the wrong way to do it: it downloads every table. The right
+shape is a cheap `max(updated_at)` probe per table, then a targeted read.
+
+**If the machine ever becomes Linux, run the whole Supabase compose and realtime comes back with
+no code change beyond deleting the polling shim.**
+
+### Migration outline
+
+1. PostgreSQL for Windows (EDB installer), PostgREST `.exe` as a Windows service.
+2. A real domain pointed at the VPS, and **HTTPS with win-acme — not optional**: without it the
+   camera QR scan, the GPS check-in and the service worker all stop working, because browsers
+   refuse those APIs on an insecure origin.
+3. Run the `supabase/*.sql` files in order on the new database, then
+   `pg_dump` from project `ywlrlfudlxsallanoroq` → `pg_restore`.
+4. The four code changes above.
+5. **`pg_dump` on a schedule, copied off the machine, and one rehearsed restore.** The VPS's
+   "Free / Remote FTP Backup 80 GB" is file-level copying and is **not** a consistent database
+   dump. A backup nobody has restored is not a backup.
+6. Run one or two people on it in parallel before moving everybody.
+
+### Five hazards to carry into that session
+
+1. **Every existing device will keep talking to the OLD database.** `js/23` fills `cloudSettings`
+   only `if(!configured)` — a phone or PC that has ever loaded the app has the old URL in
+   `imode_v5_cloud` **for ever**. Half the company would keep writing to Supabase with nobody
+   noticing and the data would split in two. js/23 must be changed to force the new endpoint when
+   it finds the known old one.
+2. **Every QR code already printed carries the old domain.** The GitHub Pages URL must keep
+   answering and redirecting, permanently — do not switch it off.
+3. **80 GB is smaller than it looks on Windows**: the OS and pagefile take 25–30 GB, leaving
+   ~45–50 GB, and every photo, video, signature and document is base64 **inside the database**,
+   inflated 33%. `docs/STORAGE-PLAN.md` should be done at the same time as this move, not after it.
+4. **Windows Update reboots the machine.** With the database on it, that is the whole company
+   stopping. Set Active Hours and a night maintenance window.
+5. **One VPS is one point of failure.** Today GitHub Pages and Supabase fail independently.
+
+### The opportunity that should not be wasted
+
+`04-anon-uat.sql` means anyone on the internet can read and write this database, including the
+SHA-256 hashes of every staff password (part 31, login audit). **Moving the server does not fix
+that by itself** — the anon key still ships in the browser. The cut-over is the moment to run
+`10-production-rls.sql` and move the staff login to real authentication, in one change.
+
+**Next session:** write `docs/MIGRATION.md` — the step-by-step with the actual commands for
+Postgres and PostgREST on Windows, IIS/nginx, win-acme, the data move, the four code changes and
+the backup schedule. That was offered and accepted.
+
+---
+
+## Session Change Log — 2026-09-23 (part 32): the passwords leave the source, and a day of offline work stops disappearing
+
+The owner asked for the offline story to be tested for real — "เช็คระบบตอนที่ช่างไม่มีเน็ต" —
+with the login set up first and the build pushed to GitHub Pages so it can be checked on a
+phone. Testing it turned up **silent data loss**: a technician who reloads the app on site with
+no signal loses everything they record, the moment the signal comes back.
+
+Four files changed. No storage key renamed, no Supabase setting touched, no schema change,
+version untouched. `Andriod_app/` is now in `.gitignore` on the owner's instruction.
+
+| File | What |
+|---|---|
+| `js/107-v70RosterScript.js` | the five staff passwords are SHA-256 hashes, not plaintext |
+| `js/96-v70EmployeeAccountScript.js` | the same for `apichat`, `samak`, `narongsak` |
+| `js/110-v70OfflineOutboxScript.js` | **two bugs** — the outbox was blind in Local Mode, and it cleared marks without sending |
+| `pages/pages.js` | the customer page survives offline |
+| `sw.js` | the two document logos are precached |
+
+### 1. THE PLAINTEXT PASSWORDS ARE OUT OF A PUBLIC REPOSITORY
+
+`js/107` held five staff passwords and `js/96` another three as `p:'…'` / `password:'…'`
+literals — **plaintext, in a repository that is public on GitHub**, so every staff password was
+readable by anyone who opened the raw file. They are not reproduced here, for the same reason. Both files now
+carry the SHA-256 hex and nothing else; `hash:window.uatAuth.hash(r.p)` became `hash:r.h`.
+
+Behaviour is identical because the hash is the same value the code used to compute at run time —
+`uatAuth.hash` is js/09's own `sha256`, and it was checked against node's crypto on a known
+vector (`sha256('admin_test')` matches the constant js/09 already ships) before any password was
+converted. A wrong hash here locks a person out silently, so that check came first.
+
+**What this does and does not buy, plainly.** The hash is **unsalted SHA-256** and the pattern
+`Imode@0NN` is guessable from one leak, and the hashes also sit in `system_settings`, which
+`04-anon-uat.sql` lets anyone SELECT. This removes the plaintext; it does not make the passwords
+safe. That waits on the VPS cut-over with Supabase Auth and `10-production-rls.sql`.
+
+**All nine roster accounts were then signed in for real** in a browser, at 1440 and at 390:
+rungarun, apichat, pannawit, phimu, admin, lead_technician, lead_rd, samak, narongsak — and a
+wrong password refused. `lead_technician` and `lead_rd` are js/09 built-ins and keep the UAT
+convention password == username (verified, not assumed).
+
+### 2. THE BUG THAT MATTERED: work done after an offline reload was destroyed on reconnect
+
+Driven end to end against a stand-in for supabase-js (never the real project) and **measured
+before and after**, because this is a data-loss claim:
+
+| | before | after |
+|---|---|---|
+| field status recorded offline, in `cases` | 1 entry with its note | 1 entry with its note |
+| the same, after the signal returned and the app synced | **0 — gone** | 1, kept |
+| the same, on the server | **never sent** | sent |
+
+The chain, and every link was read rather than guessed:
+
+1. The technician **reloads** on site with no signal. `initCloud()` (js/03:1733) probes with
+   `supa.from('service_cases').select('id')`, the probe fails, and its `catch` does `supa=null`.
+   The device is in **Local Mode** — asserted.
+2. Every typed writer in js/03 begins `if(!supa)return;`, so `cloudUpsertCase()` and
+   `cloudUpsertServiceReport()` **never reach `cloudUpsert`**. js/24 therefore never returns
+   `{offline:true}`, and js/110's wrapper — which is on `cloudUpsert` — is never called. Nothing
+   is marked. `imode_v70_pending_push` was `null`.
+3. The signal returns, `syncCloud()` does `cases=a.data.map(fromCaseDb)` — a wholesale replace —
+   and js/71 skips the row because its first test is `if(here[r.id])return`: the cloud already
+   has that case, so it is "still present".
+
+Nothing on screen said a word. **js/110 §1b** closes it: the two functions this file already
+names in `TABLES` are wrapped, and when there is no client the id is marked. That is the one
+moment the `cloudUpsert` wrapper cannot observe. A top-level `function` declaration **is** a
+window property, so replacing it changes what js/03's own bare `cloudUpsertCase(c)` resolves to.
+
+### 3. The second bug in js/110: it cleared marks without sending
+
+Found by the same suite, filing a ใบตรวจ offline. `restore()` asked **"is ours newer?"** and
+dropped the mark otherwise — but those are not opposites. The third case is that the array was
+**never replaced** and `next[at]` IS our own row, at our own timestamp, which falls through to
+the drop branch: the pending mark was cleared and the record never sent.
+
+That is not a corner case. `syncCloud()` only assigns when the fetch came back with rows
+(`if(!k.error&&k.data.length)`), so a table the server has nothing in yet is left alone — which
+is exactly why the inspection sheet stayed on the device for ever. Worse, a `Promise.all` that
+rejects on a flaky connection leaves **every** array alone while `restore()` still runs, because
+js/110's wrapper is `.then(done,done)` — so a bad reconnect would have quietly emptied the whole
+outbox.
+
+The test is now **"is theirs strictly newer?"**. Equal means either our own untouched row or the
+server echoing back what we wrote, and re-sending is an idempotent upsert either way — a wasted
+request is not a lost day of work. **The guard still holds**: a genuinely newer edit from another
+device wins, is not overwritten, and the stale mark is cleared rather than retried for ever —
+asserted with a second device's edit stamped ten minutes in the future.
+
+### 4. Nothing reconnected when the network came back
+
+The only `online` listeners in the project were js/93's error flush and the auth banner, so a
+device that booted with no signal **stayed in Local Mode until somebody reloaded or pressed
+เชื่อม Cloud**. The work marked in §2 was safe in localStorage but was not going anywhere, and
+the technician had no way to tell.
+
+**js/110 §1c** listens for `online` and for the tab becoming visible, and calls `initCloud()`
+**only when the device is actually in Local Mode**, so an already-connected one is untouched.
+`initCloud()` ends in `syncCloud()`, which this file wraps, so the re-upload rides along.
+Asserted with nothing called by hand: the browser was put back online and the work reached the
+server on its own.
+
+### 5. The customer page was broken offline — a sync XHR is not served by the service worker
+
+`pages/pages.js` reads `pages/customer-home.html` with a **synchronous** `XMLHttpRequest`
+(part 12 chose that because `fetch()` refuses `file://`). Measured with the worker installed and
+the network off:
+
+```
+the file IS in the cache            5,680 bytes
+fetch('pages/customer-home.html')   200, 5,680 bytes
+synchronous XMLHttpRequest          "Failed to execute 'send' on 'XMLHttpRequest'"
+```
+
+A sync XHR from the main thread does not go through the worker's fetch handler, so listing the
+file in sw.js's `EXTRA` could not help it. Offline the customer page fell back to pages.js's
+"open it over http" notice: no machine card, none of the eight action buttons.
+
+It cannot simply become `fetch()` — the markup has to be in the document before any other script
+runs, because `goPage()` throws without the section and `renderCustomerPortal()` reads
+`portalLineIdentity` / `portalMachineHero` / `portalContent` as id globals, and a QR link renders
+the portal during boot. So the last good copy is kept in **`imode_v70_portal_shell`**, the only
+store that can be read synchronously, refreshed on every successful load. Offline it is at worst
+one deploy behind, which beats a notice. 5.7 KB, and nothing else reads the key.
+
+`sw.js`'s `EXTRA` also gained `imode-document-logo-removeBG.png` and `imode-document-logo.webp`:
+js/111 collects `script[src]` and `link[href]` and **not** `img[src]` — deliberately, so a page
+of machine photographs is not dragged into the cache — but those two are chrome, not content, and
+without them the customer page came up with a broken image where its logo belongs.
+
+### What the offline behaviour actually is now, measured
+
+- **The shell loads with no network.** 145 files cached, the app boots, 0 page errors, the
+  sidebar is built. A device still needs **one online visit first**; with no stored copy the
+  fallback is a plain Thai page saying so.
+- **A technician can SIGN IN with no network.** `settings.authConfig.provider` is `local`
+  (js/23 pins it) and `auth-local` hashes and compares in the browser; `signIn()` in
+  `auth-core.js` has no `online()` gate. Signing out offline and straight back in was driven and
+  works. Only the Supabase provider ever needed network for a first sign-in.
+- **The session survives an offline reload**, so usually no sign-in is needed at all.
+- `service-case-detail.html` and the customer page both open offline.
+- Work recorded offline persists, is marked owed, survives the sync, and is uploaded — including
+  a ใบตรวจ.
+
+### Tests
+
+Six suites in the session scratchpad (not added to the repo), **92 assertions, 0 failures,
+0 page errors**: offline shell (11) · the technician with no signal (14) · the loss scenario
+(10) · reconnect, inspection sheet and the newer-edit guard (13) · regression at 1440 and at
+390 (22 each, including all nine sign-ins and 26/26 sidebar pages).
+
+`node --check` passes on all 116 files in `js/`, `auth/`, `pages/` and `sw.js`, and the case
+page's inline script parses through `new Function`.
+
+**The suites detect the bugs rather than agreeing with the fixes** — each one was run against the
+unfixed code first and failed there: the day of work at 0 entries, the ใบตรวจ never sent, the
+customer page with 0 action cards.
+
+### Harness notes worth keeping
+
+- **`cat <<'EOF'` in this shell collapses `\\` to `\`.** It turned the Chrome path into
+  `C:Program FilesGoogle…` and `/\s+/g` into `/s+/g`. CLAUDE.md already records heredocs
+  truncating a file here; add this to it. Write anything containing backslashes with a real
+  file-writing tool, or avoid backslashes entirely.
+- **A test stand-in for the database must persist.** The first version of it lived in
+  `Page.addScriptToEvaluateOnNewDocument`, so every reload gave it empty tables and reset its
+  offline flag — which looks exactly like data loss and was the test's fault. It keeps its tables
+  and its flag in localStorage now.
+- **`imodeOutbox()` returns COUNTS, not ids.** An assertion searching it for a case id can never
+  match; read `imode_v70_pending_push` for the ids. One false failure.
+- **The machines pager renders no numbered buttons when there is one page** (js/07), by design.
+  Another false failure.
+- Node on Windows cannot `require` an MSYS `/c/...` path; give it `C:/...`.
+
+### Open / risk
+
+1. **The hashes are still unsalted SHA-256 and still world-readable** through
+   `system_settings` + `04-anon-uat.sql`. Removing the plaintext narrowed the exposure; it did
+   not close it.
+   **And a password is only out of the repository if it is out of the CHANGE LOG too** — the
+   first draft of this entry listed all eight, and part 31 had already printed one of them, which
+   would have made the whole exercise pointless. CLAUDE.md is tracked and public. Both were taken
+   out before this was committed; do not write a password into this file.
+2. **`lead_technician` and `lead_rd` still have password == username.** They are js/09 built-ins
+   on the UAT convention this file has documented since part 2, so anyone who reads the repository
+   can sign in as either — and both are technician leads. Changing them is one edit in Settings →
+   accounts per device, or new hashes in js/09; it was not done here because it was not asked for
+   and it would have locked the two of them out without warning.
+3. **`imode_v70_portal_shell` can be one deploy stale**, and only offline. If the customer page's
+   markup ever changes incompatibly with a released `js/19`, an offline visitor would see the old
+   shell. It is refreshed on every successful online load.
+4. A row that genuinely cannot upload is retried on every sync until it lands. Intended; js/24
+   reports the failures and `imodeOutbox()` says what is owed.
+5. `js/110` covers `cases` and `serviceReports`. Quotations, warranties, documents and line
+   requests are still replaced wholesale by a sync, so an **edit** to one of those made offline is
+   still lost. Each one is a decision about delete propagation, not a free win.
+6. **Not tested on a real phone.** Everything above is headless Chrome with
+   `Network.emulateNetworkConditions`. The owner is checking the GitHub Pages build on a device.
+7. Unchanged from part 15: `04-anon-uat.sql` means anyone on the internet can read and write this
+   database.
+8. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its
+   serial or QR.
+
+### Still outstanding from part 31
+
+`docs/MIGRATION.md` has **not** been written. The DECISION section above is the plan for moving
+to the company's VPS; this session was the offline work the owner asked for instead. That
+migration note is still the accepted next piece, and it is worth re-reading its five hazards
+first — in particular that every device already carries the old database URL in
+`imode_v5_cloud` for ever, so `js/23` has to force the new endpoint when it finds the old one.

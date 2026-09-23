@@ -347,7 +347,27 @@
  }
 
  /* ------------------------------------------------------------- 4. filters ---- */
- var state={q:'',status:'',customer:'',limit:25};
+ /* 2026-09-23: `kind` splits Service work from Warranty. A warranty quotation is marked by
+    q.service==='WP' — the same test js/62 uses to decide which request a quotation closes, so
+    there is one definition of "this is a warranty quotation" in the project, not two. */
+ var state={q:'',status:'',customer:'',kind:'',limit:25};
+ /* `service === 'WP'` is the marker, but it could not be SET until 2026-09-23: index.html's
+    ประเภทบริการ select offered OS / WS / DG only, so js/03's `qService.value='WP'` was dropped
+    by the browser and every warranty quotation built from a customer request was saved
+    without it (js/103 adds the option). So a quotation built from a warranty REQUEST counts
+    too — settings.quoteRequestLink records that pairing and is exact, not a guess.
+    `warrantyMonths` is deliberately NOT used as evidence: js/03 stores it on every quotation
+    with a default of 12, so it says nothing about what kind this is. */
+ function isWarrantyQuote(q){
+  if(!q)return false;
+  if(String(q.service||'')==='WP')return true;
+  try{
+   var reqId=(settings.quoteRequestLink||{})[q.id];
+   if(!reqId)return false;
+   var r=(Array.isArray(lineRequests)?lineRequests:[]).filter(function(x){return x&&x.id===reqId})[0];
+   return !!(r&&r.type==='warranty_quote');
+  }catch(e){return false}
+ }
  window.imodeQuoteViewSet=function(k,v){
   state[k]=v;
   if(k!=='limit')state.limit=25;
@@ -356,6 +376,8 @@
  window.imodeQuoteViewMore=function(){state.limit+=25;render()};
 
  function matches(q){
+  if(state.kind==='warranty'&&!isWarrantyQuote(q))return false;
+  if(state.kind==='service'&&isWarrantyQuote(q))return false;
   if(state.status&&String(q.status||'')!==state.status)return false;
   if(state.customer&&String(q.customerId||'')!==state.customer)return false;
   var s=state.q.trim().toLowerCase();
@@ -449,6 +471,13 @@
    +'<div class="qv-filters">'
    +'<input type="search" class="qv-search" placeholder="'+esc2(tl('ค้นหาเลขที่ ลูกค้า หรือเคส','Search number, customer or case'))
    +'" value="'+esc2(state.q)+'" oninput="imodeQuoteViewSet(\'q\',this.value)">'
+   +'<select onchange="imodeQuoteViewSet(\'kind\',this.value)">'
+   +'<option value="">'+esc2(tl('ทุกประเภท','Every type'))+'</option>'
+   +'<option value="service"'+(state.kind==='service'?' selected':'')+'>'
+   +esc2(tl('งานบริการเครื่องจักร','Machine service'))+'</option>'
+   +'<option value="warranty"'+(state.kind==='warranty'?' selected':'')+'>'
+   +esc2(tl('ประกันเครื่อง','Warranty'))+'</option>'
+   +'</select>'
    +'<select onchange="imodeQuoteViewSet(\'status\',this.value)"><option value="">'
    +esc2(tl('ทุกสถานะ','Every status'))+'</option>'
    +statuses.map(function(s){

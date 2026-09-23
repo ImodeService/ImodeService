@@ -156,7 +156,7 @@
  /* The customer module has its own wordmark. imodeBrandHeaderHTML() is shared with the
     staff login and the staff Home board, so it is left alone and the header is rebuilt
     here with the same markup and the customer logo. */
- var CUSTOMER_LOGO=new URL('./assets/service.logo.png',location.href).href;
+ var CUSTOMER_LOGO=new URL('./assets/imode-document-logo-removeBG.png',location.href).href;
  function customerBrand(){
   var lang='<b>TH</b> | EN';
   try{if(settings.language==='en')lang='TH | <b>EN</b>'}catch(e){}

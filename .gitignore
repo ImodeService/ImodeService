@@ -33,3 +33,12 @@ node_modules/
 
 # Claude Code local machine settings — not part of the app
 .claude/settings.local.json
+
+# Android WebView wrapper for the technician (Andriod_app/) — kept out of this repository on
+# the owner's instruction 2026-09-23. It is 22 MB including Gradle build artifacts, GitHub
+# Pages would not serve it, and the offline test is being done in a mobile browser instead.
+# The source is on the owner's machine; move it to its own repository when it is wanted.
+Andriod_app/
+
+# Shell accidents that have landed in the repo root
+indow.*

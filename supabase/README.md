@@ -6,6 +6,29 @@ Nothing here runs automatically. You run each file yourself, on a project you co
 
 ---
 
+## Production cut-over (do not use the UAT policy)
+
+`04-anon-uat.sql` is for the disposable UAT project only. It gives the public anon key
+full read/write access and must never be applied to production.
+
+Use this order for the production project:
+
+1. Turn on and verify database backups.
+2. Create the production Supabase project and run the schema/table files it needs.
+3. Create the real staff users in Supabase Auth and verify every user has an active row
+   in `public.profiles` with the correct role and technician link.
+4. Complete the anonymous Customer Portal prerequisites listed at the top of
+   `10-production-rls.sql`, then review and run that file. Do **not** run it against the
+   current local-UAT login: local staff would immediately lose cloud access.
+5. In the application settings, set `settings.authConfig.provider` to `supabase` and keep
+   `allowLocalFallback` disabled.
+
+`10-production-rls.sql` is deliberately a prepared file: Codex/Claude must not execute it
+for you. Take a fresh backup immediately before the cut-over and test with a non-admin
+staff account before importing real customer records.
+
+---
+
 ## What changes, and what does not
 
 | | Before | After |

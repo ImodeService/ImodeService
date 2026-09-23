@@ -12,8 +12,8 @@
 
  /* ---------- 1. team lead technician records (placeholders) ---------- */
  var SEED=[
-  {id:'T-LEAD-TECH',name:'หัวหน้าทีม Technical',role:'Technical Supervisor',team:'Technical',phone:'',email:'',color:'blue'},
-  {id:'T-LEAD-RD',  name:'หัวหน้าทีม R&D',      role:'R&D Supervisor',      team:'R&D',      phone:'',email:'',color:'orange'}
+  {id:'T-LEAD-TECH',employeeId:'USR-003',name:'Artivara Polsri',role:'Technical Supervisor',team:'Technical',phone:'',email:'',color:'blue'},
+  {id:'T-LEAD-RD',employeeId:'USR-004',name:'Chaichana Photaya',role:'R&D Supervisor',team:'R&D',phone:'',email:'',color:'orange'}
  ];
  function ensureLeads(){
   var added=false;

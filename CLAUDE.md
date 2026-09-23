@@ -7223,6 +7223,61 @@ blocks of the case page parse; `css/23`'s braces balance.
 6. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its
    serial or QR.
 
+### Follow-up (same day): the sideways swipe belongs to the circles, not to the whole card
+
+Reported with two screenshots of `service-case-detail.html` on a phone: swiping across to reach
+steps 4 and 5 dragged the open detail drawer off to the left with them, and most of the card
+came out blank — "รายละเอียดมันพอดีหน้าจอทำให้มีช่องว่างโผล่มา อยากให้เลื่อนแค่แถบสถานะกลมๆ
+ละรายละเอียดของสถานะอยู่กับที่ ส่วนสถานะในรายละเอียดเช่นช่างไรงี้ อยากให้เลื่อนได้แบบตอนนี้ถือว่าดี".
+
+**One CSS cause.** `.scd-progress` carried `overflow-x:auto` and holds **both** the step strip and
+the drawer, so one gesture moved both. `.scd-steps` forced the scroll with `min-width:760px` but
+was not itself a scroller.
+
+**The strip is its own scroller now, in the shape `.sd-field` has used all along** — no
+`min-width` on the container, `flex:1 0 152px` on each item instead, so the row is 5 × 152 =
+exactly the 760px it used to demand and scrolls inside its own box. `flex-grow` keeps the desktop
+layout identical: measured 269px per step at 1440 with no scroll, 152px with a 760px scrollable
+row at 390. `.scd-progress` is `overflow-x:clip` — **not `hidden`**, which would make it a scroll
+container on the vertical axis too, and the drawer animates its own height inside it (part 30).
+
+The technician's nine-status ladder inside the drawer was already self-contained
+(`.sd-field{overflow-x:auto}` with `flex:1 0 108px`), which is why it kept working and why the
+owner was right that that part was already good.
+
+**Measured, and the control is what makes it evidence.** The suite drives the gesture by scrolling
+**whichever container really handles it**, found by walking up from the strip — otherwise it
+measures the wrong element and passes for the wrong reason, which the first version did.
+
+| | drawer's left edge before → after swiping | |
+|---|---|---|
+| old CSS, restored at run time | **31px → −401px** | dragged 432px off-screen — the blank card in the screenshot |
+| now | **31px → 31px** | and the last step is still reachable |
+
+### 10px of sideways page scroll at 360px — pre-existing, fixed while here
+
+Found by the same run. The case page's topbar is a back arrow, the brand and a 143px tool cluster
+(bell, TH, avatar), and `.scd-brand` is `flex:none`, so at 360px it never gave way and the three
+controls on the right were pushed **9.6px past the edge**. The brand is the part that can afford
+to be shortened, so below 640px it shrinks and ellipsises.
+
+Confirmed pre-existing by measuring the same 10px against the previous build before changing
+anything. **0px at 360, 390 and 430 afterwards.**
+
+### Tests
+
+**11 assertions at 360px, 11 at 390px and 8 at 1440px, 0 failures**, plus every earlier suite
+re-run: the case page's A4 (7 + 7), the three-request suite (31 + 27), regression (22 + 22).
+Both inline blocks of the case page parse.
+
+### Harness note worth keeping
+
+**`service-case-detail.html` is stored CRLF** while most of the repo reads back as `\n`, and
+`cat -A` did not show it — `node` did. An anchor containing `\n` will never match in that file.
+Anchor on a single line, and join an inserted block with the newline the file already uses.
+Backticks inside a comment passed through `node -e` in a shell string are command substitution
+and will eat the text; write the patch to a file instead.
+
 ### Still outstanding from part 31
 
 `docs/MIGRATION.md` has **not** been written. The DECISION section above is the plan for moving

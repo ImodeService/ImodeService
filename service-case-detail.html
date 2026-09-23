@@ -120,9 +120,23 @@ a{color:var(--imode-blue)}
   .scd-sla-done:hover,.scd-sla-done:active{transform:none}}
 
 /* ---------- progress ---------- */
-.scd-progress{margin-top:18px;background:var(--card);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 18px 16px;overflow-x:auto}
-.scd-steps{display:flex;align-items:flex-start;min-width:760px;list-style:none;margin:0;padding:0}
-.scd-steps li{flex:1;position:relative;text-align:center;padding:0 6px}
+/* 2026-09-24 — THE SIDEWAYS SCROLL BELONGS TO THE CIRCLES, NOT TO THE WHOLE BLOCK.
+   Reported with two screenshots: swiping to reach steps 4 and 5 on a phone dragged the open
+   step drawer off to the left with them, and most of the card came out blank. The cause was
+   here — .scd-progress carried overflow-x:auto and holds BOTH the step strip and the drawer,
+   so one gesture moved both. The strip scrolls itself now (see .scd-steps below) and this box
+   only clips, so the details stay put. "clip" rather than "hidden" on purpose: hidden would
+   make this a scroll container on the vertical axis too, and the drawer animates its own
+   height inside it (part 30). */
+.scd-progress{margin-top:18px;background:var(--card);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 18px 16px;overflow-x:clip}
+/* The strip is its own scroller, the same shape .sd-field (the nine field statuses) has used
+   all along: no min-width on the container, a flex-basis on each item instead, so the row is
+   5 x 152px — exactly the 760px it used to demand — and it scrolls inside its own box.
+   flex-grow keeps the desktop layout identical: with room to spare the five spread across the
+   card. A sixth step would simply make the row wider and still scroll, which the old hard
+   760px could not do. */
+.scd-steps{display:flex;align-items:flex-start;list-style:none;margin:0;padding:0;overflow-x:auto;-webkit-overflow-scrolling:touch;min-width:0}
+.scd-steps li{flex:1 0 152px;position:relative;text-align:center;padding:0 6px}
 .scd-steps li::before{content:"";position:absolute;top:17px;left:-50%;width:100%;height:3px;background:#e3ecfa;z-index:0}
 .scd-steps li:first-child::before{display:none}
 .scd-steps li.done::before,.scd-steps li.now::before{background:var(--ok)}
@@ -703,6 +717,14 @@ body.scd-modal-open{overflow:hidden}
   .scd-brand b{font-size:13px}
   .scd-brand small{font-size:10px}
   .scd-chip-btn{min-width:36px;height:36px;padding:0 9px}
+  /* 2026-09-24 — 10px of sideways page scroll at 360px, measured: the back arrow, the brand
+     and the 143px tool cluster came to more than the screen, and .scd-brand is flex:none so
+     it never gave way; the bell, TH and the avatar were pushed 9.6px past the right edge.
+     The brand is the part that can afford to be shortened — the three on the right are all
+     controls. Pre-existing: the same 10px was measured against the previous build, so the
+     scroll work above did not cause it. */
+  .scd-brand{flex:1 1 auto;min-width:0}
+  .scd-brand b,.scd-brand small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 }
 @media (prefers-reduced-motion:reduce){
   .scd-act,.scd-mod{transition:none}

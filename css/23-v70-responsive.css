@@ -242,3 +242,13 @@
    css/23 is a <link> in <body> and js/36 injects its <style> into <head>, so at equal
    specificity this one wins on document order (CLAUDE.md, css/21). */
 .side-nav .nav-group:first-child{min-height:26px}
+
+/* 2026-09-24 — the month view starts on Sunday and names its days (js/03 renderCalendar).
+   One header row, part of the same 7-column grid, so it lines up at every width — including
+   css/16's swipeable 82px columns on a phone. */
+.month-grid .month-dow{padding:8px 6px;text-align:center;font-size:12.5px;font-weight:800;color:var(--imode-navy,#0b2f8f);
+  background:#f3f7fd;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.month-grid .month-dow.is-weekend{color:#c2410c}
+/* 641-900px: css/01 turns the month into 2-column cards, where a 7-name header row cannot line up. */
+@media (min-width:641px) and (max-width:900px){.month-grid .month-dow{display:none}}
+@media (max-width:640px){#page-calendar .month-grid .month-dow{font-size:10px;padding:6px 2px}}

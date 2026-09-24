@@ -7289,13 +7289,12 @@ first — in particular that every device already carries the old database URL i
 
 ## Session Change Log — 2026-09-24 (part 34): Version 1.0, customer contacts, badges, and three sync bugs
 
-### ⚠ STATE AT END OF DAY — READ FIRST
+### STATE — everything in this part is pushed
 
-**Pushed** (live on GitHub Pages): `dd6bd71`, `dda6b41`, `56c26f2` — the case-page quotation
+**Pushed and live on GitHub Pages:** `dd6bd71`, `dda6b41`, `56c26f2` — the case-page quotation
 freeze, the status circles, the sidebar profile photo, `Data/` in `.gitignore`, Version 1.0, the
-UAT wording, the customer A4 quotation, the Sunday-first calendar.
-
-**NOT committed — in the working tree only** (all syntax-checked, all browser-tested headless):
+UAT wording, the customer A4 quotation, the Sunday-first calendar — and then **`aa45fbf`**
+(2026-09-24, pushed at the owner's word the next session), which carries the thirteen files below.
 
 | File | What |
 |---|---|
@@ -7312,9 +7311,9 @@ UAT wording, the customer A4 quotation, the Sunday-first calendar.
 | `index.html` | three `<script src>` tags (js/114–116) |
 | `CLAUDE.md` | this entry |
 
-The owner has not yet said to push these. After pushing: every open tab/device needs one
-Ctrl+Shift+R, and role **Admin** must have งานของฉัน unticked **once more** (the cloud row still
-holds the stale set — see §4).
+**Two things still to do by hand, now that it is deployed:** every open tab/device needs one
+Ctrl+Shift+R, and role **Admin** must have งานของฉัน unticked **once more** — the cloud row still
+holds the stale set (see §4), and nothing in the code can tell a stale set from a deliberate one.
 
 The untracked Thai-named `.txt` in the root is the owner's own file; it was deliberately never
 added.

@@ -135,7 +135,7 @@ a{color:var(--imode-blue)}
    flex-grow keeps the desktop layout identical: with room to spare the five spread across the
    card. A sixth step would simply make the row wider and still scroll, which the old hard
    760px could not do. */
-.scd-steps{display:flex;align-items:flex-start;list-style:none;margin:0;padding:0;overflow-x:auto;-webkit-overflow-scrolling:touch;min-width:0}
+.scd-steps{display:flex;align-items:flex-start;list-style:none;margin:0;padding:6px 0 4px;overflow-x:auto;-webkit-overflow-scrolling:touch;min-width:0}
 .scd-steps li{flex:1 0 152px;position:relative;text-align:center;padding:0 6px}
 .scd-steps li::before{content:"";position:absolute;top:17px;left:-50%;width:100%;height:3px;background:#e3ecfa;z-index:0}
 .scd-steps li:first-child::before{display:none}
@@ -4687,7 +4687,11 @@ load().then(function(res){
   var bar=fit.previousElementSibling;
   if(bar&&bar.classList.contains('scd-a4-bar')){
    var lab=bar.querySelector('.scd-a4-size');
-   if(lab)lab.textContent='A4 · 210 × 297 mm · '+Math.round(sc*100)+'%';
+   /* only when it really changes: a textContent write is a childList mutation, the observer
+      below re-ran apply() on it, apply() scheduled fitAll() again — one frame after another,
+      for ever. That was the "ค้าง" on ดูใบเสนอราคาเต็ม. */
+   var txt='A4 · 210 × 297 mm · '+Math.round(sc*100)+'%';
+   if(lab&&lab.textContent!==txt)lab.textContent=txt;
    var a=bar.querySelector('[data-scda4="fit"]'),b=bar.querySelector('[data-scda4="full"]');
    if(a)a.setAttribute('aria-pressed',String(!full));
    if(b)b.setAttribute('aria-pressed',String(full));
@@ -4697,10 +4701,11 @@ load().then(function(res){
  function apply(){
   css();
   var papers=document.querySelectorAll('.scd-qdoc .quote-doc.official');
-  var n=0;
+  var n=0,fresh=0;
   for(var i=0;i<papers.length;i++){
    var p=papers[i];
    if(p.closest('.scd-a4-stage')){n++;continue}
+   fresh++;
    p.classList.add('scd-a4-page');
    /* .scd-qdoc carries min-width:720px so the restated .quote-paper-* grids had something to
       lay out against. The paper is a fixed 210mm now, so that floor is obsolete for it — and
@@ -4727,7 +4732,7 @@ load().then(function(res){
    }
    n++;
   }
-  if(n)requestAnimationFrame(function(){fitAll();requestAnimationFrame(fitAll)});
+  if(fresh)requestAnimationFrame(function(){fitAll();requestAnimationFrame(fitAll)});
   return n;
  }
  window.imodeScdA4=apply;

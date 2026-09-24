@@ -126,6 +126,26 @@
   };
  }
 
+ /* 2026-09-24 — the wrapper above is not enough on its own: js/09's login() calls its own
+    CLOSURE accountToUser(), not window.uatAuth.accountToUser, so a real sign-in still arrived
+    with photo:'' — and a session restored from storage predates any photo added since. The
+    sidebar card therefore showed initials for everybody but technicians. The photo is resolved
+    from the account at render time instead, so it follows every sign-in path and every save. */
+ if(typeof window.renderUserCard==='function'){
+  var baseCard=window.renderUserCard;
+  window.renderUserCard=function(){
+   try{
+    if(typeof currentUser!=='undefined'&&currentUser){
+     var un=String(currentUser.username||String(currentUser.id||'').replace(/^UAT-/,'')).toLowerCase();
+     var acc=un&&accounts().filter(function(a){return a&&String(a.username||'').toLowerCase()===un})[0];
+     var photo=acc?(String(acc.photo||'')||inheritedPhoto(acc)):'';
+     if(photo&&currentUser.photo!==photo)currentUser.photo=photo;
+    }
+   }catch(e){}
+   return baseCard.apply(this,arguments);
+  };
+ }
+
  /* ------------------------------------------------------------------- the form block --- */
  function initials(name){
   var s=String(name||'').trim();

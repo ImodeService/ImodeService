@@ -42,3 +42,6 @@ Andriod_app/
 
 # Shell accidents that have landed in the repo root
 indow.*
+
+# Real customer / machine data — never commit (repo was public)
+Data/

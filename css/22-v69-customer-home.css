@@ -471,6 +471,25 @@ body.customer-portal-mode .chome-grid > button b{padding-right:26px}
 }
 
 /* ---------------------------------------------------------------------
+   6b. The English label fits on a phone
+   2026-09-24 - measured, not eyeballed: the label box is 95px at 390px and 80px at
+   360px, while "BUY / RENEW WARRANTY" needs 135px, so with white-space:nowrap it came
+   out as "BUY / RENEW W...". Four of the nine labels were cut at 390px, six at 360px,
+   three at 430px and one at 480px; at 540px and above nothing is cut, which is why this
+   stops there. The label is allowed to wrap instead of being truncated. The coloured
+   rule is an absolutely positioned ::before at top:0, so it is unaffected, and the
+   cards already carry min-height:112px, so a second line costs no height. The letter
+   spacing comes down a little so most labels still fit on one line.
+   --------------------------------------------------------------------- */
+@media (max-width:540px){
+  .chome-grid > button i{
+    white-space:normal;
+    letter-spacing:.07em;
+    line-height:1.3;
+  }
+}
+
+/* ---------------------------------------------------------------------
    7. Reduced motion — the page simply appears
    --------------------------------------------------------------------- */
 @media (prefers-reduced-motion:reduce){

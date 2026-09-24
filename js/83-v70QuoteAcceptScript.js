@@ -243,8 +243,9 @@
     key:'auto_quoteok_'+q.id,
     icon:'✍',
     title:tl('ลูกค้าอนุมัติใบเสนอราคาแล้ว','The customer approved a quotation'),
-    message:esc2(q.id)+' · '+esc2(q.customer||'-')+' · '+esc2(money(q.grand))
-      +(a.name?' · '+tl('เซ็นโดย ','signed by ')+esc2(a.name):''),
+    /* 2026-09-25: raw on purpose - the sink escapes. See js/16's note. */
+    message:(q.id||'')+' · '+(q.customer||'-')+' · '+money(q.grand)
+      +(a.name?' · '+tl('เซ็นโดย ','signed by ')+a.name:''),
     createdAt:a.at||q.updatedAt||q.createdAt,
     caseId:q.caseId||'',
     read:false

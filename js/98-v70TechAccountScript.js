@@ -222,7 +222,7 @@
  }
 
  var st=document.createElement('style');
- st.id='v70TechAccountStyle';
+ st.id='v70TechAccountFormStyle';   /* 2026-09-25: js/64 already uses 'v70TechAccountStyle' for ITS style block. Two elements with one id is invalid, and getElementById would always have returned js/64's. Different files, different jobs, the id collision was an accident. */
  st.textContent=''
  +'.techacc{margin:12px 0 4px;padding:11px 12px;border:1px solid #d8e2f2;border-radius:12px;'
  +'background:linear-gradient(180deg,#f7faff,#fff)}'

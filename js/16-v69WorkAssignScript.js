@@ -644,8 +644,11 @@
     key:'auto_intake_'+c.id,
     icon:c.channel==='LINE OA'?'📱':'🆕',
     title:tl('เคสใหม่รอมอบหมาย','New case waiting to be assigned'),
-    message:esc2(c.ticket)+' · '+esc2(c.customer||'-')+' · '+esc2(c.machine||'-')
-      +(c.channel?' · '+esc2(c.channel):''),
+    /* 2026-09-25: deliberately NOT escaped here. Every sink that renders a notification
+       message escapes it already (js/03 lines 397/1118/1152/1297 and js/58), and now that
+       window.esc really exists, escaping here too would double it and show the user &amp;. */
+    message:(c.ticket||'')+' · '+(c.customer||'-')+' · '+(c.machine||'-')
+      +(c.channel?' · '+c.channel:''),
     createdAt:c.createdAt||c.updatedAt,
     caseId:c.id,
     read:false

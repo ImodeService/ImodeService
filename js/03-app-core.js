@@ -246,6 +246,20 @@ const IMODE_LOGO=new URL('./assets/imode-document-logo.webp',location.href).href
 const IMODE_UI_LOGO=new URL('./assets/imode-ui-logo-v532.png',location.href).href;
 const PAGE_INFO={th:{dashboard:['I-MODE Plus Service & Maintenance','ภาพรวมงาน Service & Maintenance วันนี้'],cases:['เคสงานบริการ','รับเรื่อง มอบหมาย นัดหมาย ส่งงาน และปิดเคส'],quotation:['ทำใบเสนอราคา','คำนวณค่าบริการ ค่าเดินทาง งานด่วน อะไหล่ และเชื่อม Service Case'],customers:['ฐานข้อมูลลูกค้า','ข้อมูลลูกค้า เครื่องจักร Location และประวัติ Service'],machines:['ฐานข้อมูลเครื่องจักร','ข้อมูลหลักเครื่องจักรและประวัติการซ่อม'],qc:['QC เครื่องจักร','ตรวจรับเครื่อง / ก่อนส่งมอบ / หลังซ่อม / ก่อนติดตั้ง พร้อม Checklist และผลการอนุมัติ'],technicians:['ทีมช่าง','ทีม Service / Technical / R&D สำหรับ PM, Maintenance, Onsite และ Workshop'],calendar:['ปฏิทิน Service Maintenance','ตารางงานและนัดหมายของทีม Service Maintenance'],warranty:['ระบบประกันเครื่อง','ทะเบียนประกันและเอกสารการรับประกันเครื่องจักร'],documents:['คลังเอกสารเครื่องจักร','คู่มือ Drawing SOP PM และข้อมูลใช้งานเครื่อง'],notifications:['การแจ้งเตือน','นัดหมาย เคสด่วน งานรออะไหล่ และการส่งงาน'],reports:['รายงาน Service','สรุปข้อมูล KPI และ Service Report'],settings:['ตั้งค่าระบบ','กำหนดระบบ ภาษา โมดูล การแจ้งเตือน และ Cloud Database'],'field-service':['Field Service สำหรับทีมช่าง','คิวงาน Check-in ใบตรวจ รูปภาพ ลายเซ็น และ Service Report'],'customer-portal':['บริการลูกค้าผ่าน LINE OA','แจ้งปัญหา ตรวจประกัน ประวัติ Service และขอใบเสนอราคา']},en:{dashboard:['I-MODE Plus Service & Maintenance','Today’s Service & Maintenance overview'],cases:['Service Cases','Intake, assign, schedule, complete and close service cases'],quotation:['Quotation Builder','Calculate service, travel, emergency and parts linked to service cases'],customers:['Customer Database','Customers, machines, locations and service history'],machines:['Machine Database','Machine master data and repair history'],qc:['Machine QC','Incoming / pre-delivery / post-service / pre-installation with checklist and approval'],technicians:['Service Maintenance','Service / Technical / R&D teams for PM, maintenance, onsite and workshop'],calendar:['Service Maintenance Calendar','Service staff schedules and appointments'],warranty:['Machine Warranty','Warranty registry and warranty certificates'],documents:['Machine Document Center','Manuals, drawings, SOP, PM and machine documents'],notifications:['Notifications','Appointments, urgent cases, parts waiting and submissions'],reports:['Service Reports','KPI, summaries and service reports'],settings:['System Settings','System, language, modules, notifications and cloud database'],'field-service':['Technician Field Service','Queue, check-in, inspection, media, signatures and reports'],'customer-portal':['LINE OA Customer Service','Issue reporting, warranty, service history and quotation requests']}};let pageInfo=PAGE_INFO[settings.language||'th'];
 const esc=(v='')=>String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+/* 2026-09-25 - esc IS EXPORTED, and this one line is not cosmetic.
+   `const esc` is a LEXICAL GLOBAL, so window.esc has always been undefined - the trap this
+   project has recorded since part 17 section 5 for currentUser/settings/cases, and again in
+   part 30 for fmt and fmtDay. 48 patch files each carry
+       function esc2(v){return typeof window.esc==='function'?window.esc(v):String(v==null?'':v)}
+   whose fallback does NOT escape. So all 925 esc2() calls in this project were pass-throughs,
+   and every one of them that writes into innerHTML rendered stored text as live markup.
+   Measured before this line existed: an <img src=x onerror=...> stored in a machine name ran
+   on the assign page and in the notification centre, on every page, because renderAll()
+   renders every module. Anyone who can write a customer or machine name can do that, and
+   04-anon-uat.sql currently lets anyone on the internet write one.
+   Exporting the real function repairs all 48 files at once. fmt and fmtDay are still
+   lexical-only; export them the same way if a patch file ever needs them. */
+window.esc=esc;
 const uid=()=>crypto.randomUUID?crypto.randomUUID():'ID'+Date.now()+Math.random();
 const uiLocale=()=>settings.language==='en'?'en-GB':'th-TH';
 const fmt=v=>v?new Date(v).toLocaleString(settings.language==='en'?'en-GB':'th-TH',{dateStyle:'medium',timeStyle:'short'}):'-';
@@ -1447,7 +1461,16 @@ function getQuoteTravel(distance){
      whole-km value in the documented table is unchanged; only the gaps are filled, and they
      fill upward (15.5 km is more than 15, so it is the 'up to 30' band). */
   const z=zones.find(x=>x.max===null||x.max===''||x.max===undefined||d<=Number(x.max))||zones[zones.length-1]||{name:'Z0',min:0,max:null,fee:0,perKm:0};
-  const fee=Number(z.perKm)>0?d*Number(z.perKm):Number(z.fee)||0;
+  let fee=Number(z.perKm)>0?d*Number(z.perKm):Number(z.fee)||0;
+  /* 2026-09-25 - AND THE CURVE MUST NOT FALL. The last zone charges per km (10 THB) while
+     the one before it is a FLAT 1,900 for 121-180 km, so 181 km quoted 1,810: a customer
+     FURTHER away paid less than one at 180 km, and did so all the way to 189 km (worst case
+     90 THB short). Measured across 0-260 km in 1 km steps; that was the only place the
+     curve fell. A per-km zone is now floored at the previous zone's flat fee. Every distance
+     from 190 km up is untouched, because the per-km figure is already above the floor there,
+     and every whole-km value in the documented table is unchanged. The floor is read from
+     the zone list itself, so it still holds if the rates are edited in Settings. */
+  if(Number(z.perKm)>0){const zi=zones.indexOf(z),prev=zi>0?Number(zones[zi-1].fee)||0:0;if(prev>fee)fee=prev}
   return {zone:String(z.name||'Z0').replace(/^Z/i,''),name:z.name||'Z0',fee}
 }
 function normalizeMachineSize(v){const s=String(v||'').trim().toUpperCase();return s==='S'||s==='M'||s==='L'?s:''}

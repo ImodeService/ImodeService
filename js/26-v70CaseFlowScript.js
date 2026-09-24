@@ -126,7 +126,8 @@
     key:'auto_assigned_'+c.id,
     icon:'🧾',
     title:tl('คุณได้รับมอบหมายงาน','Work assigned to you'),
-    message:esc2(c.ticket||c.id)+' · '+esc2(c.customer||'-')+' · '+esc2(c.machine||'-')
+    /* 2026-09-25: raw on purpose - the sink escapes. See js/16's note. */
+    message:(c.ticket||c.id)+' · '+(c.customer||'-')+' · '+(c.machine||'-')
       +(c.appointment&&typeof fmt==='function'?' · '+esc2(fmt(c.appointment)):''),
     createdAt:c.updatedAt||c.createdAt,
     caseId:c.id,

@@ -7436,3 +7436,169 @@ whether it was GitHub Pages or Live Server.
   BEFORE adding the job it expects to be new.
 - `imodeOpenAssignedCase` navigates to the case page; use `imodeMarkJobRead` to clear a badge in
   a test that must stay on `index.html`.
+
+---
+
+## Session Change Log — 2026-09-25 (part 35): the escaping helper never escaped anything
+
+A bug sweep, asked for in those words ("ตรวจหาบัคทั้งหมด และแก้ไขมัน... และป้องกัน"). Everything
+below was **measured in a browser before it was touched** and re-measured after. Four defects were
+found and fixed; five suspicions were measured and turned out NOT to be defects, which is recorded
+too so the next session does not chase them again.
+
+| File | What |
+|---|---|
+| `js/03-app-core.js` | **`window.esc=esc`** — one line that repairs 925 call sites in 48 files; and the travel charge may no longer fall as the distance grows |
+| `js/16`, `js/26`, `js/83` | three notification messages stop pre-escaping, now that escaping really happens |
+| `css/22-v69-customer-home.css` | the English label on the customer page fits a phone |
+| `js/98-v70TechAccountScript.js` | its `<style>` had js/64's id |
+
+### 1. THE ONE THAT MATTERS: `esc2()` has never escaped anything, in 48 files
+
+`esc` is declared at `js/03:248` as **`const`** — a lexical global, so **`window.esc` is
+`undefined`**. Forty-eight patch files each carry the identical helper:
+
+```js
+function esc2(v){return typeof window.esc==='function'?window.esc(v):String(v==null?'':v)}
+```
+
+The test fails, so every call took the fallback — **`String(v)`, which escapes nothing**. There are
+**925 `esc2()` call sites**, and every one that writes into `innerHTML` rendered stored text as
+live markup.
+
+Measured, with one marker per field so the element names the field it came from: an
+`<img src=x onerror=...>` stored in a **machine name, customer name, ticket or channel** executed on
+**every page walked** — dashboard, cases, customers, machines, requests, quotation, calendar,
+assign, field-all, qc, warranty, documents, reports, notifications — because `renderAll()` renders
+every module whatever page is on screen. Seven `<img>` elements were created and the payload ran.
+
+**Who can do it:** anybody who can write a customer or machine name. Staff can, the portal can — and
+`04-anon-uat.sql` currently lets **anyone on the internet** write one, so this was reachable from
+outside. It is a stored XSS in the admin's browser.
+
+**The fix is one line** — `window.esc=esc;` beside the declaration — because all 48 files ask for
+the same property. This is the trap this file has recorded since part 17 §5 for
+`currentUser`/`settings`/`cases` and again in part 30 for `fmt`/`fmtDay`; nobody had applied it to
+`esc`. **`fmt` and `fmtDay` are still lexical-only** — export them the same way if a patch file
+ever needs them.
+
+**The one thing turning it on could break, and did not:** three notification `message:` fields were
+built with `esc2()` and then rendered through sinks that escape again (`esc(n.message)` at
+js/03:397/1118/1152/1297, and js/58:55). With `esc2` live that would double-escape and show the
+user `&amp;`. Those three now hand over the raw text — the sink owns the escaping. Verified: a
+company called `S&P "Alpha" <Bangkok> Co., Ltd. it's` reads correctly in 27 places across all 26
+pages, and **no rendered text anywhere contains a literal entity**.
+
+**The suite detects the bug, it does not merely agree with the fix.** Re-run with `window.esc`
+forced back to `undefined`: **7 injected elements, payload executed**. With the fix: 0 elements,
+0 images, payload never ran, and the hostile text is on screen as readable characters — which is
+what correct escaping looks like. Console errors over the same walk went 10 → 0, because the
+`<img src=x>` that were 404-ing are no longer created.
+
+`service-case-detail.html` is **not** affected: it declares its own `esc` as a function declaration
+inside its IIFE and calls it directly, never through `window`.
+
+### 2. The travel charge fell as the distance grew
+
+`getQuoteTravel()` scanned in 1 km steps from 0 to 260: **181–189 km cost LESS than 180 km.**
+180 km is a flat 1,900 (Z5); 181 km is the per-km zone at 10 THB/km = **1,810**. A customer further
+away paid up to 90 THB less, and it only caught up at 190 km. That is the documented rate card
+applied literally — `121–180 = 1,900`, `>180 = 10 THB/km` — so it is the table contradicting itself,
+not a coding slip.
+
+A per-km zone is now **floored at the previous zone's flat fee**, read from the zone list itself so
+it still holds if the rates are edited in Settings. 181–189 km becomes 1,900; **every distance from
+190 km up is untouched** (the per-km figure is already above the floor), and every whole-km value in
+the documented table is unchanged. Re-measured across 0–260 km: the curve never falls.
+
+**This is a price change** for one 9 km band. To revert it, delete the `if(Number(z.perKm)>0){...}`
+line; to go the other way instead, lower Z5.
+
+### 3. The customer page cut its own labels on every phone
+
+The small-caps English label under each action card is `white-space:nowrap; overflow:hidden`, and
+the label box is **95px at 390px, 80px at 360px** while `"BUY / RENEW WARRANTY"` needs **135px**.
+Measured: **4 of 9 labels cut at 390px, 6 of 9 at 360px**, 3 at 430px, 1 at 480px, none at 540px and
+above. On screen they read "BUY / RENEW W…", "SERVICE QUOTA…", "WARRANTY CHE…" — on the one page
+every customer sees.
+
+Below 540px the label now wraps instead of being truncated, with slightly tighter letter spacing so
+most still fit one line. The coloured rule is an absolutely positioned `::before` at `top:0` and is
+unaffected, and the cards already carry `min-height:112px`, so the second line costs no height.
+Re-measured: **0 cut at 360 / 390 / 430 / 480 / 540 / 1024**, and confirmed by screenshot.
+
+### 4. Two `<style>` elements shared one id
+
+`js/64` and `js/98` are different files with different jobs — both happen to be named
+`…TechAccountScript` — and both appended a `<style id="v70TechAccountStyle">`. Neither guarded, so
+both existed and `getElementById` would always have returned js/64's. No functional consequence
+today (CSS applies per element, and nothing reads that id), but it is invalid and exactly the kind
+of thing a later `getElementById` walks into. js/98's is `v70TechAccountFormStyle` now.
+
+### Measured and NOT a defect — do not chase these again
+
+- **`ReferenceError: customerForm is not defined`.** The part-28 fragility (≈25 modals bind their
+  submit handler on `setTimeout(…,20)`; a second `openModal()` inside that window leaves the
+  id-global gone). Opening the customer form on its own wires correctly with no error, and **all 68
+  openers on the customers page clicked one at a time produced zero errors**. It only fires when a
+  second `openModal()` lands inside 20 ms, which is what a crawler does and a person does not.
+  Part 28's decision to leave js/03 alone stands.
+- **`window.imodeV67Data is not a function`** — it is an **object** with `.get()`/`.set()`
+  (js/04:105), which is exactly how js/41 calls it. The ops sync is fine.
+- **Fractional travel bands** (15.5 / 30.5 / 50.5 / 80.7 / 120.2 km) — part 28's fix holds: 400 /
+  600 / 900 / 1300 / 1900, none falling through to the per-km zone.
+- **Dates** — `todayISO()` is the local date, `addMonthsISO` keeps the day across 31 Jan, 31 Mar and
+  31 Dec. Part 28's fix holds.
+- **Crew matching** — `caseHasTech()` finds the lead, the second technician and refuses a stranger.
+  Part 25's fix holds.
+- **`fromQuotationDb`** still reads the string `"false"` as not-under-warranty (part 18's fix holds),
+  and `warrantyMode` follows it.
+
+### What was swept, and what it cost
+
+A CDP driver in the session scratchpad (not added to the repo), carrying every harness note this
+file records. Passes: `node --check` on all 121 files and both inline blocks of the case page ·
+every inline `on*` handler resolved at runtime (981 attributes, 127 distinct functions; the only
+"missing" two are `add` and `remove` from `classList.add(` and `this.remove(`, i.e. method calls) ·
+duplicate ids at rest and with a popup open · **26 sidebar pages as admin and 7 as technician**,
+each checked for errors, wrong landing and sideways scroll · **57 popups** opened, closed and
+checked · a per-element geometry sweep of all 26 pages at 390px (in-flow children only, off-screen
+elements skipped, deliberate scrollers skipped — the false positives part 33 recorded) · the
+customer surface walked card by card, all 9 · hostile data through five lists and two popups ·
+an unknown serial · money, dates, stock, crew and signature logic.
+
+**0 page errors and 0 console errors** on every run after the fixes.
+
+### Harness notes worth keeping
+
+- **`node --check` cannot see this class of bug at all.** `esc2()` is syntactically perfect and
+  semantically empty. Only running it against hostile data finds it.
+- **Put one marker per field in the payload** (`data-f="c.ticket"`), not one generic payload. The
+  element that appears then names the field and the render path, which turned a "something is
+  unescaped somewhere" into four field names in one run.
+- **"Is the substring in `innerHTML`?" is the wrong question.** Correctly escaped text still
+  *contains* the characters `onerror=`; `innerHTML` re-serialises a text node, so `>` comes back as
+  `&gt;` and the string is there either way. Ask whether an **element** was created
+  (`querySelectorAll('*')` with that attribute, or `document.images`). That assertion failed twice
+  here for no defect.
+- **Always run the control.** Forcing `window.esc` back to `undefined` with
+  `Page.addScriptToEvaluateOnNewDocument` proved the suite detects the bug rather than agreeing
+  with the fix.
+- A clicking crawler is good at reaching states a person cannot, so **attribute every finding to a
+  single click with a human-sized gap** before believing it.
+
+### Open / risk
+
+1. **The travel fix is a price change** for 181–189 km (1,810–1,890 → 1,900). One line to revert.
+2. `fmt` and `fmtDay` are still lexical-only, so `window.fmt` is `undefined`. Nothing depends on it
+   today; part 30 records a patch file that silently printed raw ISO strings because of it.
+3. The `setTimeout(…,20)` modal binding is still there in ≈25 modals, deliberately. It is
+   crawler-only; if a future patch ever calls `openModal()` twice in a tick it becomes real, and the
+   symptom is a form that silently does not save.
+4. `c.serviceTeam` and `c.caseType` are written onto a case and are **not** in
+   `cloudUpsertCase()`'s column whitelist, so they do not survive a sync. Unchanged from part 28 §4
+   and part 27 §open-4; both degrade quietly today.
+5. Unchanged from part 15: `04-anon-uat.sql` means anyone on the internet can read and write this
+   database — which is what made §1 reachable from outside rather than only by staff.
+6. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its
+   serial or QR.

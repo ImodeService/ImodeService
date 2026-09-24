@@ -282,7 +282,12 @@
                       cloudSaveSettings() pushed a blob without them and deleted them from the
                       database. Measured — see js/90's header. quoteDocs joins it so the paper
                       another device re-bakes is picked up too. */
-                   'quoteStaffSigns','quoteDocs'];
+                   'quoteStaffSigns','quoteDocs',
+                   /* 2026-09-24 — roles and permissions, so an open tab learns about a role
+                      change at once instead of pushing its stale copy back over it. Taken only
+                      when the incoming permStamp is not older than ours (see js/90). */
+                   'roles','userPermissions','rolePresetOptOut','systemBehavior','permStamp'];
+ var PERM_RT={roles:1,userPermissions:1,rolePresetOptOut:1,systemBehavior:1,permStamp:1};
  /* Keys that are {id: record} and only ever grow. An incoming copy that has lost an id this
     device holds must not delete it: the writer may simply not have seen it yet. Same rule as
     js/90 applies to the push and the sync, and as CaseLive applies on the case page.
@@ -303,8 +308,11 @@
   var data=payload&&payload.new&&payload.new.data;
   if(!data||typeof data!=='object')return;
   var moved=[];
+  var permOk=false;
+  try{permOk=!!data.permStamp&&(!settings.permStamp||data.permStamp>=settings.permStamp)}catch(e){}
   SETTING_KEYS.forEach(function(k){
    if(!(k in data))return;
+   if(PERM_RT[k]&&!permOk)return;
    var incoming='',local='',next;
    try{next=ADDITIVE[k]?unionById(settings[k],data[k]):data[k]}catch(e){next=data[k]}
    try{incoming=JSON.stringify(next)}catch(e){return}

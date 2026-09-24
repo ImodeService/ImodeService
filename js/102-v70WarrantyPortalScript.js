@@ -162,13 +162,14 @@
  /* ------------------------------------------------ the portal repaints itself --- */
  /* Only read-only screens are re-rendered. Re-running a form would throw away what the
     customer has typed, which is worse than showing them slightly old data. */
- var last=null;
+ var last=null,lastNode=null;
  function trackRead(name,after){
   var base=window[name];
   if(typeof base!=='function')return;
   window[name]=function(){
    var r=base.apply(this,arguments);
    last=name;
+   try{var b=host();lastNode=b?b.firstElementChild:null}catch(e){lastNode=null}
    wire();
    if(after)after();
    return r;
@@ -204,13 +205,26 @@
  function repaint(){
   if(!portalVisible())return;
   /* The machine card is outside #portalContent and is what "สถานะเครื่องจักร" means. */
-  try{if(typeof renderCustomerPortal==='function'&&!last)renderCustomerPortal()}catch(e){}
+  /* renderCustomerPortal() rewrites #portalContent too, so it may only run on the Home page —
+     never over a case, a quotation or a half-filled form (detail mode). */
+  var inDetail=!!document.querySelector('.imode-portal-detail-mode');
+  if(!inDetail){try{if(typeof renderCustomerPortal==='function')renderCustomerPortal()}catch(e){}return}
   if(!last||typeof window[last]!=='function')return;
   var box=host();
   if(!box||!box.innerHTML)return;
+  /* 2026-09-24 — BUG FIXED HERE. Reported: "พอสถานะงานอัพเดตปุ๊ป มันจะเด้งไปหน้าล่าสุดที่ลูกค้า
+     เข้า". `last` was only ever cleared by a FORM, so after reading ประวัติ Service and going
+     back to the Home page — or on into one case (js/53) or one quotation (js/56) — every
+     realtime row re-ran showPortalHistory() and threw the customer back into it. Only redraw
+     the screen that is still on screen: the detail view must still be open and #portalContent
+     must still hold the very node that screen drew. Anything else put there since — the Home
+     page, a case, a quotation — means that screen is gone, and so is the memory of it. */
+  var shell=document.querySelector('.imode-portal-detail-mode');
+  if(!shell||box.firstElementChild!==lastNode){last=null;lastNode=null;return}
   var keep=last;
   window[keep]();
   last=keep;
+  try{lastNode=box.firstElementChild}catch(e){}
  }
  window.imodePortalRepaint=repaint;
 

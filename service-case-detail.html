@@ -638,6 +638,18 @@ body.scd-modal-open{overflow:hidden}
 @media (max-width:640px){.scd-ce-grid,.scd-ce-grid.is-3{grid-template-columns:minmax(0,1fr)}}
 /* ติดต่อลูกค้า: four equal cards that always fit the popup. minmax(0,1fr) lets a long phone
    number or e-mail wrap inside its card instead of pushing the grid into a sideways scroll. */
+/* 2026-09-24 — the company's contact list in ติดต่อลูกค้า */
+.scd-cc-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-bottom:12px}
+.scd-cc-card{border:1px solid #dde7f5;border-radius:14px;padding:11px 12px;background:#fbfdff;min-width:0}
+.scd-cc-top b{color:var(--imode-navy);font-size:14px}.scd-cc-top small{display:block;color:var(--muted);font-size:11.5px;margin-top:2px}
+.scd-cc-tag{display:inline-block;font-size:10px;font-weight:800;color:#087a45;background:#e8f7ef;border-radius:999px;padding:2px 7px;vertical-align:middle}
+.scd-cc-chs{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.scd-cc-ch{display:inline-flex;align-items:center;gap:4px;border:1px solid #d6e2f3;border-radius:999px;background:#fff;padding:6px 11px;color:var(--imode-navy);text-decoration:none;font-size:12.5px;font-weight:600;overflow-wrap:anywhere;max-width:100%}
+.scd-cc-ch small{color:var(--muted);font-weight:700}
+.scd-cc-ch:hover{background:#f2f7ff}
+.scd-cc-line{border-color:#b6e8c9}.scd-cc-whatsapp{border-color:#b6ebc7}.scd-cc-email{border-color:#f6d7a6}
+.scd-cc-none,.scd-cc-empty{color:#93a4c1;font-size:12.5px;margin:0}.scd-cc-note{margin:7px 0 0;font-size:11.5px;color:#56698c}
+@media (max-width:480px){.scd-cc-list{grid-template-columns:1fr}}
 .scd-contact-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;padding-top:2px}
 .scd-contact{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0;padding:14px 8px 12px;
   border-radius:14px;border:1px solid var(--line-2);background:#fff;color:var(--imode-navy);cursor:pointer;text-align:center;
@@ -1216,7 +1228,10 @@ function buildModel(c){
     m.customer={id:cu&&cu.id||c.customerId||'',name:cu&&cu.name||c.customer||'-',
       address:cu&&(cu.address||cu.location||cu.branch)||c.location||'',
       contactName:c.contact||cu&&cu.contact||'',phone:c.phone||cu&&cu.phone||'',
-      email:c.email||cu&&cu.email||'',lineUserId:cu&&cu.lineUserId||'',whatsapp:cu&&cu.whatsapp||''};
+      email:c.email||cu&&cu.email||'',lineUserId:cu&&cu.lineUserId||'',whatsapp:cu&&cu.whatsapp||'',
+      /* js/114's list; null for a customer saved before it, derived in contactList() */
+      contacts:cu&&Array.isArray(cu.contacts)?cu.contacts:null,legacyContact:cu&&cu.contact||'',
+      legacyPhone:cu&&cu.phone||'',legacyEmail:cu&&cu.email||''};
     var days=wa&&wa.endDate?daysBetween(wa.endDate,new Date()):null;
     m.machine={id:ma&&ma.id||c.machineId||'',name:ma&&(ma.nameTh||ma.name)||c.machine||'-',
       model:ma&&ma.model||c.model||'-',serialNumber:ma&&ma.serial||c.serial||'-',
@@ -3925,17 +3940,47 @@ var CONTACT_ICON={
   email:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="6" fill="#f79009"/><path fill="none" stroke="#fff" stroke-width="1.7" stroke-linejoin="round" d="M5.5 7.5h13v9h-13z M5.5 7.5l6.5 5 6.5-5"/></svg>',
   whatsapp:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="6" fill="#25d366"/><path fill="none" stroke="#fff" stroke-width="1.6" d="M12 5.2a6.8 6.8 0 0 0-5.9 10.2l-.9 3.3 3.4-.9A6.8 6.8 0 1 0 12 5.2z"/><path fill="#fff" d="M9.6 8.6c.2-.2.5-.2.6 0l.8 1.4c.1.2.1.4 0 .6l-.4.5c.4.9 1.2 1.7 2.1 2.1l.5-.4c.2-.1.4-.1.6 0l1.4.8c.2.1.2.4 0 .6l-.6.7c-.3.3-.8.4-1.2.3-2.1-.6-3.8-2.3-4.4-4.4-.1-.4 0-.9.3-1.2z"/></svg>'
 };
+/* 2026-09-24 — the company's contacts (js/114, customer.contacts), each channel a real link.
+   Same derivation as js/114 for a customer saved before it: its one-person fields become one
+   contact. The person who reported THIS case is shown first when they are not already listed. */
+var CC_TYPES={phone:['โทร','📞'],email:['อีเมล','✉️'],line:['LINE','💬'],whatsapp:['WhatsApp','🟢']};
+function ccHref(ch){
+  var v=String(ch.value||'').trim();
+  if(ch.type==='phone')return 'tel:'+v.replace(/[^0-9+]/g,'');
+  if(ch.type==='email')return 'mailto:'+v+'?subject='+encodeURIComponent(caseDetailModel.case.caseNo||'');
+  if(ch.type==='line')return /^https?:/i.test(v)?v:(v.charAt(0)==='@'?'https://line.me/R/ti/p/'+encodeURIComponent(v):'https://line.me/ti/p/~'+encodeURIComponent(v));
+  if(ch.type==='whatsapp'){var d=v.replace(/[^0-9]/g,'');if(d.charAt(0)==='0')d='66'+d.slice(1);return 'https://wa.me/'+d}
+  return '#';
+}
+function contactList(cu){
+  if(Array.isArray(cu.contacts))return cu.contacts;
+  var ch=[];
+  String(cu.legacyPhone||'').split(/[,\/]+/).map(function(x){return x.trim()}).filter(Boolean).forEach(function(v){ch.push({type:'phone',value:v})});
+  if(cu.legacyEmail)ch.push({type:'email',value:cu.legacyEmail});
+  return (cu.legacyContact||ch.length)?[{name:cu.legacyContact||'ผู้ติดต่อหลัก',position:'',channels:ch}]:[];
+}
+function ccCard(p,tag){
+  var chs=(p.channels||[]).map(function(ch){
+    var t=CC_TYPES[ch.type]||CC_TYPES.phone;
+    return '<a class="scd-cc-ch scd-cc-'+esc(ch.type)+'" href="'+esc(ccHref(ch))+'"'
+      +(ch.type==='line'||ch.type==='whatsapp'?' target="_blank" rel="noopener"':'')+'>'
+      +t[1]+' <small>'+esc(t[0])+'</small> '+esc(ch.value)+'</a>';
+  }).join('')||'<span class="scd-cc-none">ยังไม่มีช่องทางติดต่อ</span>';
+  return '<div class="scd-cc-card"><div class="scd-cc-top"><b>'+esc(p.name||'-')+'</b>'
+    +(tag?' <span class="scd-cc-tag">'+esc(tag)+'</span>':'')
+    +(p.position?'<small>'+esc(p.position)+'</small>':'')+'</div><div class="scd-cc-chs">'+chs+'</div>'
+    +(p.note?'<p class="scd-cc-note">'+esc(p.note)+'</p>':'')+'</div>';
+}
 function openContactPicker(){
-  var cu=caseDetailModel.customer;
-  panel('ติดต่อลูกค้า','<div class="scd-contact-grid">'
-   +[['phone','โทรศัพท์',cu.phone||'ยังไม่มีเบอร์',!!cu.phone],
-     ['line','LINE',cu.lineUserId?'เชื่อมแล้ว':'ยังไม่เชื่อม',!!cu.lineUserId],
-     ['email','อีเมล',cu.email||'ยังไม่มีอีเมล',!!cu.email],
-     ['whatsapp','WhatsApp',cu.whatsapp||'ยังไม่มี',!!cu.whatsapp]].map(function(p){
-      return '<button type="button" class="scd-contact'+(p[3]?'':' is-missing')+'" data-contact="'+p[0]+'">'
-        +'<span class="scd-contact-ic">'+CONTACT_ICON[p[0]]+'</span>'
-        +'<b>'+esc(p[1])+'</b><small>'+esc(p[2])+'</small></button>';
-     }).join('')+'</div>'
+  var cu=caseDetailModel.customer,raw=caseDetailModel.raw||{},list=contactList(cu);
+  var rep=String(raw.contact||'').trim(),repPhone=String(raw.phone||'').trim();
+  var listed=list.some(function(p){return rep&&String(p.name||'').trim()===rep});
+  var html='';
+  if((rep||repPhone)&&!listed)html+=ccCard({name:rep||'ผู้แจ้งเคส',channels:repPhone?[{type:'phone',value:repPhone}]:[]},'ผู้แจ้งเคสนี้');
+  html+=list.map(function(p,i){return ccCard(p,rep&&String(p.name||'').trim()===rep?'ผู้แจ้งเคสนี้':(i===0?'ผู้ติดต่อหลัก':''))}).join('');
+  panel('ติดต่อลูกค้า · '+(cu.name||''),'<div class="scd-cc-list">'
+   +(html||'<p class="scd-cc-empty">ยังไม่มีผู้ติดต่อของบริษัทนี้ — เพิ่มได้ที่หน้ารายละเอียดลูกค้า (ลูกค้า → กดชื่อบริษัท → ＋ เพิ่มผู้ติดต่อ)</p>')
+   +'</div>'
    +'<button type="button" class="sd-go ws-line-btn" data-action="open-line-message">📋 ข้อความส่งลูกค้าทาง LINE (ลิงก์เปิดหน้าลูกค้าด้วย S/N)</button>');
 }
 

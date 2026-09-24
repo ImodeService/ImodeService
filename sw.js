@@ -36,7 +36,7 @@
    activate. To remove this entirely: `imodeDisableOffline()` in the console, or delete the
    registration in js/111 — nothing else depends on it. */
 
-var VERSION = 'v1-2026-09-23';
+var VERSION = 'v2-2026-09-24';
 var CACHE = 'imode-offline-' + VERSION;
 
 /* The handful the document never references, so js/111 cannot discover them: the customer
@@ -114,6 +114,16 @@ function putIfOk(req, res) {
  return res;
 }
 
+/* 2026-09-24 — ALWAYS ASK THE SERVER. fetch(req) honours the browser's HTTP cache, and GitHub
+   Pages serves every file with max-age=600, so for ten minutes after a deploy a device could be
+   handed the previous copy of a page or a script — or, worse, a mix of old and new js/NN files,
+   which is the exact failure the network-first strategy below exists to prevent. Reported as a
+   fixed page that still behaved the old way. `no-cache` revalidates with the server every time
+   (a 304 when nothing changed, so it costs a round trip, not a download). */
+function fresh(req) {
+ try { return fetch(req, { cache: 'no-cache' }); } catch (x) { return fetch(req); }
+}
+
 self.addEventListener('fetch', function (e) {
  var req = e.request;
  if (req.method !== 'GET') return;
@@ -127,7 +137,7 @@ self.addEventListener('fetch', function (e) {
     the browser's dinosaur. */
  if (req.mode === 'navigate') {
   e.respondWith(
-   fetch(req).then(function (res) { return putIfOk(req, res); })
+   fresh(req).then(function (res) { return putIfOk(req, res); })
     .catch(function () {
      /* Each step is a promise, so they are chained rather than joined with `||` — a promise
         is always truthy and `a || b` here would return a promise resolving to undefined,
@@ -161,7 +171,7 @@ self.addEventListener('fetch', function (e) {
 
  if (sameOrigin) {
   e.respondWith(
-   fetch(req).then(function (res) { return putIfOk(req, res); })
+   fresh(req).then(function (res) { return putIfOk(req, res); })
     .catch(function () { return caches.match(req); })
   );
   return;

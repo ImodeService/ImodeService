@@ -41,8 +41,10 @@
  var have=false;
  try{have=PERMISSION_CATALOG.some(function(g){return (g.items||[]).some(function(i){return i[0]==='mywork.view'})})}catch(e){}
  if(!have&&typeof PERMISSION_CATALOG!=='undefined'){
-  PERMISSION_CATALOG.push({group:'งานของช่าง',groupEn:'Technician work',items:[
-   ['mywork.view','ดูงานที่ได้รับมอบหมายของตนเอง','View my assigned work']
+  /* Named after the sidebar entry it opens (2026-09-24): the owner looked for "งานของฉัน" in
+     Settings → roles and could not find it under "ดูงานที่ได้รับมอบหมายของตนเอง". */
+  PERMISSION_CATALOG.push({group:'งานของฉัน (ช่าง)',groupEn:'My Work (technician)',items:[
+   ['mywork.view','เมนู งานของฉัน — ดูงานที่ได้รับมอบหมายของตนเอง','My Work menu — view my assigned work']
   ]});
  }
  PAGE_PERMISSION['my-work']='mywork.view';

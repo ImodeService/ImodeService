@@ -7284,3 +7284,156 @@ to the company's VPS; this session was the offline work the owner asked for inst
 migration note is still the accepted next piece, and it is worth re-reading its five hazards
 first — in particular that every device already carries the old database URL in
 `imode_v5_cloud` for ever, so `js/23` has to force the new endpoint when it finds the old one.
+
+---
+
+## Session Change Log — 2026-09-24 (part 34): Version 1.0, customer contacts, badges, and three sync bugs
+
+### ⚠ STATE AT END OF DAY — READ FIRST
+
+**Pushed** (live on GitHub Pages): `dd6bd71`, `dda6b41`, `56c26f2` — the case-page quotation
+freeze, the status circles, the sidebar profile photo, `Data/` in `.gitignore`, Version 1.0, the
+UAT wording, the customer A4 quotation, the Sunday-first calendar.
+
+**NOT committed — in the working tree only** (all syntax-checked, all browser-tested headless):
+
+| File | What |
+|---|---|
+| `js/114-v70CustomerContactsScript.js` | **new** — many contacts per customer |
+| `js/115-v70CornerBadgeScript.js` | **new** — orange number circle on button corners |
+| `js/116-v70PortalDotsScript.js` | **new** — orange dots on the customer page |
+| `supabase/12-customer-contacts.sql` | **new — already RUN by the owner and verified** |
+| `js/16` | the My Work permission renamed so it can be found |
+| `js/74` | a technician's first job was never flagged new |
+| `js/85`, `js/90` | role changes were overwritten by other devices |
+| `js/102` | the customer page jumped back to the last screen on every update |
+| `sw.js` | revalidate same-origin files; VERSION → `v2-2026-09-24` |
+| `service-case-detail.html` | ติดต่อลูกค้า lists the company's contacts |
+| `index.html` | three `<script src>` tags (js/114–116) |
+| `CLAUDE.md` | this entry |
+
+The owner has not yet said to push these. After pushing: every open tab/device needs one
+Ctrl+Shift+R, and role **Admin** must have งานของฉัน unticked **once more** (the cloud row still
+holds the stale set — see §4).
+
+The untracked Thai-named `.txt` in the root is the owner's own file; it was deliberately never
+added.
+
+### 1. Version 1.0 — the Version section above is updated
+
+`Beta 1.0 Service focus full system` → **`Version 1.0`** in all seven places, suffix dropped, at
+the owner's request (move to the production server). js/06 now `remove()`s the sidebar sub-line.
+The login popup no longer says UAT / V6.8.
+
+### 2. Customer contacts — `js/114` + `customers.contacts jsonb`
+
+`customer.contacts = [{id, name, position, note, channels:[{id, type, value}]}]`, types
+phone / email / line / whatsapp, any number each, each deletable. The FIRST contact is primary and
+is mirrored into the old one-person `contact / phone / email` fields, so no other screen changed.
+A customer never edited shows its old fields as one contact (derived, not written).
+
+Transport is js/42's pattern: `cloudUpsertCustomer()` has a column whitelist without `contacts`,
+so the value is injected at `cloudUpsert()` keyed by row id, after a one-time column probe; a
+device-local mirror `imode_v70_customer_contacts` is put back after `syncCloud()` (which replaces
+`customers` wholesale) for as long as the column is missing. `fromCustomerDb` carries it down.
+
+UI: a ผู้ติดต่อ section in the customer popup (after js/52's delete button), listener on
+`#modalBody` because js/05 stops propagation at `#modalPanel`. Edit actions need `customer.edit`.
+The case page's ติดต่อลูกค้า now lists the company, reporter first, every channel a real link
+(`tel:`, `mailto:`, `line.me/ti/p/~id` or `/R/ti/p/@oa`, `wa.me/66…`). 22/22 headless assertions.
+
+**Not tested:** two devices through the real database, and phone widths for the popup.
+
+### 3. Badges — `js/115`, `js/116`, and a js/74 bug
+
+- **js/115**: counts outside the sidebar become an orange circle on the button's corner (mobile
+  bottom bar, Home cards) for my-work (js/74), requests (js/49's badge) and notifications
+  (`#sideNotifyBadge`). The bottom bar styles every `<span>` as its icon chip, so the badge
+  restates its geometry with `!important`. Screenshot-verified at 390px.
+- **js/74 bug**: the "seen" baseline was taken lazily by the first `isNew()`, which the filter
+  only reaches once the technician HAS a job — so a new technician's first job was baselined as
+  read and never flagged. `imodeNewJobCount()` now calls `mine()` first.
+- **js/116** customer page: dots on ใบเสนอราคาของฉัน / ประวัติ Service / เอกสารเครื่อง / เช็คประกัน
+  and on the individual rows. Seen-state per phone in `imode_v70_portal_seen`; signatures contain
+  only what the customer can see change. First visit per machine baselines everything except
+  quotations still awaiting the customer's approval; a case the customer reported (เคสใหม่) is
+  never new. Wrapping happens at DOMContentLoaded because js/53/56/75 reassign those names.
+  14/14 assertions.
+
+### 4. THE ROLE-OVERWRITE BUG — `js/90` + `js/85`
+
+Reported: untick งานของฉัน on role Admin, save, reload — still ticked. Measured: locally it worked;
+the live `system_settings` row still had Admin 43/true. `saveRoles()` did push, but **any other
+open tab or device pushes its WHOLE settings object the next time it saves anything**, and roles
+are an array js/90 never protected.
+
+Fix: `settings.permStamp`, written by a `saveRoles` wrapper only when roles / userPermissions /
+rolePresetOptOut really changed (restored if not). In js/90's `adopt()`: the side with the newer
+stamp wins for `roles, userPermissions, rolePresetOptOut, systemBehavior` — on push a stale device
+takes the cloud's copy first; on sync a device whose save never landed keeps its own and pushes it
+back. js/85 now takes those keys live, but only when the incoming stamp is not older.
+Tested with a stubbed cloud (saving device wins, stale device adopts, no-op save keeps the old
+stamp). **Not tested with two real devices.**
+
+Also: the My Work permission was there all along, as "ดูงานที่ได้รับมอบหมายของตนเอง" under
+"งานของช่าง" — renamed to "เมนู งานของฉัน — …" under "งานของฉัน (ช่าง)" (js/16).
+
+### 5. THE PORTAL JUMP — `js/102`
+
+Reported: when a status updates, the customer page jumps to the last screen they opened.
+js/102's `repaint()` (hooked on `renderAll`, which every realtime row and sync calls) re-ran the
+last read view; `last` was only cleared by a form. So after reading ประวัติ Service and going Home
+— or into one case, or one quotation — every update threw the customer back into the list, and
+`renderCustomerPortal()` (which rewrites `#portalContent`) wiped a half-typed form.
+
+Now a read view is redrawn only while detail mode is on AND `#portalContent` still holds the node
+that view drew; `renderCustomerPortal()` runs only on the Home page. 5/5 assertions; the same
+suite against the old js/102 fails 3 — the three reported symptoms.
+
+### 6. The case-page quotation "lost its A4 bar" — NOT reproduced
+
+With the real stored paper of QT-SRV-202609-037 (read from `system_settings.quoteDocs`) at 340px,
+first open, close-and-reopen and the real step-2 button all show `A4 · 34% · พอดีจอ / 100%`.
+The likely cause is a stale copy: `sw.js` used `fetch(req)`, which honours the HTTP cache, and
+GitHub Pages sends `max-age=600`. `sw.js` now fetches same-origin files with `cache:'no-cache'`
+(a 304 when unchanged) and VERSION is bumped. If the owner still sees it after a hard reload, ask
+whether it was GitHub Pages or Live Server.
+
+### 7. Other fixes pushed today
+
+- `service-case-detail.html`: the A4 observer re-ran on its own label write → an endless rAF loop
+  froze "ดูใบเสนอราคาเต็ม"; label written only on change, fit only for new papers. `.scd-steps`
+  got `padding:6px 0 4px` because its `overflow-x:auto` clipped the circles' rings.
+- js/97: js/09's `login()` calls its CLOSURE `accountToUser()` (`photo:''`), so the sidebar card
+  never had the account photo — resolved at render time now.
+- js/56 + js/112: the customer's quotation is an A4 page; js/112's toggle now also listens on the
+  document (it only listened on `#modalBody`).
+- js/03 calendar: month and week start on Sunday; the month grid has a weekday header row
+  (hidden 641–900px where css/01 turns it into 2-column cards).
+
+### Decisions recorded today (also in memory)
+
+- **Production = the company VPS on Ubuntu** (the owner can reinstall it as Ubuntu). The Windows
+  plan in the DECISION section above is superseded: on Linux the whole Supabase stack self-hosts
+  and realtime stays. `docs/MIGRATION.md` for Ubuntu is still to be written.
+- **GitHub Pages = the test site**, made public only while testing; staging and production must
+  use SEPARATE databases (js/23 will have to choose by hostname). Branches `dev` → test,
+  `main` → production.
+- **Real data** is in `Data/` (151 customers, 353 machines, 353 warranties, 105 models;
+  gitignored). No QR has been printed, so machine ids may change to the file's `M00001` form and
+  all test data may be deleted — **but only when the owner says go.** `machinery_images/` was not
+  supplied.
+- Web server on the VPS: GitHub (private) + Caddy was recommended; not yet confirmed. Domain and
+  the VPS IP are still needed from the owner.
+
+### Harness notes worth keeping
+
+- **A bash heredoc in this shell fails on long Thai/markdown text** ("unexpected EOF while looking
+  for matching `'`") and runs nothing. Write the text with the Write tool and append the file.
+- To inject a large HTML string into a page under test, send it as its own
+  `Runtime.evaluate('window.__h='+JSON.stringify(html))`; embedding it inside a template literal
+  breaks on its quotes.
+- js/74's seen-baseline is taken on the first count, so a test must call `imodeNewJobCount()`
+  BEFORE adding the job it expects to be new.
+- `imodeOpenAssignedCase` navigates to the case page; use `imodeMarkJobRead` to clear a badge in
+  a test that must stay on `index.html`.

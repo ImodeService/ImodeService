@@ -75,6 +75,8 @@
                /* 2026-09-23: the warranty package type per quotation (js/103). Same shape —
                   {id: value}, only ever added to — so the same rule protects it. */
                'quoteWarrantyType'];
+ /* Whole-value keys decided by settings.permStamp instead of a union — see adopt(). */
+ var PERM_KEYS=['roles','userPermissions','rolePresetOptOut','systemBehavior'];
 
  var has=function(o,k){return Object.prototype.hasOwnProperty.call(o,k)};
 
@@ -97,6 +99,22 @@
     dst[id]=src[id];added++;
    });
   });
+  /* 2026-09-24 — ROLES AND PERMISSIONS: the newer save wins, both ways.
+     Reported: untick งานของฉัน on role Admin, save, reload — still ticked. Measured: the save
+     reached the cloud and was then overwritten, because every other open tab or device pushes
+     its WHOLE settings object, roles included, the next time it saves anything at all. These
+     keys cannot be unioned like the maps above (an untick is a deletion), so they carry a
+     timestamp written by saveRoles() and the side with the newer one wins:
+       push — a device holding older roles takes the cloud's before it writes;
+       sync — a device whose own save never reached the cloud keeps it and pushes it back. */
+  var sa=source.permStamp,ta=target.permStamp;
+  if(sa&&(!ta||sa>ta)){
+   PERM_KEYS.forEach(function(k){
+    if(!has(source,k))return;
+    try{target[k]=JSON.parse(JSON.stringify(source[k]))}catch(e){target[k]=source[k]}
+   });
+   target.permStamp=sa;added++;
+  }
   return added;
  }
 
@@ -111,6 +129,10 @@
    var v=s[k];
    if(v&&typeof v==='object'&&!Array.isArray(v)){out[k]=v;took=true}
   });
+  if(s.permStamp){
+   PERM_KEYS.forEach(function(k){if(has(s,k))out[k]=s[k]});
+   out.permStamp=s.permStamp;took=true;
+  }
   return took?out:null;
  }
 
@@ -138,6 +160,27 @@
    var run=chain.then(step,step);
    chain=run.then(function(){},function(){});   /* never leave the chain rejected */
    return run;
+  };
+ }
+
+ /* The stamp is written only when saveRoles() really changed the roles or the individual
+    permissions, and it is written BEFORE the base runs, because the base pushes. A save that
+    bails (a nameless role) or changes nothing puts the old stamp back, so an idle device can
+    never claim to be newer than one that really saved. */
+ var baseRoles=window.saveRoles;
+ if(typeof baseRoles==='function'){
+  window.saveRoles=function(){
+   var s=live();
+   if(!s)return baseRoles.apply(this,arguments);
+   var fp=function(){try{return JSON.stringify([s.roles,s.userPermissions,s.rolePresetOptOut])}catch(e){return ''}};
+   var before=fp(),prev=s.permStamp;
+   s.permStamp=new Date().toISOString();
+   var r;
+   try{r=baseRoles.apply(this,arguments)}
+   finally{
+    try{s=live();if(s&&fp()===before){if(prev)s.permStamp=prev;else delete s.permStamp}}catch(e){}
+   }
+   return r;
   };
  }
 

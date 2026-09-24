@@ -101,6 +101,10 @@
  window.imodeNewJobCount=function(){
   var tid=myTechId();
   if(!tid)return 0;
+  /* 2026-09-24 — take the first-visit baseline NOW, even with no jobs. It used to be taken
+     lazily by the first isNew() call, which the filter below only makes once the account holds
+     a job — so a technician's FIRST job was swallowed into the baseline and never showed. */
+  mine();
   return caseList().filter(function(c){return onCase(c,tid)&&!isClosed(c)&&isNew(c.id)}).length;
  };
 

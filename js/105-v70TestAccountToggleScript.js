@@ -120,7 +120,7 @@
  function boxHTML(){
   var on=enabled();
   return '<div class="tacct-switch'+(on?'':' is-off')+'">'
-   +'<div><b>🧪 '+esc2(tl('บัญชีทดสอบ (UAT)','Test accounts (UAT)'))+'</b>'
+   +'<div><b>🧪 '+esc2(tl('บัญชีทดสอบ','Test accounts'))+'</b>'
    +'<small>'+esc2(on?tl('เปิดอยู่ — บัญชีที่ลงท้ายด้วย _test เข้าสู่ระบบได้ตามปกติ',
                          'On — accounts ending in _test can sign in')
                     :tl('ปิดอยู่ — บัญชีที่ลงท้ายด้วย _test เข้าสู่ระบบไม่ได้ ข้อมูลยังอยู่ครบ',

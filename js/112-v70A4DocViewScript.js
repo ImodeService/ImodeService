@@ -238,6 +238,10 @@
   style();
   var body=document.getElementById('modalBody');
   if(body&&!body.__a4Click){body.__a4Click=true;body.addEventListener('click',onClick)}
+  /* 2026-09-24 — and on the document, for a paper drawn into the page itself (the customer
+     portal's quotation). Without it พอดีจอ / 100% did nothing there. A click inside a popup
+     never reaches the document (js/05 stops it at #modalPanel), so it is never handled twice. */
+  if(!document.__a4Click){document.__a4Click=true;document.addEventListener('click',onClick)}
   /* A document can also be drawn straight into the page rather than a popup (the portal's
      quotation view). The same treatment, once the page has settled. */
   apply(document);

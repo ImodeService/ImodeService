@@ -214,7 +214,7 @@
   const box=document.createElement('div');
   box.className='uat-login-box';
   box.innerHTML=`<form id="uatLoginForm" onsubmit="uatSubmitLogin(event)">
-   <div class="uat-login-head"><b>เข้าสู่ระบบ UAT</b><small>ใช้ชื่อผู้ใช้และรหัสผ่านสำหรับการทดสอบ V6.8 UAT</small></div>
+   <div class="uat-login-head"><b>เข้าสู่ระบบ</b><small>ใช้ชื่อผู้ใช้และรหัสผ่านของคุณ · Version 1.0</small></div>
    <div class="form-grid cols2">
     <div class="field"><label>ชื่อผู้ใช้</label><input id="uatLoginUser" autocomplete="username" placeholder="admin_test"></div>
     <div class="field"><label>รหัสผ่าน</label><input id="uatLoginPass" type="password" autocomplete="current-password" placeholder="••••••••"></div>

@@ -35,7 +35,7 @@
 
  var provider={
   name:'local',
-  label:'บัญชีในเครื่อง (UAT / ออฟไลน์)',
+  label:'บัญชีในเครื่อง (ออฟไลน์)',
 
   /* Available whenever the account registry loaded. Needs no network. */
   ready:function(){

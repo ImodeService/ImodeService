@@ -5,7 +5,7 @@
 You are the coding agent for an existing project:
 
 I-MODE Plus Service & Maintenance
-Current release: Beta 1.0 Service focus full system  (see ## Version for the history)
+Current release: Version 1.0  (see ## Version for the history)
 
 Your job is to safely maintain and incrementally improve the existing system.
 
@@ -109,17 +109,16 @@ you which one wins.
 
 Keep:
 
-**Beta 1.0**
-**Service focus full system**
+**Version 1.0**  (no suffix, no "Beta")
 
 Seven places carry it, and all seven must move together:
 
 | Where | String |
 |---|---|
-| `index.html` `<title>` | `I-MODE Plus Service & Maintenance · Beta 1.0 Service focus full system` |
-| `index.html` sidebar block | `Version Beta 1.0` / `Service focus full system` |
-| `index.html` topbar brand | `Service focus full system · Beta 1.0` |
-| `js/06-v68ModulesScript.js` (×2) | rewrites the sidebar block on **every render** |
+| `index.html` `<title>` | `I-MODE Plus Service & Maintenance · Version 1.0` |
+| `index.html` sidebar block | `Version 1.0` (the second line was removed) |
+| `index.html` topbar brand | `Version 1.0` |
+| `js/06-v68ModulesScript.js` (×2) | rewrites the sidebar block on **every render** (sets the text, removes the sub-line) |
 | `service-case-detail.html` `<title>` and brand | its own copy — the page does not share `index.html`'s |
 
 **Editing the markup alone silently reverts**, because `js/06` rewrites the sidebar version
@@ -127,7 +126,7 @@ block on every render. That trap has been hit twice.
 
 History, because older entries in this file say otherwise: `V6.8 Service focus` until
 2026-09-09 (part 16) → `Beta Service focus` → `Beta 1.0 Service focus full system` on
-2026-09-10, each at the owner's request. An entry before all of them said "Service UAT",
+2026-09-10 → **`Version 1.0`** on 2026-09-24 (Beta and the suffix dropped for the move to the production server), each at the owner's request. An entry before all of them said "Service UAT",
 which was wrong. **This section is the current one.** The change logs below record what
 happened on a given day; they are not standing instructions.
 

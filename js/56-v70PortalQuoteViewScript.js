@@ -158,6 +158,15 @@
   var doc=scale&&scale.querySelector('.quote-doc');
   if(!wrap||!scale||!doc)return;
   scale.style.zoom='';
+  /* 2026-09-24 — the customer sees the same A4 page the office does: js/112 fixes the paper at
+     210mm and scales it to fit, with its own พอดีจอ / 100% bar. This view never goes through
+     openModal(), which is where js/112 hooks in, so it is asked for by name. Its own resize
+     handling takes over; the zoom below stays as the fallback for a build without js/112. */
+  if(typeof window.imodeA4Apply==='function'){
+   try{window.imodeA4Apply(wrap);if(typeof window.imodeA4Fit==='function')window.imodeA4Fit()}catch(e){}
+   var h=wrap.querySelector('.pqv-swipe');if(h)h.hidden=true;
+   if(doc.classList.contains('imode-a4-page'))return;
+  }
   var natural=Math.max(doc.scrollWidth||0,Math.round(doc.getBoundingClientRect().width)||0)||900;
   var avail=wrap.clientWidth-20;
   var z=(avail>0&&natural>0)?Math.min(1,avail/natural):1;
@@ -225,6 +234,8 @@
  +'border-radius:12px;background:#fff;padding:10px}'
  +'.pqv-scale{display:block}'
  +'.pqv-paper .quote-doc.official{min-width:900px;margin:0}'
+ +'.pqv-paper .quote-doc.official.imode-a4-page{min-width:0}'
+ +'.pqv-paper:has(.imode-a4-fit){overflow-x:visible}'
  +'.pqv-swipe{margin:8px 0 0;font-size:10.5px;color:#6f81a3;text-align:center}'
  +'.pqv-swipe[hidden]{display:none!important}'
  +'.pqv-note{margin:12px 0 0;font-size:10.5px;color:#6f81a3;text-align:center;line-height:1.6}';

@@ -551,7 +551,9 @@ const TEAM_META={
  'R&D':{cls:'rd',icon:'🧪',th:'ทีม R&D',en:'R&D'},
  'Admin':{cls:'adminteam',icon:'🗂',th:'แอดมิน',en:'Admin'},
  'Sales':{cls:'sales',icon:'💼',th:'เซลส์',en:'Sales'},
- 'Management':{cls:'management',icon:'👔',th:'ผู้จัดการ',en:'Management'}
+ 'Management':{cls:'management',icon:'👔',th:'ผู้จัดการ',en:'Management'},
+ /* 2026-09-25: asked for — "ทีม Dev". */
+ 'Dev':{cls:'devteam',icon:'💻',th:'ทีม Dev',en:'Dev'}
 };
 const TEAM_LIST=Object.keys(TEAM_META);
 function teamMeta(team){return TEAM_META[team]||TEAM_META['Technical']}

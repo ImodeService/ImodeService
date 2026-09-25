@@ -85,6 +85,13 @@
    '.tacc-chip.is-tech{background:#e4f7ee;color:#177353}',
    '.tacc-chip.is-office{background:#f1eef9;color:#5b4794}',
    '.tacc-chip.is-test{background:#fff0d6;color:#8f5800}',
+   '.tacc-group{margin-top:14px}',
+   '.tacc-group-head{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:800;color:#173f8a}',
+   '.tacc-group-head span{padding:2px 9px;border-radius:999px;background:#e8f0ff;font-size:11px}',
+   '.tacc-group-head::after{content:"";flex:1;height:1px;background:#e4e9f2}',
+   '.tacc-group .tacc-grid{margin-top:8px}',
+   '.tacc-block.is-top{margin:0 0 18px;border-top:0;padding-top:0}',
+   '.team-badge.devteam{background:#e7f6f8;color:#0f6b78}',
    '@media(max-width:640px){.tacc-grid{grid-template-columns:1fr}}'
   ].join('');
   document.head.appendChild(s);
@@ -119,6 +126,21 @@
    +'<div class="tacc-chips">'+chips+'</div></div></div>';
  }
 
+ var ROLE_ORDER=['Dev','CEO','Service Manager','Admin','Admin / Coordinator','Sale / Admin','Sales',
+  'Technical Lead','R&D Lead','Technician','Technician - Technical','R&D','Technician - R&D'];
+ function groupsHTML(list){
+  var by={};
+  list.forEach(function(a){var r=a.role||tl('ไม่ระบุบทบาท','No role');(by[r]=by[r]||[]).push(a)});
+  var names=Object.keys(by).sort(function(x,y){
+   var i=ROLE_ORDER.indexOf(x),j=ROLE_ORDER.indexOf(y);
+   if(i<0&&j<0)return x.localeCompare(y);return (i<0?99:i)-(j<0?99:j);
+  });
+  if(!names.length)return '<p class="tacc-user" style="margin-top:10px">'+esc2(tl('ยังไม่มีบัญชีในทีมนี้','No accounts in this team'))+'</p>';
+  return names.map(function(r){
+   return '<div class="tacc-group"><div class="tacc-group-head">'+esc2(r)+' <span>'+by[r].length+'</span></div>'
+    +'<div class="tacc-grid">'+by[r].map(cardHTML).join('')+'</div></div>';
+  }).join('');
+ }
  function render(){
   var grid=document.getElementById('technicianGrid');
   if(!grid||!grid.parentNode)return;
@@ -128,6 +150,11 @@
 
   var list=accounts().slice();
   if(!list.length)return;
+  /* 2026-09-25: "หน้าทีมงานโชว์ทุกคน ทุก account แบ่งเป็นหมวดตาม Role". The block now leads the
+     page, is grouped by role, and follows the team chips above it (ทั้งหมด shows everyone). */
+  var team='all';try{team=techTeamFilter||'all'}catch(e){}
+  var TEAMS=[];try{TEAMS=TEAM_LIST.slice()}catch(e){}
+  if(team!=='all'&&TEAMS.indexOf(team)>=0)list=list.filter(function(a){return (a.team||'Technical')===team});
   list.sort(function(a,b){
    return String(a.name||a.username||'').localeCompare(String(b.name||b.username||''),'th');
   });
@@ -147,12 +174,13 @@
   box.innerHTML='<div class="tacc-head"><div>'
    +'<h4>'+esc2(tl('บัญชีผู้ใช้งานทั้งหมด','All login accounts'))+' ('+list.length+')</h4>'
    +'<p>'+esc2(tl('ช่างหน้างาน '+techCount+' · ไม่ใช่ช่าง '+(list.length-techCount)
-     +' — ทุกบัญชีที่เข้าสู่ระบบได้ ไม่ขึ้นกับตัวกรองทีมด้านบน',
+     +' — ทุกบัญชีที่เข้าสู่ระบบได้ แบ่งตาม Role · ตัวกรองทีมด้านบนใช้กับรายการนี้ด้วย',
      techCount+' field · '+(list.length-techCount)
-     +' office — every account that can sign in, not affected by the team filter above'))+'</p>'
+     +' office — every account that can sign in, grouped by role; the team chips filter it too'))+'</p>'
    +'</div>'+manage+'</div>'
-   +'<div class="tacc-grid">'+list.map(cardHTML).join('')+'</div>';
-  grid.parentNode.insertBefore(box,grid.nextSibling);
+   +groupsHTML(list);
+  box.classList.add('is-top');
+  grid.parentNode.insertBefore(box,grid);
  }
  window.imodeRenderTeamAccounts=render;
 

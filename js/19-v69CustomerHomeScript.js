@@ -246,11 +246,32 @@
  }
  var baseRender=window.renderCustomerPortal;
  if(typeof baseRender==='function'){
+  /* 2026-09-25 — reported: "หน้าของลูกค้าเวลามันรีหน้าเองประมาณ 3 รอบ". Measured on a ?serial=
+     boot: the machine card was rebuilt three times (renderAll at load, js/102's repaint after
+     every renderAll, initPortalFromUrl) and each pass replayed the pop-in of every button —
+     the page visibly redrew itself three times, more with a cloud sync and realtime on top.
+     When the card would come out byte-identical and is already on screen, the base's write
+     to the hero is held (shadowed on the element, the way js/35 shadows .value) and the
+     entrance is not replayed. Anything that really changes the card redraws as before. */
+  var lastCard='',heroHold=false;
+  function holdHero(hero){
+   if(!hero||hero.__chomeHold)return;
+   var d=Object.getOwnPropertyDescriptor(Element.prototype,'innerHTML');if(!d)return;
+   Object.defineProperty(hero,'innerHTML',{configurable:true,get:function(){return d.get.call(this)},
+    set:function(v){if(!heroHold)d.set.call(this,v)}});
+   hero.__chomeHold=true;
+  }
   window.renderCustomerPortal=function(){
-   var r=baseRender.apply(this,arguments);
+   var hero=document.getElementById('portalMachineHero'),card='';
+   try{card=machineCardHTML()}catch(e){card=''}
+   var same=!!(hero&&card&&card===lastCard&&hero.querySelector('.chome-machine'));
+   holdHero(hero);
+   heroHold=same;
+   var r;
+   try{r=baseRender.apply(this,arguments)}finally{heroHold=false}
    paintHeader();
-   var hero=document.getElementById('portalMachineHero');
-   var card=machineCardHTML();
+   if(same)return r;
+   lastCard=card||'';
    if(hero&&card){
     hero.innerHTML=card;
     /* Attached here rather than as an inline onerror: that handler needs quotes of its own

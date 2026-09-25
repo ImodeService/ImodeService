@@ -809,6 +809,8 @@ body.scd-modal-open{overflow:hidden}
      builds inside a popup is caught with no wiring here. The hidden native input keeps its id
      and its value, which is what doAssign() reads. -->
 <script src="./js/51-v70Time24Script.js"></script>
+<!-- 2026-09-25: status bars animate when the status moves on — the same file index.html loads. -->
+<script src="./js/121-v70TrackAnimScript.js"></script>
 <script>
 (function(){
 'use strict';
@@ -1961,7 +1963,11 @@ function quoteFacts(q){
   var draft=String(q.status||'ร่าง')===(list[0]||'ร่าง');
   /* 0 not sent · 1 waiting for the signature · 2 signed, not sent back · 3 sent back · 4 done */
   var state=draft?0:String(q.status)===QT_DONE?4:(a&&a.sentAt)?3:a?2:1;
-  return {approval:a,doc:doc,state:state};
+  /* 2026-09-25: the customer's first open of the quotation (js/120, settings.quoteViews). Until
+     then the track waits on step 1; from then on step 2 reads ลูกค้ากำลังเซ็น. */
+  var v=(s.quoteViews||{})[q.id]||null,viewed=Date.parse(v&&v.at||'');
+  if(v&&Number.isFinite(created)&&Number.isFinite(viewed)&&viewed<created)v=null;
+  return {approval:a,doc:doc,state:state,opened:v&&v.at||''};
 }
 function quoteSectionHTML(){
   var q=caseQuote();
@@ -1981,14 +1987,15 @@ function quoteSectionHTML(){
   var doneUpTo=[1,2,3,4];
   var dots=QT_STEPS.map(function(label,k){
     var done=f.state>=doneUpTo[k]&&!(k===1&&f.state===1);
-    var now=(k===1&&f.state===1)||(k===2&&f.state===2)||(k===3&&f.state===3);
+    var now=(k===0&&f.state===1&&!f.opened)||(k===1&&f.state===1&&!!f.opened)||(k===2&&f.state===2)||(k===3&&f.state===3);
     var sub=done&&when[k]?fmtDateTime(when[k]):(k===1&&f.state===2?'ลูกค้าเซ็นแล้ว ยังไม่กดส่ง':'');
+    if(k===1&&f.state===1)sub=f.opened?'ลูกค้ากำลังเซ็น · เปิดดู '+fmtDateTime(f.opened):'รอลูกค้าเปิดดู';
     return '<li class="'+(done?'done':'pending')+(now?' now':'')+'">'
       +'<span class="fdot">'+(done?'✔':String(k+1))+'</span><b>'+esc(label)+'</b>'
       +(sub?'<small>'+esc(sub)+'</small>':'')+'</li>';
   }).join('');
   var via=a&&a.by==='staff-other-channel'?' · อนุมัติผ่านช่องทางอื่น ('+esc(a.channel||'ไม่ระบุ')+')':'';
-  var note=f.state===1?'<p class="sd-wait">⏳ รอลูกค้าเปิดใบเสนอราคาและเซ็นอนุมัติ</p>'
+  var note=f.state===1?(f.opened?'<p class="sd-wait">✍ ลูกค้าเปิดใบเสนอราคาแล้ว ('+esc(fmtDateTime(f.opened))+') — กำลังเซ็น</p>':'<p class="sd-wait">⏳ ส่งแล้ว รอลูกค้าเปิดใบเสนอราคา</p>')
     :f.state===2?'<p class="sd-wait">✍ ลูกค้าเซ็นแล้ว'+(a.name?' ('+esc(a.name)+')':'')+via+' — รอลูกค้ากดส่งกลับมา</p>'
     :f.state===3?'<p class="sd-wait">📥 '+(a&&a.by==='staff-other-channel'?'ลูกค้าอนุมัติผ่านช่องทางอื่น ('+esc(a.channel||'ไม่ระบุ')+')':'ลูกค้าส่งใบเสนอราคาที่เซ็นแล้วกลับมา')+' — ตรวจสอบแล้วกดยืนยัน</p>'
     :'<p class="sd-ok">✔ ใบเสนอราคาเสร็จสิ้น — ไปขั้นตอนนัดหมายได้เลย</p>';
@@ -4570,7 +4577,7 @@ var CaseLive=(function(){
     return true;
   }
 
-  var SETTING_KEYS=['quoteApprovals','quoteAccepts','caseFeedback','caseStatusLog',
+  var SETTING_KEYS=['quoteApprovals','quoteAccepts','quoteViews','caseFeedback','caseStatusLog',
                     'quoteStaffSigns','quoteDocs'];
   /* 2026-09-21 — AN APPROVAL THAT HAS A SIGNATURE IS NEVER REPLACED BY ONE THAT HAS NONE.
      saveStaffSign() writes the WHOLE settings object back to system_settings, and this

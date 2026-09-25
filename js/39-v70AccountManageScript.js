@@ -259,6 +259,8 @@
   if(hash&&window.ImodeAuthLocal&&typeof window.ImodeAuthLocal.resetLocalOverride==='function'){
    try{window.ImodeAuthLocal.resetLocalOverride(uname);window.ImodeAuthLocal.resetLocalOverride(acc?acc.username:uname)}catch(e){}
   }
+  /* ...and so would a lockout left by the wrong guesses that made the reset necessary (2026-09-25). */
+  if(hash&&typeof window.imodeClearSignInLock==='function'){window.imodeClearSignInLock(uname);if(acc)window.imodeClearSignInLock(acc.username)}
   persist();
   /* The cached auth session still contains the old username. Sign out after saving instead
      of leaving a ghost session that no longer matches any account. */
@@ -1026,4 +1028,37 @@
  +'.acctmg-group.is-test .acctmg-group-head::after{background:#f6dcb8}'
  +'.acctmg-group.is-test .acctmg-row{background:#fffdf8;border-color:#f0e2cc}';
  document.head.appendChild(st3);
+
+ /* 2026-09-25 — REPORTED: samak could not sign in even after an admin set a new password, while
+    narongsak could. Reproduced: five wrong guesses lock the username for 15 minutes
+    (auth-core, imode_v69_auth_lock) and nothing an admin did lifted it — the new password was
+    correct and still answered "locked". narongsak had simply been guessed fewer times.
+
+    The lock is per DEVICE, so clearing it on the admin's PC (imodeAccountSave above) is not
+    enough for the technician's own phone. So the lock remembers which password hash it was set
+    against, and a sign-in on any device drops a lock whose account has had its password changed
+    since: an admin reset lifts the lock everywhere once the new settings have synced. A lock
+    against an unchanged password stays exactly as it was. */
+ (function(){
+  var LOCK='imode_v69_auth_lock';
+  function rd(){try{return JSON.parse(localStorage.getItem(LOCK)||'{}')||{}}catch(e){return {}}}
+  function wr(o){try{localStorage.setItem(LOCK,JSON.stringify(o))}catch(e){}}
+  function k(u){return String(u||'').trim().toLowerCase()}
+  function curHash(u){try{var a=window.uatAuth&&window.uatAuth.findAccount(u);return a&&a.hash||''}catch(e){return ''}}
+  window.imodeClearSignInLock=function(u){var o=rd();if(o[k(u)]){delete o[k(u)];wr(o)}};
+  var A=window.ImodeAuth;
+  if(!A||typeof A.signIn!=='function')return;
+  var base=A.signIn;
+  A.signIn=function(u){
+   var h=curHash(u),o=rd(),r=o[k(u)];
+   if(r&&r.pwHash&&h&&r.pwHash!==h){delete o[k(u)];wr(o)}
+   return Promise.resolve(base.apply(this,arguments)).then(function(res){
+    if(res&&res.reason==='locked'){
+     var o2=rd(),r2=o2[k(u)];if(r2&&!r2.pwHash&&h){r2.pwHash=h;wr(o2)}
+     res.message=(res.message||'')+' หรือให้แอดมินตั้งรหัสผ่านใหม่เพื่อปลดล็อก';
+    }
+    return res;
+   });
+  };
+ })();
 })();

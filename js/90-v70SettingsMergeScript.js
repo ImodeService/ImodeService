@@ -76,7 +76,9 @@
                   {id: value}, only ever added to — so the same rule protects it. */
                'quoteWarrantyType',
                /* 2026-09-25: km per customer (js/118). Cleared entries are stored as 0, never deleted. */
-               'customerDistances'];
+               'customerDistances',
+               /* 2026-09-25: when the customer first opened a quotation (js/120). */
+               'quoteViews'];
  /* Whole-value keys decided by settings.permStamp instead of a union — see adopt(). */
  var PERM_KEYS=['roles','userPermissions','rolePresetOptOut','systemBehavior'];
 

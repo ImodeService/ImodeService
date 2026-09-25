@@ -273,7 +273,7 @@
     their work replaced under them, and every repair in js/12, js/20, js/29 and js/47 would
     re-run against someone else's copy. These are the shared operational records — things one
     device writes for the others to see — and nothing about configuration. */
- var SETTING_KEYS=['quoteApprovals','quoteAccepts','quoteRequestLink','caseStatusLog',
+ var SETTING_KEYS=['quoteApprovals','quoteAccepts','quoteViews','quoteRequestLink','caseStatusLog',
                    'caseFeedback','trash','portalNews','uatAccounts','uatAccountEdits',
                    /* 2026-09-21 — quoteStaffSigns WAS MISSING, and that made a loss certain
                       rather than merely likely. service-case-detail.html writes the two staff

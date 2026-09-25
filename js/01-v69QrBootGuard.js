@@ -95,12 +95,14 @@
      function list, the browser falls back to matrix interpolation, and a matrix for
      rotate(360deg) is the identity - the thing would sit perfectly still. */
   st.textContent='html.qr-booting .app-shell{visibility:hidden!important}'
-   +'.qr-boot-splash{position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:linear-gradient(160deg,#0b3f9e,#0b63e5 55%,#1f7ef0)}'
+   +'.qr-boot-splash{position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#2d3695}'
    +'.qr-boot-splash>.qr-boot-name{color:rgba(255,255,255,.92);font:600 13px/1.4 system-ui,sans-serif;letter-spacing:.02em}'
-   +'.qr-boot-orbit{position:relative;width:216px;height:216px;flex:none}'
+   +'.qr-boot-orbit{position:relative;width:340px;height:340px;flex:none}'
    +'.qbo-ring{position:absolute;inset:0;animation:qboSpin 9s linear infinite}'
    +'.qbo-slot{position:absolute;top:50%;left:50%;width:0;height:0}'
-   +'.qbo-cancel{position:absolute;display:block}'
+   +'.qbo-pull{position:absolute;display:block;translate:0 calc(var(--ro) * -1);'
+   +'animation:qboPull var(--d) ease-in-out var(--dl) infinite alternate}'
+   +'.qbo-cancel{position:absolute;display:block;animation:qboShrink var(--d) ease-in-out var(--dl) infinite alternate}'
    +'.qbo-face{position:absolute;width:42px;height:42px;margin:0;border-radius:50%;display:flex;'
    +'align-items:center;justify-content:center;font-size:19px;line-height:1;'
    +'background:rgba(255,255,255,.17);border:1px solid rgba(255,255,255,.36);'
@@ -110,11 +112,13 @@
    +'.qbo-core img{width:118px;max-width:40vw;height:auto;display:block}'
    +'@keyframes qboSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}'
    +'@keyframes qboBack{from{transform:translate(-50%,-50%) rotate(0deg)}to{transform:translate(-50%,-50%) rotate(-360deg)}}'
+   +'@keyframes qboPull{from{translate:0 calc(var(--ro) * -1)}to{translate:0 calc(var(--ri) * -1)}}'
+   +'@keyframes qboShrink{from{scale:1;opacity:1}to{scale:.5;opacity:.35}}'
    +'@keyframes qboFade{0%,100%{opacity:.62}50%{opacity:1}}'
-   +'@media (max-width:420px){.qr-boot-orbit{transform:scale(.84)}}'
+   +'@media (max-width:420px){.qr-boot-orbit{transform:scale(.8)}}'
    /* Reduced motion: nothing travels. The ring keeps its place and breathes instead, and the
       faces drop their counter-rotation so they stay upright without it. */
-   +'@media (prefers-reduced-motion:reduce){.qbo-ring{animation:qboFade 2.6s ease-in-out infinite}.qbo-face{animation:none}}';
+   +'@media (prefers-reduced-motion:reduce){.qbo-ring{animation:qboFade 2.6s ease-in-out infinite}.qbo-face,.qbo-pull,.qbo-cancel{animation:none}}';
   (document.head||document.documentElement).appendChild(st);
   document.documentElement.classList.add('qr-booting');
   var released=false;
@@ -126,12 +130,20 @@
    /* The eight the sidebar leads with. Emoji rather than the module table, because that table
       is defined in js/06 and this file is the first script in the document. */
    var MODS=['\ud83d\udccb','\ud83e\uddf0','\ud83d\udcc5','\ud83c\udfed','\u2705','\ud83d\udcb0','\ud83d\udce6','\ud83d\udd14'];
-   var R=86,ring='';
+   /* 2026-09-25, "ลากเข้าลากออกจาก Imode แบบสุ่ม เอารัศมีกว้างๆ": every circle is pulled in
+      towards the logo and let back out along its own spoke, each on its own random radius,
+      period and phase, so no two move together. .qbo-pull carries the radial travel with the
+      individual `translate` property, and .qbo-cancel shrinks and fades with `scale` - separate
+      properties, so neither disturbs the transform the counter-rotation relies on. The slot
+      only rotates now; the radius moved to .qbo-pull. */
+   var ring='';
+   function rnd(lo,hi){return lo+Math.random()*(hi-lo)}
    for(var i=0;i<MODS.length;i++){
-    var a=i*(360/MODS.length);
-    ring+='<span class="qbo-slot" style="transform:rotate('+a+'deg) translateY(-'+R+'px)">'
-     +'<span class="qbo-cancel" style="transform:rotate('+(-a)+'deg)">'
-     +'<span class="qbo-face">'+MODS[i]+'</span></span></span>';
+    var a=i*(360/MODS.length)+rnd(-10,10),dur=rnd(2.2,4.4);
+    ring+='<span class="qbo-slot" style="transform:rotate('+a.toFixed(1)+'deg);--ro:'+rnd(122,150).toFixed(0)
+     +'px;--ri:'+rnd(14,40).toFixed(0)+'px;--d:'+dur.toFixed(2)+'s;--dl:-'+rnd(0,dur*2).toFixed(2)+'s">'
+     +'<span class="qbo-pull"><span class="qbo-cancel" style="transform:rotate('+(-a).toFixed(1)+'deg)">'
+     +'<span class="qbo-face">'+MODS[i]+'</span></span></span></span>';
    }
    d.innerHTML='<div class="qr-boot-orbit"><div class="qbo-ring">'+ring+'</div>'
     +'<span class="qbo-core"><img src="./assets/imode-ui-logo-v532.png" alt="I-MODE"></span></div>'

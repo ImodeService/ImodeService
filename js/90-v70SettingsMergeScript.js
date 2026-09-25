@@ -74,7 +74,9 @@
                'quoteRequestLink','caseFeedback','caseStatusLog',
                /* 2026-09-23: the warranty package type per quotation (js/103). Same shape —
                   {id: value}, only ever added to — so the same rule protects it. */
-               'quoteWarrantyType'];
+               'quoteWarrantyType',
+               /* 2026-09-25: km per customer (js/118). Cleared entries are stored as 0, never deleted. */
+               'customerDistances'];
  /* Whole-value keys decided by settings.permStamp instead of a union — see adopt(). */
  var PERM_KEYS=['roles','userPermissions','rolePresetOptOut','systemBehavior'];
 

@@ -478,7 +478,7 @@
           </div>
 
           <div class="panel quote-section quote-staff-sign-section">
-            <div class="panel-head"><div><h3>8. ลายเซ็นฝั่งบริษัท</h3><p>บันทึกใบเสนอราคาก่อน แล้วจึงลงลายเซ็นผู้อนุมัติและผู้จัดทำ</p></div></div>
+            <div class="panel-head"><div><h3>8. ลายเซ็นฝั่งบริษัท</h3><p>ลงลายเซ็นผู้อนุมัติและผู้จัดทำได้เลย ระบบจะบันทึกพร้อมใบเสนอราคา</p></div></div>
             <div class="panel-body">
               <div class="quote-staff-sign-grid">
                 <div class="quote-staff-sign-card">
@@ -496,7 +496,7 @@
                   <button type="button" class="primary-btn quote-staff-save" onclick="saveQuoteStaffSign('prepared')">บันทึกลายเซ็นผู้จัดทำ</button>
                 </div>
               </div>
-              <div class="quote-staff-sign-footer"><small id="quoteStaffSignHint">บันทึกใบเสนอราคาก่อนลงลายเซ็น</small><div><button type="button" class="soft-btn" onclick="previewSignedQuotation()">🖨 พิมพ์ / PDF</button><button type="button" class="primary-btn" onclick="saveQuoteStaffSigns()">💾 บันทึกลายเซ็นทั้งสอง</button></div></div>
+              <div class="quote-staff-sign-footer"><small id="quoteStaffSignHint">ลงลายเซ็นได้เลย · ระบบจะบันทึกพร้อมใบเสนอราคา</small><div><button type="button" class="soft-btn" onclick="previewSignedQuotation()">🖨 พิมพ์ / PDF</button><button type="button" class="primary-btn" onclick="saveQuoteStaffSigns()">💾 บันทึกลายเซ็นทั้งสอง</button></div></div>
             </div>
           </div>
         </div>
@@ -1081,6 +1081,8 @@
 <!-- Version 1.0: counts as an orange circle on the corner of the button (js/115); orange dots on the customer page for what the office changed (js/116). -->
 <script src="./js/115-v70CornerBadgeScript.js"></script>
 <script src="./js/116-v70PortalDotsScript.js"></script>
+<!-- Version 1.0: a customer's travel distance, entered once in Settings, fills every new quotation (js/118). -->
+<script src="./js/118-v70CustomerDistanceScript.js"></script>
 <!-- Version 1.0: the loading screen stays up until the app is really ready, for every visitor (js/117). Loads LAST so its wrappers are outermost. -->
 <script src="./js/117-v70BootSplashScript.js"></script>
 

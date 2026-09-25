@@ -88,6 +88,85 @@
  function live(){try{return settings&&typeof settings==='object'?settings:null}catch(e){return null}}
  function client(){try{return supa||null}catch(e){return null}}
 
+ /* 2026-09-25 — THE SETTINGS ROW WAS 995 KB, and it is the one row every device downloads on
+    every sync, re-reads before every settings push, and receives whole over realtime every time
+    it changes. That drove Supabase egress to 319 % of the free plan. Most of it belonged to
+    records that no longer exist: signatures, papers and views of deleted quotations, the status
+    history and reviews of deleted cases. The maps above only ever GROW (a union, so a signature
+    is never lost), so nothing removed them.
+
+    prune() removes an entry when the record it belongs to is gone AND the entry is older than
+    GRACE_DAYS. It runs inside the merge — after adopt() on a push and after a sync — so every
+    device applies the same rule and none can put the entries back. The guards:
+      - only on a device that has completed a sync this page view (its lists are current);
+      - only on a device that holds the whole list: a field technician's device, which may load
+        only its own cases, never prunes;
+      - an entry with no timestamp is never pruned (its age is unknown);
+      - the grace period covers a record created on another device since this one synced. */
+ var GRACE_DAYS=7;
+ var QUOTE_MAPS=['quoteApprovals','quoteStaffSigns','quoteDocs','quoteViews','quoteAccepts','quoteRequestLink','quoteWarrantyType'];
+ var CASE_MAPS=['caseStatusLog','caseFeedback'];
+ var syncedOnce=false;
+ function newestIn(v,depth){
+  var best=0;
+  if(v==null||depth>3)return 0;
+  if(typeof v==='string'){var t=/^\d{4}-\d\d-\d\dT/.test(v)?Date.parse(v):0;return t||0}
+  if(Array.isArray(v)){v.forEach(function(x){best=Math.max(best,newestIn(x,depth+1))});return best}
+  if(typeof v==='object')Object.keys(v).forEach(function(k){
+   if(k==='sig'||k==='html'||k==='data')return;           /* images and papers carry no dates */
+   best=Math.max(best,newestIn(v[k],depth+1));
+  });
+  return best;
+ }
+ function ids(list){var o={};(Array.isArray(list)?list:[]).forEach(function(r){if(r&&r.id)o[r.id]=1});return o}
+ function prune(target){
+  if(!target||!syncedOnce)return 0;
+  try{if(currentUser&&currentUser.technicianId)return 0}catch(e){}
+  var q=null,c=null;
+  try{q=Array.isArray(quotations)?ids(quotations):null}catch(e){q=null}
+  try{c=Array.isArray(cases)?ids(cases):null}catch(e){c=null}
+  var cutoff=Date.now()-GRACE_DAYS*86400000,removed=0;
+  function sweep(keys,live){
+   if(!live)return;
+   keys.forEach(function(k){
+    var m=target[k];if(!m||typeof m!=='object'||Array.isArray(m))return;
+    Object.keys(m).forEach(function(id){
+     if(live[id])return;
+     var t=newestIn(m[id],0);
+     if(!t||t>cutoff)return;
+     delete m[id];removed++;
+    });
+   });
+  }
+  sweep(QUOTE_MAPS,q);
+  sweep(CASE_MAPS,c);
+  if(removed)try{console.info('[imode settings-merge] pruned '+removed+' entries of records that no longer exist')}catch(e){}
+  return removed;
+ }
+ window.imodeSettingsPrune=function(){return prune(live())};
+
+ /* So it cannot quietly happen again: after each sync the row's size is measured, and past
+    WARN_KB an account that can manage settings is told once per page view — with the biggest
+    keys named, which is where to look. */
+ var WARN_KB=400,warned=false;
+ function sizeReport(s){
+  var out=[];
+  try{Object.keys(s).forEach(function(k){var n=JSON.stringify(s[k]||'').length;if(n>20480)out.push([k,Math.round(n/1024)])})}catch(e){}
+  return out.sort(function(a,b){return b[1]-a[1]});
+ }
+ function checkSize(){
+  if(warned)return;
+  var s=live();if(!s)return;
+  var kb=0;try{kb=Math.round(JSON.stringify(s).length/1024)}catch(e){return}
+  if(kb<=WARN_KB)return;
+  warned=true;
+  var top=sizeReport(s).slice(0,3).map(function(x){return x[0]+' '+x[1]+' KB'}).join(', ');
+  try{console.warn('[imode settings-merge] settings row is '+kb+' KB — every device downloads it on every sync. Biggest: '+top)}catch(e){}
+  try{if(typeof canPermission==='function'&&canPermission('settings.manage')&&typeof toastMsg==='function')
+   toastMsg('⚠ ข้อมูลการตั้งค่ากลางใหญ่ผิดปกติ ('+kb+' KB) — ทำให้ทุกเครื่องโหลดช้าและเปลืองโควตา · ส่วนที่ใหญ่สุด: '+top)}catch(e){}
+ }
+ window.imodeSettingsSize=function(){var s=live();return s?{kb:Math.round(JSON.stringify(s).length/1024),top:sizeReport(s)}:null};
+
  /* Copy into `target` every id `source` has that `target` does not. Returns how many moved,
     so a caller can tell whether anything is worth saving or pushing. */
  function adopt(target,source){
@@ -155,7 +234,8 @@
      .then(function(res){
       var remote=res&&!res.error&&res.data&&res.data.data;
       if(!remote||typeof remote!=='object')return;
-      if(!adopt(s,remote))return;
+      var moved=adopt(s,remote),cut=prune(s);
+      if(!moved&&!cut)return;
       /* Keep what we just learned rather than re-reading it on every push. */
       try{if(typeof saveLocal==='function')saveLocal()}catch(e){}
      },function(){/* offline or refused: push as before rather than losing the save */})
@@ -196,9 +276,12 @@
    var r=baseSync.apply(this,arguments);
    var done=function(){
     try{
+     syncedOnce=true;
+     setTimeout(checkSize,4000);
      var s=live();
-     if(!s||!keep)return;
-     if(!adopt(s,keep))return;               /* the incoming copy dropped nothing */
+     if(!s)return;
+     var moved=keep?adopt(s,keep):0,cut=prune(s);
+     if(!moved&&!cut)return;                 /* nothing adopted, nothing pruned */
      if(typeof saveLocal==='function')saveLocal();
      /* Push the union back so the shared row stops being short for every other device. It
         converges: the next sync finds nothing left to adopt. */

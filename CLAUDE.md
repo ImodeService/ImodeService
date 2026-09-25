@@ -7792,12 +7792,36 @@ NEW tab to see the loading screen again.
 All pushed to `main` except the last commit of the day (see STATE). Replies to the owner are in
 Thai from this session on (memory: reply-in-thai).
 
-### STATE — read first
+### STATE — read first (updated at the end of the session, 2026-09-26)
 
-Pushed: `a37e4d9` … `74467ef`. **Not yet pushed at the time of writing:** js/71 (database-scoped
-"seen" list + the bin purging quotations/customers/machines/documents), new js/122, one
-`index.html` tag, and this entry. The owner has bought an **Ubuntu 24 VPS**; `docs/MIGRATION.md`
-is still to be written once they send specs, domain and who runs the commands.
+Everything in part 36 is pushed; the last commit carries the js/90 settings prune and this note.
+`supabase/13-notification-reads.sql` HAS been run by the owner (table verified, empty at the time).
+Every open device needs one Ctrl+Shift+R.
+
+**Where the work stopped — the owner's queue, in this order:**
+
+1. **Technician-scoped sync** (decided, not built). A field technician AND a team lead download
+   only the cases they are assigned to — alone or on a crew (js/38's comma list in `assignee`) —
+   plus their own service reports; no quotations, requests, petty cash, purchase orders, and not
+   the quotation signatures in settings. Customers, machines, warranties stay (small, needed on
+   site). **Such a device must never push the settings row whole** (it would erase what it did
+   not download); write only the keys it changed. js/90's prune already skips technician devices.
+2. **Supabase egress is at 319 % of the free plan** (15.9 / 5 GB; database only 44 MB). The prune
+   shrinks the ~1 MB settings row from now on; the owner may need to upgrade temporarily or move
+   sooner if Supabase starts restricting the project.
+3. **Move to the company VPS (Ubuntu 24.04, bought).** `docs/MIGRATION.md` still to be written —
+   needs from the owner: machine specs, the domain, who runs the commands. Do at the move:
+   photos/signatures to file storage (`docs/STORAGE-PLAN.md`), sync only changed rows, separate
+   test (GitHub Pages) and production databases, js/23 forcing the new endpoint, `sw.js` bypass
+   no longer matching only `supabase.co`, and `10-production-rls.sql` + real auth.
+4. **Notifications stage 2** (Web Push to phones) — needs the VPS.
+5. **LINE to customers (stage 3) — PARKED by the owner**, full plan below.
+
+Left in the database for the owner to decide: 10 quotations and 1 service report pointing at
+deleted cases; technician rows T001 (a duplicate "พี่ย้ง") and T1790129751665 (Thanawat);
+demo rows (WTY-DEMO ×40, QC-DEMO, PC-DEMO) that go when real data is imported. A cleanup delete
+from here was refused by the permission classifier — backups of what was going to be deleted are
+in `Data/backup/2026-09-25-cleanup-*.json`.
 
 ### Features
 
@@ -7972,3 +7996,31 @@ or case that genuinely never reached the cloud is still kept and uploaded (S3, S
 
 The remaining rule, stated for whoever touches sync next: **a record comes back only if this
 device holds it, the cloud has never had it, and it is not in the bin.**
+
+### Follow-up: Supabase egress at 319 % — the settings row is pruned and watched
+
+Measured: Egress 15.9 GB of the free plan's 5 GB while the database is only 44 MB. Every sync
+downloads every table whole; `system_settings` alone was **995 KB** (customer signatures 455 KB,
+staff signatures 273 KB, papers 117 KB — mostly of quotations that no longer exist) and is also
+re-read before every settings push and broadcast whole over realtime on every change.
+
+js/90 now **prunes** inside the merge (so no device can put the entries back): an entry of
+quoteApprovals / quoteStaffSigns / quoteDocs / quoteViews / quoteAccepts / quoteRequestLink /
+quoteWarrantyType whose quotation is gone, or of caseStatusLog / caseFeedback whose case is gone,
+is removed once it is older than 7 days. Guards: only after a sync in this page view, never on a
+field technician's device, never an entry with no date. After each sync the row size is checked
+and an account with `settings.manage` gets one warning past 400 KB naming the biggest keys
+(`window.imodeSettingsSize()`).
+
+**Decided with the owner, not built yet:** a field technician — and a team lead the same way —
+downloads only the cases they are assigned to, alone or on a crew, plus their own reports; no
+quotations, requests, petty cash or purchase orders; customers, machines and warranties stay
+(small, needed on site). The settings row must then never be pushed whole from such a device.
+
+**Rules so it does not come back** (for whoever adds the next feature):
+1. Never put images or growing per-record logs into `settings` — it is one row every device
+   downloads on every sync. Give them a table.
+2. Anything keyed by a record id in settings must be in js/90's prune lists.
+3. Photos and signatures belong in file storage, not in rows (`docs/STORAGE-PLAN.md`), at the VPS
+   move at the latest.
+4. Sync should fetch only rows changed since the last sync — to do with the VPS move.

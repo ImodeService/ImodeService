@@ -187,6 +187,15 @@
   return out;
  }
  function tidyRecords(){
+  /* 2026-09-25 — SWITCHED OFF. This was a one-time sweep of the UAT test records (part 31),
+     but it runs after EVERY sync on EVERY device, and it deletes any technician record no
+     account links to — with its cases, requests, reports and QC, in Supabase too. A device
+     whose accounts and technician list disagree for a moment (an account re-linked to a new
+     record, a stale device) therefore destroyed real work: measured on the live project, the
+     records of samak and narongsak were replaced by new ids today and every case that named
+     the old ones lost them. The test records it was written for are long gone. Nothing may
+     delete a technician record or a case automatically any more. */
+  return false;
   var list=[];
   try{list=Array.isArray(technicians)?technicians:[]}catch(e){return false}
   var linked={};

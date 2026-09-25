@@ -215,7 +215,11 @@
      This has to happen HERE, before the guard below, not after the save: the guard is what
      used to reject it, so an auto-create placed further down was never reached at all.
      An account being edited that already points at a live record is untouched. */
-  if(data.accountType==='technician'&&!hasRecord(String(data.technicianId||'').trim())){
+  /* 2026-09-25: only when the account has NO record at all. An id this device merely does not
+     hold (a stale device, a list that failed to save) is not a missing record — creating a new
+     one there re-linked samak and narongsak to fresh ids when their passwords were reset, and
+     the old records, still carrying their work, were then swept away. */
+  if(data.accountType==='technician'&&!String(data.technicianId||'').trim()){
    var autoId=createRecordFor({username:uname,name:data.name,role:data.role,team:data.team},data.team);
    if(autoId)data=Object.assign({},data,{technicianId:autoId});
   }

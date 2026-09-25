@@ -252,8 +252,18 @@
   /* The สถานะ button is gone on purpose. A คำขอ is an inbox item, not a second place to
      track a job: once somebody picks the case up it leaves this page altogether and the
      Service Cases page is the one record of where the work stands. */
+  /* 2026-09-25: "เพิ่มปุ่มลบคำขอ". The delete itself is js/61's imodeDeleteRequest — to the bin,
+     restorable, the cloud row removed, the case it opened left alone — so this page and
+     ประวัติคำขอ delete the same way. Same key js/61 checks: line.manage. */
+  if(can('line.manage')&&typeof window.imodeDeleteRequest==='function')
+   out+='<button type="button" class="req-act req-act-del" onclick="event.stopPropagation();'
+    +'imodeRequestsDelete(&quot;'+esc2(r.id)+'&quot;)">🗑 '+esc2(tl('ลบ','Delete'))+'</button>';
   return out;
  }
+ window.imodeRequestsDelete=function(id){
+  try{var md=document.getElementById('modal');if(md&&md.classList.contains('open')&&typeof closeModal==='function')closeModal()}catch(e){}
+  window.imodeDeleteRequest(id);
+ };
  function rowHTML(r){
   var cu=customerOf(r),m=machineOf(r);
   var media=Array.isArray(r.media)?r.media.length:0;
@@ -374,6 +384,14 @@
   paintBadge();
  }
  window.imodeRenderRequests=render;
+ /* js/61 ends a delete with renderAll(), which does not draw this page — redraw it here when
+    it is the page on screen, so the deleted row goes at once. */
+ var baseAllReq=window.renderAll;
+ if(typeof baseAllReq==='function')window.renderAll=function(){
+  var r=baseAllReq.apply(this,arguments);
+  try{var p=document.getElementById('page-'+PAGE);if(p&&p.classList.contains('active'))render()}catch(e){}
+  return r;
+ };
 
  /* ---------------------------------------------------------- the request ---- */
  /* The case a แจ้งปัญหา opened lives in the application; js/28 routes the seam to the
@@ -542,6 +560,7 @@
  +'.req-status.is-done{background:#e9f8ef;border-color:#b6e6c9;color:#0a6b3d}'
  +'.req-media{font-size:10.5px;font-weight:800;color:#0b3f9e}'
  +'.req-row-side{flex:none;display:flex;flex-direction:column;gap:7px;align-items:stretch}'
+ +'.req-act.req-act-del{border-color:#f3c9c6;background:#fff5f4;color:#b42318}'
  +'.req-act{border:1px solid #d9e6fa;border-radius:11px;padding:7px 13px;cursor:pointer;'
  +'white-space:nowrap;background:#fff;color:#0c225e;font-size:12px;font-weight:800;min-height:32px}'
  +'.req-act:hover{border-color:#0b63e5;color:#0b63e5}'

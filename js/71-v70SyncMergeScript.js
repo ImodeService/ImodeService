@@ -51,10 +51,12 @@
   {name:'cases',
    get:function(){return (typeof cases!=='undefined'&&Array.isArray(cases))?cases:null},
    set:function(v){cases=v},
+   table:'service_cases',
    push:'cloudUpsertCase'},
   {name:'lineRequests',
    get:function(){return (typeof lineRequests!=='undefined'&&Array.isArray(lineRequests))?lineRequests:null},
    set:function(v){lineRequests=v},
+   table:'line_customer_requests',
    push:'cloudUpsertLineRequest'}
  ];
 
@@ -84,7 +86,7 @@
   return out;
  }
 
- function reconcile(before){
+ function reconcile(before,refs){
   var seen=readSeen();
   var firstRun=!seen.__seeded;
   var changed=false,repush=[];
@@ -92,6 +94,11 @@
   TABLES.forEach(function(t){
    var now=t.get();
    if(!now)return;
+   /* 2026-09-25: the base did not replace this array (the cloud table came back empty, or the
+      sync failed), so `now` is still this device's own list. Treating it as "what the cloud
+      returned" marked every local row acknowledged — including ones never uploaded — which
+      the empty-table check below would then have dropped. Nothing was learned; record nothing. */
+   if(refs&&now===refs[t.name])return;
    var prev=before[t.name];
    if(!Array.isArray(prev)||!prev.length)return;
 
@@ -140,17 +147,45 @@
   });
  }
 
- var base=window.syncCloud;
- window.syncCloud=function(){
-  var before={};
+ /* 2026-09-25 — REPORTED: every case was deleted, and one browser still showed five of them after
+    a reload and Ctrl+F5 while the other two showed none. syncCloud() only replaces the array
+    `if(!a.error && a.data.length)`, so a table the cloud has EMPTIED is never applied: the last
+    delete can never reach another device. When the base left the array untouched, one cheap
+    probe asks whether the table is really empty, and if it is, every row the cloud had already
+    acknowledged here is dropped — it was deleted elsewhere. A row the cloud has never seen stays,
+    exactly as reconcile() treats it. A failed probe changes nothing. */
+ function emptiedTables(refs){
+  var db=null;try{db=supa}catch(e){db=null}
+  if(!db||typeof db.from!=='function')return;
   TABLES.forEach(function(t){
    var cur=t.get();
+   if(!t.table||!cur||cur!==refs[t.name]||!cur.length)return;   /* replaced, or nothing to clear */
+   db.from(t.table).select('id').limit(1).then(function(res){
+    if(!res||res.error||!Array.isArray(res.data)||res.data.length)return;
+    var known={};(readSeen()[t.name]||[]).forEach(function(id){known[id]=1});
+    var now=t.get();if(!now)return;
+    var left=now.filter(function(r){return !(r&&r.id&&known[r.id])});
+    if(left.length===now.length)return;
+    t.set(left);
+    try{console.info('[imode sync-merge] cloud '+t.table+' is empty — removed '+(now.length-left.length)+' deleted row(s) from this device')}catch(e){}
+    try{if(typeof saveLocal==='function')saveLocal()}catch(e){}
+    try{if(typeof renderAll==='function')renderAll()}catch(e){}
+   },function(){});
+  });
+ }
+
+ var base=window.syncCloud;
+ window.syncCloud=function(){
+  var before={},refs={};
+  TABLES.forEach(function(t){
+   var cur=t.get();
+   refs[t.name]=cur;
    before[t.name]=cur?cur.slice():[];      /* a shallow copy: the base REPLACES the array */
   });
   var out;
   try{out=base.apply(this,arguments)}
   catch(e){throw e}
-  var after=function(){try{reconcile(before)}catch(e){console.warn('[imode sync-merge]',e)}};
+  var after=function(){try{reconcile(before,refs)}catch(e){console.warn('[imode sync-merge]',e)}try{emptiedTables(refs)}catch(e){}};
   if(out&&typeof out.then==='function')out.then(after,after);
   else after();
   return out;

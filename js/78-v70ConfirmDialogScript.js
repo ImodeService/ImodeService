@@ -194,7 +194,9 @@
   ['imodeDeleteQuotation',   {danger:true,title:'ลบใบเสนอราคาไปถังขยะ'}],
   ['imodeDeleteMachine',     {danger:true,title:'ลบเครื่องจักร'}],
   ['imodeDeleteCustomer',    {danger:true,title:'ลบลูกค้า'}],
-  ['imodeDeleteRequestLog',  {danger:true,title:'ลบประวัติคำขอ'}],
+  /* 2026-09-25: was imodeDeleteRequestLog, a name that never existed, so this delete kept the
+     browser's grey box. js/61's function is imodeDeleteRequest. */
+  ['imodeDeleteRequest',     {danger:true,title:'ลบคำขอไปถังขยะ'}],
   ['deleteRelatedEmployee',  {danger:true,title:'ลบพนักงาน'}],
   ['v68ApplyPricingToQuotation',{title:'ใช้ราคานี้ใน Quotation',okText:'นำไปใช้'}],
   ['prepareQuotation',       {title:'เริ่มใบเสนอราคาใหม่',okText:'เริ่มใหม่'}]

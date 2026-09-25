@@ -7895,3 +7895,80 @@ M 17, F 15, E 36: pass. `node --check` on every file.
    pannawit's account team is still Technical. Left for the owner.
 4. Unchanged from part 15: `04-anon-uat.sql` means anyone on the internet can read and write this
    database.
+
+### Follow-up (same day): the notification centre works — js/123
+
+Measured first: every automatic notice (auto_visit_, auto_urgent_ …) was rebuilt with
+`read:false` on every render, so the bell never went down; the notices js/03 STORES lived only on
+the device that made them (the cloud `notifications` table: 0 rows), which is why three browsers
+showed 23 / 37 / 13; and apart from js/16's assignment notices everybody saw everything.
+
+`js/123-v70NotifyCenterScript.js` is the outermost wrapper on buildNotifications():
+
+- device-local stored notices (`n_…` without `audience`) are dropped, so the list is derived only
+  from shared data and every device computes the same one;
+- added: `auto_req_<id>` (a quote / warranty request still ใหม่, for `line.view`),
+  `auto_qview_<qid>` (the customer opened a quotation) and `auto_qsent_<qid>` (sent it back
+  signed), for `quotation.view`;
+- a field technician (account with `technicianId`) sees only notices about cases they are on;
+- **read state is per ACCOUNT** in `public.notification_reads` (`supabase/13-notification-reads.sql`,
+  one row per account + notice key, realtime-published) and mirrored in `imode_v70_notice_reads`.
+  Opening a notice marks it read; the page has ✓ อ่านทั้งหมด. Reads are pulled after every sync
+  and on tab focus, and pushed at once. Until the SQL is run the reads stay on the device and the
+  console says so once.
+
+**`13-notification-reads.sql` must be run once in the SQL Editor** for reads to cross devices.
+
+Known limits: a derived key is stable per case (`auto_visit_<case>`), so a notice read once stays
+read even if the appointment later moves. Nothing reaches a phone that does not have the app open
+— that is stage 2 (Web Push, needs the VPS).
+
+### PARKED at the owner's word (2026-09-25): notifying customers through LINE — stage 3
+
+Customers deal with I-MODE through the LINE OA **@imodeservice**. The design agreed in principle,
+to be built later, after the VPS:
+
+1. **Messaging API** enabled for the OA in LINE Developers → a **Channel Access Token**. The token
+   lives on the SERVER only (VPS), never in the browser: whoever holds it can message every
+   customer in the company's name.
+2. **Who the customer is in LINE**: pushing needs the person's LINE userId and that they have
+   added the OA. Get it through **LIFF** — the customer opens the customer page from the OA's
+   rich menu or scans a machine QR inside LINE; the page learns the userId without a login and
+   stores it on the case they report (the reporter is the one notified). The scaffold is already
+   there: `customer.lineUserId`, `req.lineUserId`, and js/11's `imodeLineAuth`, inert until
+   `settings.lineConfig.liffId` is set.
+3. **The sender**: on each event the server pushes a message with a button that opens the
+   customer's live case view (js/120). Events to send are to be chosen by the owner to control
+   volume — received / appointment / on the way / finished / waiting for parts / quotation ready.
+4. Things to settle then: LINE OA pricing (push messages count against the plan's monthly quota —
+   check the current Thai plan before switching it on); a case opened by phone has no LINE userId
+   unless that customer has used the page from LINE before; show the office when a push fails
+   (customer blocked the OA).
+
+Needed from the owner when this resumes: admin access to the OA in LINE Developers (to create the
+Messaging API channel and the LIFF app), the VPS, and the list of events to send.
+
+### Follow-up: where the "mystery requests" came from, and why they cannot come back
+
+The owner asked for this to be closed for good ("ไม่อยากให้เกิดคำขอปริศนาขึ้นมาอีก"). The bin check
+above covered only rows still IN the bin; emptying the bin removed the protection. The root cause
+was that js/71 learned "the cloud has this row" from a full sync only. A row this device
+UPLOADED, or received by REALTIME, was unknown to it until the next full sync, and a delete made
+elsewhere in between read as "unsent work" → re-uploaded. The customer's phone that reported a
+problem is exactly such a device. js/110 had the same hole for an offline edit to a record
+deleted elsewhere ("the server never had it: put it back").
+
+- js/71: a row is acknowledged the moment the cloud has it — a successful upload through the
+  `cloudUpsert` funnel (js/71 now wraps it; js/110 stays outside and still sees js/24's result)
+  or a row arriving by realtime (js/85 calls `window.imodeSyncAck(table,id)`). Covers cases,
+  requests, quotations, warranties, machine documents and service reports.
+- js/110: a pending offline row the cloud no longer has is put back only if it was never
+  acknowledged and is not in the bin (`window.imodeSyncWasDeleted`); otherwise the delete wins
+  and the pending mark is cleared.
+
+Measured with the old code, three ways back: a request uploaded by this device (S1), one
+received by realtime (S2), an offline edit to a deleted case (S4a). All three closed; a request
+or case that genuinely never reached the cloud is still kept and uploaded (S3, S4b).
+
+The remaining rule, stated for whoever touches sync next: **a record comes back only if this
+device holds it, the cloud has never had it, and it is not in the bin.**

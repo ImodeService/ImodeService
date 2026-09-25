@@ -204,6 +204,9 @@
   var id=row&&row.id;
   if(!id)return;
 
+  /* 2026-09-25: a row that arrives from the cloud is one the cloud has — tell js/71, so a later
+     delete elsewhere is read as a delete and not as unsent work (the "mystery requests"). */
+  if(ev!=='DELETE'){try{if(typeof window.imodeSyncAck==='function')window.imodeSyncAck(cfg.name,id)}catch(e){}}
   var at=-1;
   for(var i=0;i<list.length;i++)if(list[i]&&list[i].id===id){at=i;break}
 

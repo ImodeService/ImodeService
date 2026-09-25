@@ -186,6 +186,11 @@
    mine.forEach(function(row){
     var at=index[row.id];
     if(at===undefined){                       /* the server never had it: put it back */
+     /* 2026-09-25 — unless the server DID have it and it was deleted since (or it is in the bin):
+        then the delete wins and the pending mark goes, instead of the record coming back. */
+     var gone=false;
+     try{gone=typeof window.imodeSyncWasDeleted==='function'&&window.imodeSyncWasDeleted(tableName,row.id)}catch(e){gone=false}
+     if(gone){dropped++;clear(tableName,row.id);return}
      next.unshift(row);touched=true;repush.push({t:t,row:row});return;
     }
     /* 2026-09-23 — THE TEST IS "IS THEIRS NEWER", NOT "IS OURS NEWER". Those are not

@@ -302,4 +302,42 @@
 
  /* For the console, and for a suite: what this device believes the cloud has acknowledged. */
  window.imodeSyncSeen=function(){return readSeen()};
+
+ /* 2026-09-25 — WHERE THE "MYSTERY REQUESTS" CAME FROM. "Seen" used to be learned from a full
+    sync only. A row this device UPLOADED itself, or received by REALTIME, was unknown to it until
+    the next full sync — and if another device deleted it first, reconcile() took the missing row
+    for unsent work and uploaded it again. The customer's phone that reported a problem is exactly
+    that device. So a row is acknowledged the moment the cloud has it: a successful upload (the
+    cloudUpsert funnel below) or a row arriving by realtime (js/85 calls imodeSyncAck). */
+ var ACK_TABLES={service_cases:'cases',line_customer_requests:'lineRequests',quotations:'quotations',
+  machine_warranties:'warranties',machine_documents:'machineDocuments',service_reports:'serviceReports'};
+ function ack(table,id){
+  var name=ACK_TABLES[table]||table;
+  if(!id||!name)return;
+  var seen=readSeen(),list=Array.isArray(seen[name])?seen[name]:[];
+  if(list.indexOf(id)>=0)return;
+  list.push(id);
+  if(list.length>CAP_SEEN)list=list.slice(list.length-CAP_SEEN);
+  seen[name]=list;writeSeen(seen);
+ }
+ window.imodeSyncAck=function(table,id){try{ack(table,String(id||''))}catch(e){}};
+ /* For js/110: was this row in the cloud once (so its absence now is a deletion), or in the bin? */
+ window.imodeSyncWasDeleted=function(name,id){
+  if(!id)return false;
+  name=ACK_TABLES[name]||name;   /* a table name (service_cases) or an array name (cases) */
+  try{if(binnedIds()[id])return true}catch(e){}
+  var seen=readSeen();
+  return Array.isArray(seen[name])&&seen[name].indexOf(id)>=0;
+ };
+ var baseUp=window.cloudUpsert;
+ if(typeof baseUp==='function'){
+  window.cloudUpsert=function(table,obj){
+   var r=baseUp.apply(this,arguments);
+   var id=obj&&obj.id;
+   if(id&&ACK_TABLES[table]&&r&&typeof r.then==='function')r.then(function(res){
+    if(res&&res.ok&&!res.offline&&!res.error)ack(table,String(id));
+   },function(){});
+   return r;
+  };
+ }
 })();

@@ -7783,3 +7783,115 @@ new-feature suite (18), and `node --check` on all 122 files. 0 page errors throu
 
 **When testing this by hand:** a reload in the same tab is a warm load and shows nothing. Open a
 NEW tab to see the loading screen again.
+
+
+---
+
+## Session Change Log — 2026-09-25 (part 36): a long day of features, and four ways data went missing
+
+All pushed to `main` except the last commit of the day (see STATE). Replies to the owner are in
+Thai from this session on (memory: reply-in-thai).
+
+### STATE — read first
+
+Pushed: `a37e4d9` … `74467ef`. **Not yet pushed at the time of writing:** js/71 (database-scoped
+"seen" list + the bin purging quotations/customers/machines/documents), new js/122, one
+`index.html` tag, and this entry. The owner has bought an **Ubuntu 24 VPS**; `docs/MIGRATION.md`
+is still to be written once they send specs, domain and who runs the commands.
+
+### Features
+
+| File | What |
+|---|---|
+| js/19 | customer page: an identical machine card is not redrawn (it was rebuilt 3× on load, replaying the pop-in) |
+| js/95 | quotation signatures can be made before the quotation is saved (held, written on save); preview works unsaved and shows ink not yet saved |
+| js/118 (new) | `settings.customerDistances` — km per customer set once in ตั้งค่าระบบ (card, search, 📍 Maps per row); fills every new quotation. Registered in js/90 MAP_KEYS; cleared = 0, never deleted |
+| js/119 (new) | calendar opens on MONTH; month chips wear the crew's colours (split left bar + smoky radial blend) |
+| js/120 (new) | customer case view: full field ladder (vertical, PM/ซ่อม merged, รออะไหล่ a badge), live via renderAll + 3 s check, green bar flows to a new step; review editable after the job (settings.caseFeedback, `source:'portal'`, history 5) → derived `auto_review_` notice; first open of a quotation writes `settings.quoteViews` |
+| js/121 (new) | every status bar animates when its status moves on (case page main/field/qt tracks, หน้างาน ladder). Loaded by index.html AND service-case-detail.html. Seen scores in `imode_v70_track_seen` |
+| case page | quotation track waits on step 1 until the customer opens it (quoteViews) |
+| js/99 | ทีมช่าง cards show the calendar colour; own colour picker with ยกเลิก / ตกลง (the native one cannot take a button) |
+| js/113 + js/03 + index.html | ทีมงาน lists every account grouped by Role (Dev first), at the top, filtered by the team chips; team **Dev** added to TEAM_META and the chip row |
+| js/49 | 🗑 ลบ on each request and in its popup (js/61's delete, to the bin) |
+
+New device-local keys: `imode_v70_portal_step_seen`, `imode_v70_track_seen`.
+New settings keys: `customerDistances`, `quoteViews` (both in js/90 MAP_KEYS; quoteViews also in
+js/85 and the case page's SETTING_KEYS).
+
+### Bugs — the four data-loss ones first
+
+1. **js/107 `tidyRecords` deleted real technician records and their cases, on every device, every
+   sync.** Written as a one-time UAT sweep (part 31) but re-run after every sync; it deleted any
+   technician record no account linked to, with its cases, in Supabase. Combined with js/39
+   creating a NEW record whenever an account's technicianId was missing on *this* device (a stale
+   Live Server device), samak's and narongsak's records were replaced today and their work lost.
+   **tidyRecords now returns false; js/39 creates a record only for an account with no link at
+   all.** Nothing may delete a technician record or a case automatically.
+2. **Deleting the LAST row of a table never reached other devices.** js/03's syncCloud applies a
+   table only `if(!x.error && x.data.length)`. js/71 now probes when the base left the array
+   untouched and, if the cloud table is really empty, drops the rows the cloud had acknowledged.
+   reconcile() no longer marks an untouched local array as acknowledged (that would have made
+   unsent rows look deleted).
+3. **Deleted requests came back.** A device that learned of a row by realtime had no "seen" record
+   of it and re-uploaded it after the delete (6 of 10 binned requests were back in Supabase).
+   **The bin decides now:** js/71 never keeps or re-uploads an id in `settings.trash`, and removes
+   one that came back, locally and in the cloud — for cases, requests, quotations, customers,
+   machines and machine documents. js/40 stamps `refIds` on every bin entry so a payload too big
+   to travel still protects its ids. Restoring removes the entry, so a restore is never undone.
+4. **Pointing a device at a new, empty database would have wiped it** — the migration trap. The
+   js/71 "seen" list is now stamped with the project URL and ignored under any other one.
+   Measured with the old code: `cases` went to `[]`.
+
+Also fixed:
+
+- **Sign-in lockout survived an admin password reset** (5 wrong guesses → 15 min, per device).
+  js/39: a reset clears the lock on the admin's device; the lock records the password hash it was
+  set against and any device drops it once the hash has changed. The locked message now says an
+  admin reset unlocks it.
+- **Assign picker empty for Admin / Coordinator** — that role carries `teamScope 'Admin'`, a team
+  no technician is in. js/13 and the case page: a scope matching no technician team is no scope.
+- **Search boxes took one character** on คำขอจากลูกค้า, ประวัติคำขอ, ดูใบเสนอราคา and
+  งานที่สำเร็จแล้ว — each keystroke rebuilt the page with the box in it. js/122 keeps the focused
+  box and caret across those setters and renderAll(). Swept: all 27 text boxes on 26 pages keep
+  focus.
+- js/78 wrapped `imodeDeleteRequestLog`, a name that never existed, so that delete kept the grey
+  browser confirm.
+
+### Measured and not a bug
+
+- Role **Dev** already had every permission (43/43), every page, and can edit / reset the admin
+  account. js/107's ROLE_SPEC re-adds all keys for Dev, CEO, Service Manager, Admin, Sale / Admin
+  on every load; Role Admin's account screen is read-only on purpose.
+- "admin missing from the account screen" and "only two technicians" were a Live Server
+  (127.0.0.1:5500) device holding stale local data; the cloud has all nine accounts.
+
+### Sweeps run at the end of the day
+
+Every sidebar page and every safe popup opener as Dev, Admin and a technician at 1440 and 390
+(26 / 26 / 7 pages, 189 openers): 0 errors, 0 undefined/NaN/Invalid Date, 0 sideways scroll. Case
+page drawers and field chips at 1440 and 390: clean. Customer portal, all 9 cards at 390: clean.
+Hostile markup in customer / technician / case / request / feedback fields through every new
+screen: nothing executes. 16 same-day suites (94 assertions) and the part-30 suites C 56, T 58,
+M 17, F 15, E 36: pass. `node --check` on every file.
+
+### Harness notes worth keeping
+
+- **A regex inside a node template literal needs `\\b`** — a single `\b` is a backspace and
+  `\[object Object\]` becomes a character class that matches almost anything. Compare with plain
+  `indexOf` when in doubt.
+- Setting `currentUser` without saving and reloading leaves the sidebar computed for nobody; the
+  role's pages only appear after `saveLocal()` + a reload.
+- The part-30 suites sign in as `technician_test1` / `admin_test`, which the roster deleted — run
+  them with `lead_technician` / `lead_rd` (password = username) and `T-LEAD-TECH`.
+
+### Open / risk
+
+1. js/71's empty-table probe covers cases and requests; the bin purge covers four more tables. A
+   quotation / warranty / document / report deleted WITHOUT the bin is still not propagated when
+   it was the last one of its table.
+2. Sixteen `แจ้งปัญหา` requests point at cases deleted outside the bin (most likely by the old
+   tidy sweep). They stay on หน้าคำขอ until somebody deletes them.
+3. Supabase still has a duplicate "พี่ย้ง" (T001 and T-LEAD-TECH) and Thanawat Suvunchato;
+   pannawit's account team is still Technical. Left for the owner.
+4. Unchanged from part 15: `04-anon-uat.sql` means anyone on the internet can read and write this
+   database.

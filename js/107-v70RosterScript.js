@@ -41,7 +41,7 @@
  var ROSTER=[
   {u:'rungarun', h:'99e518490c5e3142f647a43a4357a2bebbef13ba86252501e66c8b2b57928dc3', name:'Rungarun Suvunchato', th:'รุ่งอรุณ สุวรรณชาโต', role:'CEO', type:'staff'},
   {u:'apichat',  h:'0fa2d066330b597421c4f95af27806bc1d9f0eb8fb7c4e42bc9e608fdf636da7', name:'Apichat Pimpaeng',    th:'อภิชาติ ปิมแปง',      role:'Service Manager', type:'staff', userId:'USR-001'},
-  {u:'pannawit', h:'cf58e725854c3ba6d10a65cf245ae5a4fd2f0a4e58e201c9115d24027ac11650', name:'Pannawit Chaimongkhon', th:'ปัณณวิชญ์ ชัยมงคล', role:'Dev', type:'staff'},
+  {u:'pannawit', h:'cf58e725854c3ba6d10a65cf245ae5a4fd2f0a4e58e201c9115d24027ac11650', name:'Pannawit Chaimongkhon', th:'ปัณณวิชญ์ ชัยมงคล', role:'Dev', type:'staff', team:'Dev'},
   /* 4: the real name is not known yet. The owner said to put this in and change it later, so
      it is written as given rather than invented. */
   {u:'phimu',    h:'d3fec1fd2bfe6816e2916b796c54806bda91e068db877a2f577f72d57a318b35', name:'พี่หมู่',             th:'พี่หมู่',             role:'Sale / Admin', type:'staff'},
@@ -115,6 +115,8 @@
     if(r.name&&cur.name!==r.name)patch.name=r.name;
     if(r.role&&cur.role!==r.role)patch.role=r.role;
     if(r.userId&&cur.userId!==r.userId)patch.userId=r.userId;
+    /* 2026-09-25: the roster may name a team too — pannawit is ทีม Dev. */
+    if(r.team&&cur.team!==r.team)patch.team=r.team;
     if(!Object.keys(patch).length)return;
     if(cur.builtIn){
      var k=lc(cur.originalUsername||cur.username);
@@ -132,7 +134,7 @@
    if(r.keepPassword)return;          /* a record-linked login that should already exist */
    st.uatAccounts.push({
     username:r.u,hash:r.h,
-    accountType:r.type||'staff',role:r.role||'',team:'',
+    accountType:r.type||'staff',role:r.role||'',team:r.team||'',
     name:r.name,userId:r.userId||'',technicianId:r.tech||'',
     createdAt:new Date().toISOString(),createdBy:'roster-2026-09-23'
    });

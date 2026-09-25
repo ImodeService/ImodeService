@@ -60,11 +60,22 @@
    push:'cloudUpsertLineRequest'}
  ];
 
+ /* 2026-09-25: what a database has acknowledged is only true of THAT database. The record is
+    stamped with the project URL and ignored under any other one — otherwise pointing a device at
+    a new, still-empty database (the move to the company VPS) would read every local row as
+    "deleted in the cloud" and emptiedTables() would drop them. */
+ function dbUrl(){try{return String((cloudSettings&&cloudSettings.url)||'')}catch(e){return ''}}
  function readSeen(){
-  try{var o=JSON.parse(localStorage.getItem(SEEN_KEY)||'{}');return (o&&typeof o==='object')?o:{}}
+  try{
+   var o=JSON.parse(localStorage.getItem(SEEN_KEY)||'{}');
+   if(!o||typeof o!=='object')return {};
+   var u=dbUrl();
+   if(o.__url&&u&&o.__url!==u)return {};
+   return o;
+  }
   catch(e){return {}}
  }
- function writeSeen(o){try{localStorage.setItem(SEEN_KEY,JSON.stringify(o))}catch(e){}}
+ function writeSeen(o){try{var u=dbUrl();if(u)o.__url=u;localStorage.setItem(SEEN_KEY,JSON.stringify(o))}catch(e){}}
 
  function idsOf(list){
   var m=Object.create(null);
@@ -170,16 +181,27 @@
     if(!e)return;
     (Array.isArray(e.refIds)?e.refIds:[]).forEach(function(id){o[id]=1});
     var p=e.payload;
-    if(p&&p.id&&(e.type==='case'||e.type==='request'))o[p.id]=1;
+    if(p&&p.id&&PURGE_TYPES[e.type])o[p.id]=1;
     if(p&&Array.isArray(p.__imodeRequests))p.__imodeRequests.forEach(function(r){if(r&&r.id)o[r.id]=1});
    });
   }catch(e){}
   return o;
  }
+ /* The bin covers more than the two tables reconcile() looks after: a quotation, a customer, a
+    machine or a machine document deleted on one device was just as able to linger on another —
+    syncCloud() never applies an EMPTY table, so deleting the last one never travelled. Only ids
+    that are in the bin are touched, so nothing is removed that somebody did not delete. */
+ var PURGE_TYPES={'case':1,'request':1,quotation:1,customer:1,machine:1,document:1};
+ var PURGE=TABLES.concat([
+  {name:'quotations',table:'quotations',get:function(){return (typeof quotations!=='undefined'&&Array.isArray(quotations))?quotations:null},set:function(v){quotations=v}},
+  {name:'customers',table:'customers',get:function(){return (typeof customers!=='undefined'&&Array.isArray(customers))?customers:null},set:function(v){customers=v}},
+  {name:'machines',table:'machines',get:function(){return (typeof machines!=='undefined'&&Array.isArray(machines))?machines:null},set:function(v){machines=v}},
+  {name:'machineDocuments',table:'machine_documents',get:function(){return (typeof machineDocuments!=='undefined'&&Array.isArray(machineDocuments))?machineDocuments:null},set:function(v){machineDocuments=v}}
+ ]);
  function purgeBinned(){
   var bin=binnedIds(),db=null,changed=false;
   try{db=supa}catch(e){db=null}
-  TABLES.forEach(function(t){
+  PURGE.forEach(function(t){
    var now=t.get();if(!now||!now.length||!t.table)return;
    var back=now.filter(function(r){return r&&r.id&&bin[r.id]});
    if(!back.length)return;
@@ -218,9 +240,52 @@
   });
  }
 
+ /* 2026-09-25 — the same "last one never leaves" hole for the tables reconcile() does not look
+    after. Only the detection is extended, NOT reconcile's keep-and-re-upload: each sync that
+    really replaced one of these arrays records its ids (as "seen", scoped to the database like
+    everything above), and a sync that left it untouched while the cloud table is empty drops the
+    rows the cloud had acknowledged. A row the cloud never had is left alone. */
+ var EXTRA=[
+  {name:'quotations',table:'quotations',get:function(){return (typeof quotations!=='undefined'&&Array.isArray(quotations))?quotations:null},set:function(v){quotations=v}},
+  {name:'warranties',table:'machine_warranties',get:function(){return (typeof warranties!=='undefined'&&Array.isArray(warranties))?warranties:null},set:function(v){warranties=v}},
+  {name:'machineDocuments',table:'machine_documents',get:function(){return (typeof machineDocuments!=='undefined'&&Array.isArray(machineDocuments))?machineDocuments:null},set:function(v){machineDocuments=v}},
+  {name:'serviceReports',table:'service_reports',get:function(){return (typeof serviceReports!=='undefined'&&Array.isArray(serviceReports))?serviceReports:null},set:function(v){serviceReports=v}}
+ ];
+ function extraAfter(refs){
+  var seen=readSeen(),dirty=false;
+  EXTRA.forEach(function(t){
+   var now=t.get();if(!now)return;
+   if(now!==refs[t.name]){
+    var ids=now.map(function(r){return r&&r.id}).filter(Boolean);
+    if(ids.length>CAP_SEEN)ids=ids.slice(ids.length-CAP_SEEN);
+    seen[t.name]=ids;dirty=true;
+   }
+  });
+  if(dirty)writeSeen(seen);
+  var db=null;try{db=supa}catch(e){db=null}
+  if(!db||typeof db.from!=='function')return;
+  EXTRA.forEach(function(t){
+   var now=t.get();
+   if(!now||now!==refs[t.name]||!now.length)return;
+   var known={};(seen[t.name]||[]).forEach(function(id){known[id]=1});
+   if(!Object.keys(known).length)return;
+   db.from(t.table).select('id').limit(1).then(function(res){
+    if(!res||res.error||!Array.isArray(res.data)||res.data.length)return;
+    var cur=t.get();if(!cur)return;
+    var left=cur.filter(function(r){return !(r&&r.id&&known[r.id])});
+    if(left.length===cur.length)return;
+    t.set(left);
+    try{console.info('[imode sync-merge] cloud '+t.table+' is empty — removed '+(cur.length-left.length)+' deleted row(s) from this device')}catch(e){}
+    try{if(typeof saveLocal==='function')saveLocal()}catch(e){}
+    try{if(typeof renderAll==='function')renderAll()}catch(e){}
+   },function(){});
+  });
+ }
+
  var base=window.syncCloud;
  window.syncCloud=function(){
   var before={},refs={};
+  EXTRA.forEach(function(t){refs[t.name]=t.get()});
   TABLES.forEach(function(t){
    var cur=t.get();
    refs[t.name]=cur;
@@ -229,7 +294,7 @@
   var out;
   try{out=base.apply(this,arguments)}
   catch(e){throw e}
-  var after=function(){try{reconcile(before,refs)}catch(e){console.warn('[imode sync-merge]',e)}try{emptiedTables(refs)}catch(e){}try{purgeBinned()}catch(e){}};
+  var after=function(){try{reconcile(before,refs)}catch(e){console.warn('[imode sync-merge]',e)}try{emptiedTables(refs)}catch(e){}try{purgeBinned()}catch(e){}try{extraAfter(refs)}catch(e){}};
   if(out&&typeof out.then==='function')out.then(after,after);
   else after();
   return out;

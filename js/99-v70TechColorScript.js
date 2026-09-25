@@ -38,6 +38,8 @@
   if(/^#[0-9a-f]{6}$/i.test(v))return v.toLowerCase();
   return presets()[0].hex;
  }
+ /* 2026-09-25: js/119 colours the month calendar by technician and needs the same answer. */
+ window.imodeTechColorHex=toHex;
  function toValue(hex){
   hex=String(hex||'').toLowerCase();
   var p=presets().filter(function(x){return String(x.hex).toLowerCase()===hex})[0];

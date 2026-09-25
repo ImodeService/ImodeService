@@ -2667,7 +2667,14 @@ function goApp(page,extra){window.location.href=appLink(page,extra)}
    Same rules as js/16's picker, so the two cannot disagree: the first technician ticked is
    the lead, a team lead may only pick inside their own team, and an admin (teamScope null)
    sees everybody. */
+/* A scope matching no technician team is no scope — same rule as js/13 (the live Admin /
+   Coordinator role carries teamScope 'Admin' and emptied this picker). */
 function teamScope(){
+  var s=rawTeamScope();if(!s)return null;
+  var hit=CaseDetailData.allTechnicians().some(function(t){return (t.team||'Technical')===s});
+  return hit?s:null;
+}
+function rawTeamScope(){
   var u=CaseDetailData.currentUser();
   if(!u)return null;
   var rec=null,list=CaseDetailData.allTechnicians();

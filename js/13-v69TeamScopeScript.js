@@ -74,7 +74,12 @@
   if(!id)return null;
   return technicians.filter(function(t){return t.id===id})[0]||null;
  }
- function teamScope(){
+ /* 2026-09-25 — a scope that names no team any technician is in is no scope at all. The live
+    Admin / Coordinator role carries teamScope 'Admin', so every assign picker for an admin came
+    out EMPTY ("ไม่มีช่างในขอบเขตของบัญชีนี้") while ทีมช่าง listed four technicians. A real team
+    lead still gets their own team; only a scope matching nobody falls back to everyone. */
+ function teamScope(){var s=rawTeamScope();if(!s)return null;try{if(!technicians.some(function(t){return (t.team||'Technical')===s}))return null}catch(e){}return s}
+ function rawTeamScope(){
   var u=(typeof currentUser!=='undefined'&&currentUser)||null;
   if(!u)return null;
   var rec=techRecord();

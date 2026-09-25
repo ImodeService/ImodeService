@@ -89,7 +89,7 @@
  function reconcile(before,refs){
   var seen=readSeen();
   var firstRun=!seen.__seeded;
-  var changed=false,repush=[];
+  var changed=false,repush=[],bin=binnedIds();
 
   TABLES.forEach(function(t){
    var now=t.get();
@@ -111,6 +111,7 @@
     if(!r||!r.id||here[r.id])return;                  /* still present: nothing to do */
     if(known[r.id])return;                            /* the cloud had it and does not now: deleted */
     if(firstRun&&!isFresh(r))return;                  /* seeding: only rescue what is clearly new */
+    if(bin[r.id])return;                              /* in the bin: deleted on purpose */
     if(keep.length<CAP_KEEP)keep.push(r);
    });
 
@@ -154,6 +155,49 @@
     probe asks whether the table is really empty, and if it is, every row the cloud had already
     acknowledged here is dropped — it was deleted elsewhere. A row the cloud has never seen stays,
     exactly as reconcile() treats it. A failed probe changes nothing. */
+ /* 2026-09-25 — REPORTED: deleted cases went to the bin and their customer requests came back
+    on หน้าคำขอ. Measured: of the ten requests bundled into binned cases, six were in Supabase again.
+    js/40 deletes the cloud row, but a device that had learned of a row by REALTIME and never in
+    a sync had no record of the cloud acknowledging it, so reconcile() took it for unsent work and
+    uploaded it again. The bin (settings.trash, which every device receives) now decides: a row
+    whose id is in it is never kept or re-uploaded, and one that has come back anyway is removed
+    here and in the cloud again. Restoring an entry takes it out of the bin, so a restore is
+    never undone by this. */
+ function binnedIds(){
+  var o=Object.create(null);
+  try{
+   (Array.isArray(settings.trash)?settings.trash:[]).forEach(function(e){
+    if(!e)return;
+    (Array.isArray(e.refIds)?e.refIds:[]).forEach(function(id){o[id]=1});
+    var p=e.payload;
+    if(p&&p.id&&(e.type==='case'||e.type==='request'))o[p.id]=1;
+    if(p&&Array.isArray(p.__imodeRequests))p.__imodeRequests.forEach(function(r){if(r&&r.id)o[r.id]=1});
+   });
+  }catch(e){}
+  return o;
+ }
+ function purgeBinned(){
+  var bin=binnedIds(),db=null,changed=false;
+  try{db=supa}catch(e){db=null}
+  TABLES.forEach(function(t){
+   var now=t.get();if(!now||!now.length||!t.table)return;
+   var back=now.filter(function(r){return r&&r.id&&bin[r.id]});
+   if(!back.length)return;
+   t.set(now.filter(function(r){return !(r&&r.id&&bin[r.id])}));
+   changed=true;
+   if(db&&typeof db.from==='function')back.forEach(function(r){
+    try{db.from(t.table).delete().eq('id',r.id).then(function(){},function(){})}catch(e){}
+   });
+   try{console.info('[imode sync-merge] removed '+back.length+' '+t.name+' row(s) that are in the bin')}catch(e){}
+  });
+  if(changed){
+   try{if(typeof saveLocal==='function')saveLocal()}catch(e){}
+   try{if(typeof renderAll==='function')renderAll()}catch(e){}
+   try{if(typeof window.imodeRenderRequests==='function')window.imodeRenderRequests()}catch(e){}
+  }
+ }
+ window.imodePurgeBinnedRows=purgeBinned;
+
  function emptiedTables(refs){
   var db=null;try{db=supa}catch(e){db=null}
   if(!db||typeof db.from!=='function')return;
@@ -185,7 +229,7 @@
   var out;
   try{out=base.apply(this,arguments)}
   catch(e){throw e}
-  var after=function(){try{reconcile(before,refs)}catch(e){console.warn('[imode sync-merge]',e)}try{emptiedTables(refs)}catch(e){}};
+  var after=function(){try{reconcile(before,refs)}catch(e){console.warn('[imode sync-merge]',e)}try{emptiedTables(refs)}catch(e){}try{purgeBinned()}catch(e){}};
   if(out&&typeof out.then==='function')out.then(after,after);
   else after();
   return out;

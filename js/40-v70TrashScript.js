@@ -294,7 +294,10 @@
    deletedAt:new Date().toISOString(),
    deletedBy:meName(),
    device:big?(navigator.userAgent||'').slice(0,60):'',
-   big:big
+   big:big,
+   /* 2026-09-25: the ids of the records this entry holds, kept even when the payload is too
+      big to travel — js/71 reads them so no device can sync a binned record back to life. */
+   refIds:[payload&&payload.id].concat(((payload&&payload[REQ_KEY])||[]).map(function(r){return r&&r.id})).filter(Boolean)
   };
   if(big){
    if(!putBlob(id,payload))return null;   /* nothing recorded rather than a dead entry */

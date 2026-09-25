@@ -61,15 +61,60 @@
         || active==='page-customer-home'||active==='page-scan';
    }catch(e){return false}
   };
+  /* ------------------------------------------- A WARM TAB GETS NO LOADING SCREEN -------
+     2026-09-25, reported as "มันยังขึ้นอยู่อะ" after the first attempt only shortened the wait:
+     js/117 stopped the tab's SECOND load from waiting for the sync, but this file still
+     painted the splash and js/11 still took it off at DOMContentLoaded, so switching between
+     the app and service-case-detail.html - a separate document, so a full page load each way -
+     still put a loading screen on screen for about 2 seconds every time.
+     On a tab that has already completed one boot there is nothing to cover: the markup, the
+     stylesheets and every js/NN file are in the HTTP and service-worker caches, the session is
+     known and the data is in localStorage. So the guard does not run at all and the app simply
+     appears.
+     `qr` is the exception and this is what it was computed for. A customer route still has to
+     be covered even on a warm tab, because initPortalFromUrl() decides where that visitor
+     belongs asynchronously and the dashboard would show through in the meantime. */
+  var warmTab=false;
+  try{warmTab=sessionStorage.getItem('imode_v70_tab_booted')==='1'}catch(e){}
+  if(warmTab&&!qr){
+   /* js/11, js/14 and js/21 all call this by name; give them something harmless. */
+   window.imodeQrBootRelease=function(){};
+   return;
+  }
+
   var st=document.createElement('style');
   st.id='v69QrBootGuardStyle';
+  /* 2026-09-25: the spinner became a ring of module circles orbiting the logo, asked for as
+     "เอาหน้าโหลดแบบ มี animation โมดุลเป็นวงกลมหมุนไปรอบๆ".
+     Three nested elements per circle, and each level exists for a reason:
+       .qbo-slot   static rotate(a) translateY(-R)  - puts the point on the ring
+       .qbo-cancel static rotate(-a)                - undoes the slot's own rotation
+       .qbo-face   animated rotate(0 -> -360deg)    - undoes the RING's rotation
+     so the icon rides the circle and still reads upright. Both keyframe sets declare an
+     explicit from AND to: with a `to`-only rule the implicit start has a different transform
+     function list, the browser falls back to matrix interpolation, and a matrix for
+     rotate(360deg) is the identity - the thing would sit perfectly still. */
   st.textContent='html.qr-booting .app-shell{visibility:hidden!important}'
-   +'.qr-boot-splash{position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:linear-gradient(160deg,#0b3f9e,#0b63e5 55%,#1f7ef0)}'
-   +'.qr-boot-splash img{width:190px;max-width:60vw;height:auto}'
-   +'.qr-boot-splash span{color:rgba(255,255,255,.9);font:600 13px/1.4 system-ui,sans-serif}'
-   +'.qr-boot-dot{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.28);border-top-color:#fff;animation:qrBootSpin .9s linear infinite}'
-   +'@keyframes qrBootSpin{to{transform:rotate(360deg)}}'
-   +'@media (prefers-reduced-motion:reduce){.qr-boot-dot{animation-duration:2.4s}}';
+   +'.qr-boot-splash{position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:linear-gradient(160deg,#0b3f9e,#0b63e5 55%,#1f7ef0)}'
+   +'.qr-boot-splash>.qr-boot-name{color:rgba(255,255,255,.92);font:600 13px/1.4 system-ui,sans-serif;letter-spacing:.02em}'
+   +'.qr-boot-orbit{position:relative;width:216px;height:216px;flex:none}'
+   +'.qbo-ring{position:absolute;inset:0;animation:qboSpin 9s linear infinite}'
+   +'.qbo-slot{position:absolute;top:50%;left:50%;width:0;height:0}'
+   +'.qbo-cancel{position:absolute;display:block}'
+   +'.qbo-face{position:absolute;width:42px;height:42px;margin:0;border-radius:50%;display:flex;'
+   +'align-items:center;justify-content:center;font-size:19px;line-height:1;'
+   +'background:rgba(255,255,255,.17);border:1px solid rgba(255,255,255,.36);'
+   +'box-shadow:0 6px 16px rgba(3,24,66,.26);transform:translate(-50%,-50%);'
+   +'animation:qboBack 9s linear infinite}'
+   +'.qbo-core{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center}'
+   +'.qbo-core img{width:118px;max-width:40vw;height:auto;display:block}'
+   +'@keyframes qboSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}'
+   +'@keyframes qboBack{from{transform:translate(-50%,-50%) rotate(0deg)}to{transform:translate(-50%,-50%) rotate(-360deg)}}'
+   +'@keyframes qboFade{0%,100%{opacity:.62}50%{opacity:1}}'
+   +'@media (max-width:420px){.qr-boot-orbit{transform:scale(.84)}}'
+   /* Reduced motion: nothing travels. The ring keeps its place and breathes instead, and the
+      faces drop their counter-rotation so they stay upright without it. */
+   +'@media (prefers-reduced-motion:reduce){.qbo-ring{animation:qboFade 2.6s ease-in-out infinite}.qbo-face{animation:none}}';
   (document.head||document.documentElement).appendChild(st);
   document.documentElement.classList.add('qr-booting');
   var released=false;
@@ -78,7 +123,19 @@
    var d=document.createElement('div');
    d.className='qr-boot-splash';
    d.id='qrBootSplash';
-   d.innerHTML='<img src="./assets/imode-ui-logo-v532.png" alt="I-MODE"><div class="qr-boot-dot"></div><span>I-MODE Plus Service</span>';
+   /* The eight the sidebar leads with. Emoji rather than the module table, because that table
+      is defined in js/06 and this file is the first script in the document. */
+   var MODS=['\ud83d\udccb','\ud83e\uddf0','\ud83d\udcc5','\ud83c\udfed','\u2705','\ud83d\udcb0','\ud83d\udce6','\ud83d\udd14'];
+   var R=86,ring='';
+   for(var i=0;i<MODS.length;i++){
+    var a=i*(360/MODS.length);
+    ring+='<span class="qbo-slot" style="transform:rotate('+a+'deg) translateY(-'+R+'px)">'
+     +'<span class="qbo-cancel" style="transform:rotate('+(-a)+'deg)">'
+     +'<span class="qbo-face">'+MODS[i]+'</span></span></span>';
+   }
+   d.innerHTML='<div class="qr-boot-orbit"><div class="qbo-ring">'+ring+'</div>'
+    +'<span class="qbo-core"><img src="./assets/imode-ui-logo-v532.png" alt="I-MODE"></span></div>'
+    +'<span class="qr-boot-name">I-MODE Plus Service</span>';
    document.body.appendChild(d);
   }
   paintSplash();

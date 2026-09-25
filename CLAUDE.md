@@ -7441,6 +7441,31 @@ whether it was GitHub Pages or Live Server.
 
 ## Session Change Log — 2026-09-25 (part 35): the escaping helper never escaped anything
 
+### ⚠ STATE AT END OF DAY — READ FIRST
+
+**Pushed and live on GitHub Pages:** `aa45fbf` (part 34's thirteen files), `31e8783` (its state
+note) and **`13b8ba8`** — the bug sweep: the `window.esc` export, the three notification messages,
+the travel floor, the customer-page labels and the js/98 style id. Verified on
+`https://imodeservice.github.io/ImodeService/` itself: `window.esc` is a function, a payload
+stored in a machine name creates 0 elements, and `getQuoteTravel(181)` is 1,900.
+
+**NOT committed — in the working tree only** (owner tried it locally and said ok; syntax clean,
+all suites passing, nothing pushed):
+
+| File | What |
+|---|---|
+| `js/117-v70BootSplashScript.js` | **new** — the loading screen waits for the app to be ready, first load of a tab only |
+| `js/01-v69QrBootGuard.js` | the orbiting module circles, and a warm tab gets no splash at all |
+| `index.html` | one `<script src>` for js/117 |
+| `CLAUDE.md` | this entry |
+
+Next step when work resumes: commit and push these four, then every open tab needs one
+Ctrl+Shift+R. **Still outstanding from part 34 and unchanged:** role **Admin** must have
+งานของฉัน unticked once more (the cloud row still holds the stale set), `docs/MIGRATION.md` for
+the Ubuntu VPS has still not been written, the contacts/permStamp sync has not been tried across
+two real devices, and the real data in `Data/` has not been imported.
+
+
 A bug sweep, asked for in those words ("ตรวจหาบัคทั้งหมด และแก้ไขมัน... และป้องกัน"). Everything
 below was **measured in a browser before it was touched** and re-measured after. Four defects were
 found and fixed; five suspicions were measured and turned out NOT to be defects, which is recorded
@@ -7602,3 +7627,155 @@ an unknown serial · money, dates, stock, crew and signature logic.
    database — which is what made §1 reachable from outside rather than only by staff.
 6. Unchanged from part 11: the customer Home page still shows any machine to anyone who has its
    serial or QR.
+
+### Follow-up (same day): the loading screen stays up until the app is ready — `js/117`
+
+Asked for: "อยากให้เพิ่มหน้ารอเว็บโหลดหน่อย ของทุกคนเลย".
+
+**A splash already existed and already covered everyone.** `js/01` (part 5) adds `qr-booting`
+and paints the blue I-MODE screen unconditionally — the `qr` variable there is computed and then
+deliberately `void`ed. What was wrong was **when it came off**. Measured with a stub cloud
+answering in 1.2 s per call:
+
+| | before | after |
+|---|---|---|
+| splash visible | 418 ms | 418 ms |
+| DOMContentLoaded | 635 ms | 635 ms |
+| **splash removed** | **1903 ms** | **5311 ms** |
+| `window load` — the boot sequence *starts* | 1904 ms | 1627 ms |
+| `createClient` | 2325 ms | 2002 ms |
+| the 11 table reads land | ~4400 ms | 4421 ms |
+
+js/03's boot is `load → renderAll() → await initCloud() → renderAll() → await
+initPortalFromUrl()`, and js/11's `install()` released the splash at DOMContentLoaded — **before
+the first byte of data had even been requested**. The visitor got the shell filled from
+localStorage (on a new device, an empty dashboard) and watched it populate.
+
+`js/117-v70BootSplashScript.js` holds it until `initPortalFromUrl()` settles, which is the last
+await of that handler and so the honest end of boot. **js/01 and js/03 are not edited**: the
+existing `imodeQrBootRelease` is wrapped, so every early caller — js/11 at DOMContentLoaded,
+js/14 and js/21 on the customer routes — only *arms* the release. The file loads last, so its
+wrapper on `initPortalFromUrl` is the outermost one and resolves after js/09, js/11, js/14,
+js/19, js/84, js/85, js/93 and js/110 have had theirs.
+
+- **A status line** (`กำลังโหลด…` → `กำลังเชื่อมต่อฐานข้อมูล…` → `กำลังซิงก์ข้อมูล…`) driven by
+  wrappers on the real `initCloud` / `syncCloud`, not by a timer, so it cannot claim to be
+  syncing when it is not. Four seconds of bare spinner reads as a hang.
+- **`HOLD_MAX` = 10 s, and it is not optional.** Nobody may be stranded, so the hold ends
+  regardless and the app — which works offline — appears. Note that js/01's own 12 s timeout
+  calls the release *by name*, which is now the wrapper, so it would only arm it; js/117's own
+  timeout is what really fires.
+- `window.imodeBootSplashState()` reports `{held, armedEarly, cap}`.
+
+**The door waits too, and that is a deliberate behaviour change.** A visitor with no session
+could type a password at ~1.9 s and now waits for the sync. It closes a real footgun: since
+part 31 the login accounts live in `settings.uatAccounts`, so they arrive **with** the cloud
+copy — an account created on another device does not exist on this one until `syncCloud()` has
+landed, and signing in before that fails with "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" for no visible
+reason.
+
+`service-case-detail.html` was checked and left alone: it is a separate document and already
+shows `กำลังโหลดข้อมูลเคส...` of its own.
+
+**Tested — 27 assertions across five scenarios, 0 failures, 0 page errors:** signed in with a
+slow cloud (held to 5311 ms, ends on the dashboard) · no session with a slow cloud (5816 ms,
+ends on the staff door) · offline / local mode (3157 ms — the real local boot time, nowhere near
+the cap) · a customer QR `?serial=` (3641 ms, ends on the customer portal) · a 390 px phone
+(4797 ms). Every one shows the splash and every one takes it off. Regression re-run afterwards:
+the page sweep, the 390 px geometry sweep of all 26 pages, the new-feature suite, the portal +
+hostile-data suite and the escaping verification all still pass, 0 page errors.
+
+**Open / risk:** the hold adds roughly a second to a local-mode boot (1.9 s → 3.2 s) because
+that is when the app is genuinely ready; and on a connection slower than 10 s the cap fires and
+the app appears mid-sync, exactly as it used to. Deleting `js/117` and its `<script>` tag
+restores the old behaviour precisely.
+
+#### Same day, after the owner tried it: the orbit, and only the first load waits
+
+Two things came back from the local try-out.
+
+**1. "เอาหน้าโหลดแบบ มี animation โมดุลเป็นวงกลมหมุนไปรอบๆ"** — the spinner is now a ring of
+eight module circles orbiting the logo (📋 เคส · 🧰 หน้างาน · 📅 ปฏิทิน · 🏭 เครื่องจักร ·
+✅ QC · 💰 ใบเสนอราคา · 📦 อะไหล่ · 🔔 แจ้งเตือน). The markup and CSS live in **js/01**, which
+already owns how the splash looks, so it is there from the first paint instead of popping in
+when js/117 parses at the end of the body.
+
+Three nested elements per circle, and each level earns its place:
+
+| | |
+|---|---|
+| `.qbo-slot` | static `rotate(a) translateY(-R)` — puts the point on the ring |
+| `.qbo-cancel` | static `rotate(-a)` — undoes the slot's own rotation |
+| `.qbo-face` | animated `rotate(0 → -360deg)` — undoes the **ring's** rotation |
+
+so the icon rides the circle and still reads upright. **Both keyframe sets declare an explicit
+`from` as well as a `to`**: with a `to`-only rule the implicit start has a different transform
+function list, the browser falls back to matrix interpolation, and the matrix for
+`rotate(360deg)` is the identity — the whole thing would sit perfectly still.
+
+Emoji rather than the real module table, because that table is defined in js/06 and this is the
+first script in the document. Reduced motion: the ring keeps its place and breathes instead, and
+the faces drop their counter-rotation so they stay upright without it.
+
+**2. "ระหว่างที่แอดมินสลับหน้ารายละเอียดเคสกับหน้าหลักปกติอะไม่ต้องโหลดได้มั้ย"** — a fair
+complaint about what had just shipped. `service-case-detail.html` is a separate document, so
+going there and back is two full page loads, and the hold turned each one into a fresh wait for
+the whole sync. Measured on a 1 s-per-call cloud, index → case page → index in one tab:
+
+| | before | after |
+|---|---|---|
+| first open of the tab | 5440 ms | 4986 ms |
+| **coming back from a case** | **4593 ms** | **1950 ms** |
+
+The hold now applies to the **first load in the tab and nothing else**. There is nothing to wait
+for on the second: the data is already in localStorage from the first, and `syncCloud()` keeps
+running behind the app either way. `sessionStorage` is exactly this scope — created with the
+tab, kept across same-tab navigation and reloads, gone when the tab closes — the same reason
+js/50 keeps its pending route there. A new tab, a bookmark or coming back tomorrow waits again;
+losing `imode_v70_tab_booted` costs one extra wait and nothing else. The remaining 1950 ms is the
+document's own parse, which is inherent to the case page being a separate file.
+
+**Worth knowing when testing:** a hard reload in the same tab is a *warm* load and will NOT show
+the full loading screen. Open a new tab to see it again.
+
+**Tested — 56 assertions, 0 failures, 0 page errors:** the orbit at 1440 px and 390 px and under
+forced reduced motion (eight circles, all on one ring, really travelling 46–55 px in 900 ms,
+staying on the ring, and **at exactly 0° on screen** — the icons are upright) · the five boot
+scenarios again (27) · the round trip · the page sweep, the 390 px geometry sweep of 26 pages,
+the portal + hostile-data suite and the new-feature suite. `node --check` on all 122 files.
+
+**A measurement trap worth keeping:** reading `getComputedStyle(el).transform` on the icon gives
+`-112°` while the icon is perfectly upright — that value is the *counter*-rotation, not the
+on-screen angle. The screen angle is the accumulated matrix of the whole ancestor chain
+(`new DOMMatrix(parent).multiply(child)` up the tree). The first version of the assertion failed
+for no defect at all, and the screenshot is what settled it.
+
+##### Correction, same day: shortening the wait was not enough — a warm tab gets no splash at all
+
+Reported as **"มันยังขึ้นอยู่อะ"**. The first attempt put the rule in js/117, which only stopped the
+tab's second load from WAITING for the sync — js/01 still painted the splash and js/11 still took
+it off at DOMContentLoaded, so every hop between the app and `service-case-detail.html` still put
+a loading screen on screen for about two seconds. Measured: 1950 ms of splash on the return.
+
+The guard now does not run at all on a warm tab: `js/01` reads `imode_v70_tab_booted` before it
+adds `qr-booting` or paints anything, and returns early. On a tab that has already completed one
+boot there is nothing to cover — the markup, the stylesheets and every `js/NN` file are in the
+HTTP and service-worker caches, the session is known and the data is in localStorage.
+
+**`qr` is the exception, and this is finally what that variable was computed for** (it had been
+`void`ed since part 5). A customer route is still covered even on a warm tab, because
+`initPortalFromUrl()` decides where that visitor belongs asynchronously and the dashboard would
+show through in the meantime.
+
+Measured end to end, one tab: cold load shows the orbit and hides the shell · the tab is marked ·
+the mark survives the case page · **coming back shows no splash and never hides the shell**, and a
+screenshot 260 ms into that return has the sidebar, topbar and dashboard already drawn, with no
+flash of anything else · a `?serial=` customer route on the same warm tab is still covered and
+still reaches the customer page. 10 assertions, 0 failures.
+
+Regression after it, all passing: the five boot scenarios (27), the orbit at 390 px (10), the page
+sweep, the 390 px geometry sweep of 26 pages, the portal + hostile-data suite (16), the
+new-feature suite (18), and `node --check` on all 122 files. 0 page errors throughout.
+
+**When testing this by hand:** a reload in the same tab is a warm load and shows nothing. Open a
+NEW tab to see the loading screen again.

@@ -7449,18 +7449,22 @@ the travel floor, the customer-page labels and the js/98 style id. Verified on
 `https://imodeservice.github.io/ImodeService/` itself: `window.esc` is a function, a payload
 stored in a machine name creates 0 elements, and `getQuoteTravel(181)` is 1,900.
 
-**NOT committed — in the working tree only** (owner tried it locally and said ok; syntax clean,
-all suites passing, nothing pushed):
+**Also pushed, same day:** **`35f22fd`** — js/117 (the loading screen waits for the app, first
+load of a tab only), js/01's orbit and warm-tab skip, the `index.html` tag, this entry — and
+**`f254e69`** — the loading-screen look the owner signed off on ("เท่มาก"): every module circle is
+pulled in towards the I-MODE logo and back out along its own spoke, each with a random outer
+radius (122–150px), inner radius (14–40px), period (2.2–4.4 s) and phase, shrinking and fading as
+it goes in; the ring is 340px (×0.8 at ≤420px); the background is a flat **`#2d3695`** (was the
+blue gradient). `.qbo-pull` animates the individual `translate` property and `.qbo-cancel` the
+`scale` property, so neither disturbs the transform the counter-rotation relies on. Reduced
+motion: no travel. **Trap hit and fixed before pushing:** a loop variable named `d` shadowed the
+splash element `d` in `paintSplash()`, so `appendChild` threw, js/01's `catch(e){}` swallowed it
+and the splash silently never appeared. The screenshots at 1440 were checked; the phone width and
+the real app with the new look were not.
 
-| File | What |
-|---|---|
-| `js/117-v70BootSplashScript.js` | **new** — the loading screen waits for the app to be ready, first load of a tab only |
-| `js/01-v69QrBootGuard.js` | the orbiting module circles, and a warm tab gets no splash at all |
-| `index.html` | one `<script src>` for js/117 |
-| `CLAUDE.md` | this entry |
-
-Next step when work resumes: commit and push these four, then every open tab needs one
-Ctrl+Shift+R. **Still outstanding from part 34 and unchanged:** role **Admin** must have
+The owner closed the session to continue from the office machine — `git pull` there first. The
+untracked Thai-named `.txt` in the root is the owner's file and was never added. Every open
+tab needs one Ctrl+Shift+R. **Still outstanding from part 34 and unchanged:** role **Admin** must have
 งานของฉัน unticked once more (the cloud row still holds the stale set), `docs/MIGRATION.md` for
 the Ubuntu VPS has still not been written, the contacts/permStamp sync has not been tried across
 two real devices, and the real data in `Data/` has not been imported.

@@ -45,3 +45,6 @@ indow.*
 
 # Real customer / machine data — never commit (repo was public)
 Data/
+
+# The owner's own to-do list (list-to-make.html) — kept on this machine only
+list-to-make.html

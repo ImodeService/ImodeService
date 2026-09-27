@@ -239,6 +239,8 @@
   var v=(document.getElementById('centrySerial')||{}).value||'';
   if(!String(v).trim()){entryError(tl('กรุณากรอกหมายเลขเครื่อง','Please enter the serial number'));return}
   var hits=findMachines(v);
+  /* production customer address: the machine is fetched from the server (js/125) */
+  if(!hits.length&&typeof window.imodePortalRemote==='function'){window.imodePortalRemote(v,'serial');return}
   if(hits.length>1){showMachineChoice(hits);return}
   var m=hits[0]||null;
   if(!m){entryError(tl('ไม่พบเครื่องนี้ในระบบ กรุณาตรวจหมายเลขอีกครั้ง หรือติดต่อทีม Service','No machine with that number. Please check it, or contact the service team.'));return}
@@ -288,6 +290,13 @@
   var key=m?decodeURIComponent(m[1]):v;
   var machine=findMachine(key);
   if(machine){stopScan();openMachinePortal(machine);return}
+  /* production customer address: the machine is fetched from the server (js/125) */
+  if(typeof window.imodePortalRemote==='function'){
+   window.imodePortalRemote(key,'token');
+   /* keep the camera reading; the same code is not asked for twice */
+   if(scanState.stream&&scanState.tick)scanState.raf=requestAnimationFrame(scanState.tick);
+   return;
+  }
   /* A code that does not match is no reason to shut the camera off — the visitor may have
      caught a neighbouring sticker or half a frame, and closing the preview on the first
      unreadable code is why scanning felt like the camera died on its own. Keep the stream

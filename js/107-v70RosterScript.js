@@ -38,7 +38,10 @@
     override; or hash the new one here with
       node -e "console.log(require('crypto').createHash('sha256').update('NEW','utf8').digest('hex'))"
     Never put the plaintext back. */
+ /* dev-only: on the production server the nine logins live in Supabase Auth
+    (database/seed/04-staff-accounts.sql) and this list, with its hashes, is removed. */
  var ROSTER=[
+  /*@dev-only*/
   {u:'rungarun', h:'99e518490c5e3142f647a43a4357a2bebbef13ba86252501e66c8b2b57928dc3', name:'Rungarun Suvunchato', th:'รุ่งอรุณ สุวรรณชาโต', role:'CEO', type:'staff'},
   {u:'apichat',  h:'0fa2d066330b597421c4f95af27806bc1d9f0eb8fb7c4e42bc9e608fdf636da7', name:'Apichat Pimpaeng',    th:'อภิชาติ ปิมแปง',      role:'Service Manager', type:'staff', userId:'USR-001'},
   {u:'pannawit', h:'cf58e725854c3ba6d10a65cf245ae5a4fd2f0a4e58e201c9115d24027ac11650', name:'Pannawit Chaimongkhon', th:'ปัณณวิชญ์ ชัยมงคล', role:'Dev', type:'staff', team:'Dev'},
@@ -50,6 +53,7 @@
   {u:'samak',    keepPassword:true, name:'Samak Thammachad',    role:'Technician', type:'technician', userId:'USR-006'},
   {u:'narongsak',keepPassword:true, name:'Narongsak Poomipalai',role:'Technician', type:'technician', userId:'USR-007'},
   {u:'lead_rd',  keepPassword:true, name:'Chaichana Photaya',   role:'R&D Lead',   type:'technician', userId:'USR-004', tech:'T-LEAD-RD'}
+  /*@end-dev-only*/
  ];
  function keep(){var o={};ROSTER.forEach(function(r){o[r.u.toLowerCase()]=r});return o}
 
@@ -103,6 +107,8 @@
   return out;
  }
  function applyRoster(){
+  /* production: logins are the server's profiles; this roster would tombstone every one */
+  if(window.IMODE_ENV&&window.IMODE_ENV.production)return false;
   var st=store(),wanted=keep(),changed=false;
   var have={};
   accounts().forEach(function(a){if(a&&a.username)have[lc(a.username)]=a});

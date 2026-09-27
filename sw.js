@@ -36,7 +36,7 @@
    activate. To remove this entirely: `imodeDisableOffline()` in the console, or delete the
    registration in js/111 — nothing else depends on it. */
 
-var VERSION = 'v2-2026-09-24';
+var VERSION = 'v3-2026-09-27';
 var CACHE = 'imode-offline-' + VERSION;
 
 /* The handful the document never references, so js/111 cannot discover them: the customer
@@ -64,7 +64,11 @@ var EXTRA = [
 function bypass(url) {
  /* Live data. A cached answer here would show a technician yesterday's jobs and look right. */
  return url.indexOf('supabase.co') >= 0 || url.indexOf('/rest/v1/') >= 0
-     || url.indexOf('/auth/v1/') >= 0 || url.indexOf('/realtime/v1/') >= 0;
+     || url.indexOf('/auth/v1/') >= 0 || url.indexOf('/realtime/v1/') >= 0
+     /* the company's own server (production) answers on its own domain, so the paths are
+        what identify live data there, never the hostname */
+     || url.indexOf('/functions/v1/') >= 0 || url.indexOf('/storage/v1/') >= 0
+     || url.indexOf('/graphql/v1/') >= 0;
 }
 function cacheFirstPath(url) {
  return /\/(assets|vendor)\//.test(url);

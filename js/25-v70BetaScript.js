@@ -35,7 +35,7 @@
  var SEED_VERSION=1;
  function seedTechnicians(){
   if(typeof technicians==='undefined'||!Array.isArray(technicians))return;
-  if(settings.v70BetaSeed===SEED_VERSION)return;
+  if(settings.v70BetaSeed===SEED_VERSION||(window.IMODE_ENV&&window.IMODE_ENV.production))return;
   var added=false;
   SEED.forEach(function(row){
    if(technicians.some(function(t){return t.id===row.id}))return;

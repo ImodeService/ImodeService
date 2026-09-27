@@ -32,7 +32,10 @@
  }
 
  /* Staff accounts: password hashes only, so the plaintext is not in the source. */
+ /* dev-only: the UAT logins and their hashes. The production build removes them — on the
+    server every login is a Supabase Auth user (G:/ImodeService-production/database). */
  const STAFF=[
+  /*@dev-only*/
   {username:'admin_test',hash:'cb9b36b102080fdd528586959f259535502519291b06d3ddfe76c8a74cecd638',accountType:'staff',name:'ผู้ดูแลระบบ UAT',role:'Admin / Coordinator',team:'Admin'},
   {username:'technician_test1',hash:'e9f58202803625adb4fa3720cfe589a7153397ceeef3c4edd1bff2945ad237e3',accountType:'technician',technicianId:'T001',role:'Technician',team:'Technical'},
   {username:'technician_test2',hash:'6511f2de08ccfc63e9ab23e6304147dbb715ceabfa988b844af75181df9930d8',accountType:'technician',technicianId:'T002',role:'Technician',team:'Technical'},
@@ -59,6 +62,7 @@
      R&D_test1 is removed outright — the owner said to drop it rather than re-point it.
      The R&D ROLE and the T-RD-1 seed in js/25 are untouched; only the account is gone. */
   {username:'tech_test1',hash:'2d42d1649d3e6ea478491a8a70ad1145e972cc1a7d76b9f4bce98a365224f0d5',accountType:'technician',technicianId:'T003',role:'Technician',team:'Technical'}
+  /*@end-dev-only*/
  ];
 
  /* Every customer in the system gets an account. CUST-0001 -> customer_test1, and so on. */

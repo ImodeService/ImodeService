@@ -28,9 +28,17 @@
 (function(){
  'use strict';
 
- var DEFAULT_CLOUD={
+ /* Production (js/00-env.js, written by the production build) brings its own server and
+    must win over whatever this device remembers: every phone that ever opened the test site
+    carries the TEST database in imode_v5_cloud for ever, and would otherwise keep writing
+    there while everyone else moved on — the data would split in two without a sound.
+    The test values below are dev-only: the production build removes them. */
+ var PROD=(window.IMODE_ENV&&window.IMODE_ENV.production)?window.IMODE_ENV:null;
+ var DEFAULT_CLOUD=PROD?{url:(PROD.cloud&&PROD.cloud.url)||'',key:(PROD.cloud&&PROD.cloud.key)||''}:{
+  /*@dev-only*/
   url:'https://ywlrlfudlxsallanoroq.supabase.co',
   key:'sb_publishable_HmX5AeClb2ln3XG7umpHaw_kWw7E1kk'
+  /*@end-dev-only*/
  };
  var OPT_OUT='imode_v69_cloud_optout';
 
@@ -41,6 +49,9 @@
  try{optedOut=localStorage.getItem(OPT_OUT)==='1'}catch(e){}
 
  var configured=!!(cloudSettings.url&&cloudSettings.key);
+ if(PROD&&DEFAULT_CLOUD.url&&(cloudSettings.url!==DEFAULT_CLOUD.url||cloudSettings.key!==DEFAULT_CLOUD.key)){
+  configured=false;optedOut=false;    /* production: the shipped server, always */
+ }
  if(!configured&&!optedOut&&DEFAULT_CLOUD.url&&DEFAULT_CLOUD.key){
   cloudSettings.url=DEFAULT_CLOUD.url;
   cloudSettings.key=DEFAULT_CLOUD.key;
@@ -99,7 +110,8 @@
   try{
    if(typeof settings!=='object'||!settings)return;
    if(!settings.authConfig||typeof settings.authConfig!=='object')settings.authConfig={};
-   if(!settings.authConfig.provider)settings.authConfig.provider='local';
+   if(PROD)settings.authConfig.provider='supabase';        /* the server's login, only */
+   else if(!settings.authConfig.provider)settings.authConfig.provider='local';
   }catch(e){}
  }
  ensureAuthProvider();

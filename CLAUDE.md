@@ -8024,3 +8024,119 @@ quotations, requests, petty cash or purchase orders; customers, machines and war
 3. Photos and signatures belong in file storage, not in rows (`docs/STORAGE-PLAN.md`), at the VPS
    move at the latest.
 4. Sync should fetch only rows changed since the last sync — to do with the VPS move.
+
+---
+
+## Session Change Log — 2026-09-27 (part 37): the production folder, the real database, and full security
+
+The owner asked for the site to be separated into its own folder with only the necessary files,
+made secure, and for the real data in `Data/` to become the database. **Nothing was deployed,
+nothing was committed or pushed, and the live test database was only read** (settings and
+technicians, to carry the configuration over).
+
+### STATE — read first
+
+- The server is **not paid for yet** and there is **no domain yet**. `production.config.json` in
+  the production folder holds four `REPLACE_ME` values; `build-web.js --strict` refuses until they
+  are filled.
+- The owner is creating a **free Supabase staging project** so the login and RLS can be tested
+  end to end before the VPS exists. Nothing on the staff side has run against real GoTrue yet.
+- The changes to this repository are **uncommitted** (12 modified files + js/124 + js/125).
+  GitHub Pages is unaffected either way: every production branch is gated on `IMODE_ENV`.
+
+### ONE SOURCE, BUILT — `G:\ImodeService-production`
+
+A separate private git repository (initialised, files staged, **not committed**, no remote).
+`web/` in it is **generated** from this repository by `tools/build-web.js` and must never be
+edited by hand. Two copies of 120 patch scripts would disagree within a week.
+
+The build copies an allow-list only (the two HTML documents, `css/`, `js/` minus
+`js/02-demo-data.js`, `auth/`, `pages/`, `vendor/`, `sw.js`, and only the images something
+references: 13, not 18), serves supabase-js 2.117.2 and qrcodejs from `vendor/` instead of a CDN,
+adds `robots.txt`, and writes **`js/00-env.js`** (`window.IMODE_ENV`, frozen) loaded right after
+`<meta charset>` in both documents. It then **fails the build** on a missing referenced file, a
+script that does not parse as a classic script, the test database address or key, any 64-hex
+string (a password hash), a leftover dev-only marker, or a `.md/.sql/.xlsx/.csv/.log` file.
+
+**`/*@dev-only*/ … /*@end-dev-only*/`** (HTML: `<!--@dev-only-->…<!--@end-dev-only-->`) is
+the new convention: the build deletes what is between the markers. Used on the test database
+URL/key in js/23, js/09's STAFF, js/96's SPEC and js/107's ROSTER (all their hashes).
+
+**Parse check trap:** `node --check` follows the nearest `package.json`; under a
+`"type":"module"` folder it parses these files as ES modules, where js/03's duplicate top-level
+function declarations are an error. The build uses `new vm.Script()` — a classic script, as the
+browser loads it.
+
+### What `IMODE_ENV.production` changes in the source (inert without it)
+
+| File | Change |
+|---|---|
+| js/03 | `initCloud()` treats **42501 as reachable**, not absent — under RLS every table refuses until sign-in, and the old code set `supa=null`; no demo technicians / customers / QC; **`saveMachine()` now keeps `qrToken` and `modelId`** (it rebuilt the machine without them, so an edit would have minted a new token and broken the printed QR — hidden in dev because the token was always re-derived) |
+| js/04, js/25 | no demo petty cash / parts / POs / test technicians — js/41 would otherwise push them into the real database after the first sign-in |
+| js/09, js/96, js/107 | test accounts and hashes are dev-only; js/96's one-off repairs and js/107's roster do not run (they would tombstone every server account) |
+| js/14, js/21 | one-line hooks: a serial / QR not on this phone calls `window.imodePortalRemote` |
+| js/21 | **random 128-bit tokens**, never `QR-<id>`; minted before js/03's weaker `'QR-'+uid()` |
+| js/23 | the shipped server **overrides a stale `imode_v5_cloud`** (every device that ever opened the test site carries the test database for ever); provider pinned to `supabase` |
+| sw.js | bypasses `/functions/v1/`, `/storage/v1/`, `/graphql/v1/` too; VERSION → `v3-2026-09-27` |
+| service-case-detail.html | uses `IMODE_ENV.cloud` first |
+| **js/124** (new) | staff host: local provider replaced by one that refuses; `saveManualUser` / `chooseUser` refuse; account list = `admin_list_staff()`; **การจัดการบัญชีผู้ใช้ rebuilt on the admin_* RPCs**, editing only for Dev / Service Manager; sign-in → sync; no server session → no sync; an app session without a server session is signed out; the technician's display name comes from the technician record (Field Service matches by name); QR address pinned to the customer host after every sync (`machinePortalUrl()` reads `publicAppUrl` directly); a customer link on the staff host moves to the customer host |
+| **js/125** (new) | customer host: only the three customer pages exist; data arrives as a **snapshot** from `portal_open` / `portal_find` merged into the normal arrays; writes rerouted at the two funnels — `cloudUpsert()` → `portal_submit` / `portal_quote_status`, `cloudSaveSettings()` → `portal_settings_patch` with only the entries that changed; serial RPC queue; 20 s refresh instead of realtime |
+
+### The database — `database/` in the production folder
+
+- **01-schema.sql**: every table as actually run (00 + 01 + 05 + 06 + 07 + 11 + 12 + 13) on a
+  fresh database, plus `machine_models` (new) and `machines."modelId"`, a **unique** index on
+  `"qrToken"`, and realtime publication when it exists.
+- **02-security.sql**: `staff_all` on 16 tables; anon has **no** table access except INSERT on
+  `client_errors`; `notification_reads` own rows only; profiles read-only to staff. Five
+  **`portal_*` SECURITY DEFINER functions** are the customer page's only door, each keyed by the
+  QR token (≥ 16 chars, so the old guessable form opens nothing) and rate-limited per IP
+  (`imode_private.hit`, IP from `request.headers`). The snapshot leaves out the case's internal
+  note and reporter contact, report signatures/photos/videos, warranty attachments, and every
+  other customer. `portal_find` is an **exact** normalised serial match (no partial search: that
+  is an enumeration tool), 20 per 10 minutes. `portal_settings_patch` merges one entry at a time
+  with `jsonb_set` — approvals and views once, reviews editable.
+  **Staff logins**: `imode_private.create_staff` writes `auth.users` + `auth.identities` +
+  `profiles` with bcrypt; `admin_create_staff / update_staff / set_password` require
+  `is_account_admin()` = **Dev or Service Manager** (owner, 2026-09-27; Admin is refused), never
+  the last one, never disabling yourself; a password reset deletes the refresh tokens.
+- **seed/03-real-data.sql** (generated, gitignored): 151 customers + `CUST-INTERNAL-IMODE`,
+  353 machines, 341 warranties (12 machines have no dates at all), 105 models, the 4 real
+  technicians, and a 12 KB configuration-only settings row (it was ~1 MB; no test data, no
+  hashes, `authConfig.provider = supabase`). Machine identity fields are imported unchanged —
+  11 shared serials and 4 empty ones are listed in `03-real-data-report.txt`. A model is linked
+  only on an exact name match (166 / 353). Warranty status is computed on the day it is built.
+- **seed/04-staff-accounts.sql** (gitignored): the nine logins with password placeholders that
+  fail on purpose. The test site's SHA-256 hashes cannot become bcrypt, so everyone gets a new
+  password.
+
+### Tests — `tools/test` in the production folder (`npm test`, `npm run dev`)
+
+PGlite (real PostgreSQL in WASM) with a stand-in `auth` schema; `fakesb.mjs` answers RPCs and
+table requests **as the anon / authenticated role**, so the grants and RLS answer, not the
+harness. **61** security assertions; **32** browser assertions on the production build at 390
+and 1440 (customer root → scan page, staff door unreachable, one machine on the phone, no
+internal note, shared-serial chooser, แจ้งปัญหา creates exactly one case forced to เคสใหม่ /
+LINE OA, signature → approval + อนุมัติ, a server change reaching the open page, the page's own
+key getting 401 on `customers`, staff door with local login dead, QR pointing at the customer
+host); **14** dev-regression assertions proving GitHub Pages behaves as before.
+
+**Bug the browser suite found:** `submitPortalIssue()` uploads the request **before** its case,
+so a strict `case_id` check refused every report's request. The server now refuses only a
+`case_id` that exists on another machine (ids are random, so nobody can point at a future case).
+
+**Harness trap:** blocking `*supabase.co*` makes a `?machineToken=` load land on the dashboard,
+on the unchanged HEAD too — set `imode_v69_cloud_optout` instead, as earlier parts say.
+
+### Open / risk
+
+1. Nothing staff-side has run against real Supabase Auth: `create_staff` writes GoTrue's tables
+   directly and depends on their current columns. The staging project is where to prove it.
+2. Serial-only access is kept on the owner's word pending a team decision; with rate limiting it
+   is slower to enumerate, not impossible.
+3. The customer page cannot link a LINE profile to a customer any more (`cloudUpsertCustomer` is
+   skipped on the customer host). LIFF is not configured, so nothing is lost today.
+4. Signing out does not clear this device's cached data; a shared office PC keeps it in
+   localStorage.
+5. Server install guide (Ubuntu + Supabase + Caddy + backups) not written — waiting for the
+   server's specs and the domain.

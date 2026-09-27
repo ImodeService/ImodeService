@@ -1309,6 +1309,8 @@ function load(){
 var CaseWrite=(function(){
   var client=null,tried=false;
   function cfg(){
+    /* production (js/00-env.js): the shipped server wins over whatever this device remembers */
+    var E=window.IMODE_ENV;if(E&&E.production&&E.cloud&&E.cloud.url&&E.cloud.key)return {url:E.cloud.url,key:E.cloud.key};
     try{var c=JSON.parse(localStorage.getItem('imode_v5_cloud')||'{}');return (c&&c.url&&c.key)?c:null}
     catch(e){return null}
   }

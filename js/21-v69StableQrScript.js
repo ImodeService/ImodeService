@@ -32,8 +32,26 @@
   var id=String(m&&m.id||'').trim();
   return id?'QR-'+id:'';
  }
+ /* PRODUCTION: the token is the secret in the printed QR, and 'QR-<id>' is guessable — on the
+    server anyone could open any machine by counting. There every machine carries a random
+    token (the database seed made them; database/02-security.sql refuses anything under 16
+    characters), so nothing is derived: a machine the office adds gets a fresh random one, and
+    a token that already exists is never touched, because it is already printed on a label. */
+ var PROD=!!(window.IMODE_ENV&&window.IMODE_ENV.production);
+ function randomToken(){
+  var b=new Uint8Array(16);
+  (window.crypto||window.msCrypto).getRandomValues(b);
+  var hex='';for(var i=0;i<b.length;i++)hex+=('0'+b[i].toString(16)).slice(-2);
+  return 'Q'+hex;
+ }
+ if(PROD)window.imodeNewQrToken=randomToken;
  function applyStableTokens(){
   var changed=false;
+  if(PROD){
+   try{machines.forEach(function(m){if(!m.qrToken||String(m.qrToken).length<16){m.qrToken=randomToken();changed=true}})}catch(e){return false}
+   if(changed&&typeof saveLocal==='function')saveLocal();
+   return changed;
+  }
   try{
    machines.forEach(function(m){
     var want=stableToken(m);
@@ -51,6 +69,9 @@
  var baseEnsure=window.ensureMasters;
  if(typeof baseEnsure==='function'){
   window.ensureMasters=function(){
+   /* production: mint before js/03's ensureMasters, which would otherwise hand a new machine
+      its own weaker 'QR-'+uid() token first */
+   if(PROD)applyStableTokens();
    var r=baseEnsure.apply(this,arguments);
    applyStableTokens();
    return r;
@@ -94,6 +115,13 @@
     var m=window.imodeFindCustomerMachine(serial);
     if(m&&typeof window.imodeOpenMachinePortal==='function'){
      window.imodeOpenMachinePortal(m);
+     if(typeof window.imodeQrBootRelease==='function')window.imodeQrBootRelease();
+     return;
+    }
+    /* production customer address: the machine is fetched from the server (js/125) */
+    if(!m&&typeof window.imodePortalRemote==='function'){
+     if(typeof window.goPage==='function')window.goPage('customer-entry');
+     window.imodePortalRemote(serial,'serial');
      if(typeof window.imodeQrBootRelease==='function')window.imodeQrBootRelease();
      return;
     }

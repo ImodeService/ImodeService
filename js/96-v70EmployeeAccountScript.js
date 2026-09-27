@@ -13,12 +13,14 @@
     their USR id — that is why they live in this file and are not duplicated in js/107's
     roster. The plaintext is not written down anywhere in this repository; ask the owner. */
  var SPEC={
+  /*@dev-only*/
   'USR-001':{username:'apichat',hash:'0fa2d066330b597421c4f95af27806bc1d9f0eb8fb7c4e42bc9e608fdf636da7',role:'Service Manager'},
   /* USR-004 (พี่หนุ่ม, Chaichana Photaya) is NOT here: he owns the built-in lead_rd account,
      exactly as USR-003 (พี่ย้ง) owns lead_technician. Putting him back would re-create the
      second account the owner asked to remove. */
   'USR-006':{username:'samak',hash:'f635f3769bf4fba922b9b4c84940586bfc354fcb7aaec8d726c31f74dbf844eb',role:'Technician',technician:true},
   'USR-007':{username:'narongsak',hash:'d8d136ef5d95e390f3108dfb1d7adc5bf18203c64d2dad750cce22c37d040356',role:'Technician',technician:true}
+  /*@end-dev-only*/
  };
 
  /* 2026-09-23, on the owner's instruction while tidying the account list: these three are
@@ -144,6 +146,8 @@
     once the client exists. It sets no flag, so it is idempotent and silent when there is
     nothing to do. */
  function afterSync(){
+  /* production: these one-off repairs were written for the test database; never on real data */
+  if((window.IMODE_ENV&&window.IMODE_ENV.production))return;
   /* Runs on the copy the server just sent, where `supa` finally exists, so this is also when
      the duplicate's row is actually deleted and the repointed cases are pushed back. */
   var merged1=mergeDuplicateYung();
@@ -323,6 +327,7 @@
   return !missing;
  }
  function seed(){
+  if((window.IMODE_ENV&&window.IMODE_ENV.production))return;
   /* พี่ย้ง already owns the built-in lead_technician identity. */
   var moved=false;
   if(!settings.v70LeadTechnicianDeduped){

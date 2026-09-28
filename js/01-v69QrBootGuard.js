@@ -1,3 +1,27 @@
+/* V7.0 — the test site holds no demo data (owner, 2026-09-28).
+   IMODE_NO_DEMO turns off every demo seed js/03, js/04 and js/25 used to run on an empty
+   device; production already skipped them. The test database was emptied by hand, so the
+   copies each browser still keeps are wiped ONCE per device (marker below) before js/03
+   reads them — otherwise js/41, js/71 and js/110 would upload them straight back.
+   Only business-data caches go; session, settings, accounts, cloud config and technicians
+   stay. Never runs in production. Bump RESET to wipe again. */
+(function(){
+ if(window.IMODE_ENV&&window.IMODE_ENV.production)return;
+ window.IMODE_NO_DEMO=true;
+ var RESET='2026-09-28', MARK='imode_v70_test_reset';
+ try{
+  if(localStorage.getItem(MARK)===RESET)return;
+  ['imode_test_v532_cases','imode_test_v532_customers','imode_test_v532_machines',
+   'imode_test_v532_notifications','imode_test_v532_quotes','imode_test_v532_warranties',
+   'imode_test_v532_machine_documents','imode_test_v532_line_requests',
+   'imode_test_v532_service_reports','imode_v66_qc_records','imode_v67_petty_cash',
+   'imode_v67_spare_parts','imode_v67_purchase_orders','imode_v70_cloud_seen',
+   'imode_v70_pending_push','imode_v70_customer_contacts','imode_v70_storage_shed'
+  ].forEach(function(k){localStorage.removeItem(k)});
+  localStorage.setItem(MARK,RESET);
+ }catch(e){}
+})();
+
 /* V6.9 — snapshot the saved settings before anything can rewrite them.
 
    mergeSettings() in js/03 runs normalizeRoleSetting() -> migrateLegacyPermissions(),

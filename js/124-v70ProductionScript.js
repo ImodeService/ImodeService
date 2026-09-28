@@ -22,11 +22,18 @@
         showing an empty application that looks signed in;
      5. a customer link opened on the staff address goes to the customer address.
 
-   The customer address is js/125's job. */
+   The customer address is js/125's job.
+
+   2026-09-28 — "อัพเดตให้ทั้งคู่เหมือนกัน" (owner chose: the account screen only). Section 3,
+   การจัดการบัญชีผู้ใช้, now also runs on the TEST site (DEV below), so both have one screen and
+   one piece of code. On the test site it stores through js/39's own API (imodeAccountSave /
+   imodeAccountDelete), so nothing about where test accounts live changed; the third button is
+   ลบ instead of ปิดใช้, access follows users.manage, and there is no last-sign-in column.
+   Sections 1, 2, 4 and 5 stay production-only. */
 (function(){
  'use strict';
- var ENV=window.IMODE_ENV;
- if(!ENV||!ENV.production)return;
+ var ENV=window.IMODE_ENV||{};
+ var DEV=!ENV.production;
  var host=String(location.hostname||'').toLowerCase();
  var CUSTOMER_HOST=String(ENV.customerHost||'').toLowerCase();
  if(CUSTOMER_HOST&&host===CUSTOMER_HOST)return;   /* the customer address: js/125 */
@@ -37,14 +44,18 @@
  function toast(m){try{if(typeof toastMsg==='function')toastMsg(m)}catch(e){}}
  function h(v){return typeof window.esc==='function'?window.esc(v):String(v==null?'':v)}
  function lc(v){return String(v||'').trim().toLowerCase()}
- function canManage(){var u=me();return !!(u&&ACCOUNT_ADMIN_ROLES.indexOf(String(u.role||u.permissionRole||''))>=0)}
+ /* Dev and Service Manager only, on BOTH sites (owner, 2026-09-27 for production and
+    2026-09-28 for the test site: "DEV manager"). js/113 asks the same question. */
+ function canManage(){
+  var u=me();return !!(u&&ACCOUNT_ADMIN_ROLES.indexOf(String(u.role||u.permissionRole||''))>=0)}
+ window.imodeCanManageAccounts=canManage;
  function techList(){try{return Array.isArray(technicians)?technicians:[]}catch(e){return []}}
  function roleNames(){
   try{return (settings.roles||[]).map(function(r){return r&&r.name}).filter(Boolean)}catch(e){return []}
  }
 
  /* ------------------------------------------------ 1. only the server door --- */
- if(window.ImodeAuth&&typeof window.ImodeAuth.register==='function'){
+ if(!DEV&&window.ImodeAuth&&typeof window.ImodeAuth.register==='function'){
   var refuse={ok:false,reason:'disabled',message:'เข้าสู่ระบบด้วยบัญชีของเซิร์ฟเวอร์เท่านั้น'};
   window.ImodeAuth.register('local',{
    name:'local',label:'ปิดใช้งานบน server จริง',
@@ -67,9 +78,9 @@
    }
   }catch(e){}
  }
- pinProvider();
+ if(!DEV)pinProvider();
  ['saveManualUser','chooseUser'].forEach(function(name){
-  if(typeof window[name]!=='function')return;
+  if(DEV||typeof window[name]!=='function')return;
   window[name]=function(e){
    try{if(e&&e.preventDefault)e.preventDefault()}catch(x){}
    toast('ต้องเข้าสู่ระบบด้วยชื่อผู้ใช้และรหัสผ่าน');
@@ -87,8 +98,18 @@
    photo:p.photo_url||'',active:p.is_active!==false,lastSignInAt:p.last_sign_in_at||'',builtIn:false
   };
  }
- window.imodeAccountList=function(){return staff.map(toAccount)};
+ if(!DEV)window.imodeAccountList=function(){return staff.map(toAccount)};
+ /* Test site: js/39's merged account list, shaped like a profiles row. */
+ function devStaff(){
+  var list=[];try{list=(typeof window.imodeAccountList==='function'?window.imodeAccountList():[])||[]}catch(e){}
+  return list.map(function(a){
+   var t=a.technicianId?techList().filter(function(x){return x.id===a.technicianId})[0]:null;
+   return {id:lc(a.username),username:a.username,full_name:a.name||a.username,role:a.role||'',team:a.team||'',
+    technician_id:a.technicianId||'',photo_url:a.photo||(t&&t.photo)||'',is_active:true,last_sign_in_at:'',_acc:a};
+  });
+ }
  function refreshStaff(){
+  if(DEV){staff=devStaff();return Promise.resolve(staff)}
   var c=client();
   if(!c||!me())return Promise.resolve(staff);
   return c.rpc('admin_list_staff').then(function(r){
@@ -116,7 +137,7 @@
   },function(){});
  }
  var baseSignIn=window.imodeSignIn;
- if(typeof baseSignIn==='function'){
+ if(!DEV&&typeof baseSignIn==='function'){
   window.imodeSignIn=function(){
    return Promise.resolve(baseSignIn.apply(this,arguments)).then(function(res){
     if(res&&res.ok!==false&&me())afterSignIn();
@@ -127,7 +148,7 @@
  /* At boot: an app session with no server session behind it would show an application that
     looks signed in and receives nothing. End it and send the visitor to the door. */
  var baseInit=window.initCloud;
- if(typeof baseInit==='function'){
+ if(!DEV&&typeof baseInit==='function'){
   window.initCloud=function(){
    return Promise.resolve(baseInit.apply(this,arguments)).then(function(v){
     var c=client();
@@ -153,7 +174,7 @@
   return c.auth.getSession().then(function(r){return !!(r&&r.data&&r.data.session)},function(){return false});
  }
  var baseSync=window.syncCloud;
- if(typeof baseSync==='function'){
+ if(!DEV&&typeof baseSync==='function'){
   window.syncCloud=function(){
    var self=this,args=arguments;
    return hasSession().then(function(yes){
@@ -186,18 +207,49 @@
  var MSG={
   not_allowed:'เฉพาะ Dev และ Service Manager เท่านั้นที่จัดการบัญชีได้',
   username_taken:'ชื่อผู้ใช้นี้มีอยู่แล้ว',
-  weak_password:'รหัสผ่านต้องยาวอย่างน้อย 8 ตัว และมีทั้งตัวอักษรและตัวเลข',
+  weak_password:'รหัสผ่านต้องยาวอย่างน้อย 8 ตัว และมีตัวอักษรอย่างน้อย 1 ตัว',
   bad_username:'ชื่อผู้ใช้ใช้ได้เฉพาะ a-z 0-9 . _ - & ยาว 3–40 ตัว',
   cannot_disable_self:'ปิดบัญชีของตัวเองไม่ได้',
+  cannot_delete_self:'ลบบัญชีของตัวเองไม่ได้',
+  'admin_delete_staff':'เซิร์ฟเวอร์ยังไม่มีคำสั่งลบบัญชี — รัน database/patch-2026-09-28-delete-staff.sql ก่อน',
   last_account_admin:'ต้องเหลือ Dev หรือ Service Manager ที่ใช้งานได้อย่างน้อย 1 บัญชี',
   not_found:'ไม่พบบัญชีนี้'
  };
  function errText(err){
   var m=String(err&&(err.message||err.hint||err)||'');
+  if(DEV)return m||'ทำรายการไม่สำเร็จ';
   for(var k in MSG)if(m.indexOf(k)>=0)return MSG[k];
   return 'ทำรายการไม่สำเร็จ: '+m;
  }
+ /* Test site: the same calls, answered by js/39. It derives the technician link from the role
+    itself (createRecordFor), so p_technician_id is not used here. */
+ function devCall(fn,a){
+  return new Promise(function(res,rej){
+   var r;
+   if(fn==='admin_create_staff'){
+    r=window.imodeAccountSave('',{username:a.p_username,password:a.p_password,name:a.p_full_name,
+     role:a.p_role,team:a.p_team||'',accountType:'staff',technicianId:''});
+   }else{
+    var p=byId(a.p_id),acc=p&&p._acc;
+    if(!acc)return rej(new Error('ไม่พบบัญชีนี้'));
+    if(fn==='delete')r=window.imodeAccountDelete(acc.username);
+    else{
+     var d={username:acc.username,name:acc.name,role:acc.role,team:acc.team||'',
+      accountType:acc.accountType||(acc.technicianId?'technician':'staff'),technicianId:acc.technicianId||''};
+     if(fn==='admin_update_staff'){
+      if(a.p_full_name!=null)d.name=a.p_full_name;
+      if(a.p_role!=null)d.role=a.p_role;
+      if(a.p_team!=null)d.team=a.p_team;
+      if(typeof a.p_photo_url==='string')d.photo=a.p_photo_url;
+     }else if(fn==='admin_set_password')d.password=a.p_password;
+     r=window.imodeAccountSave(acc.username,d);
+    }
+   }
+   if(r&&r.ok===false)rej(new Error(r.message||'ทำรายการไม่สำเร็จ'));else res(r);
+  });
+ }
  function call(fn,args){
+  if(DEV)return devCall(fn,args||{});
   var c=client();
   if(!c)return Promise.reject(new Error('ยังไม่ได้เชื่อมต่อฐานข้อมูล'));
   return c.rpc(fn,args||{}).then(function(r){if(r.error)throw r.error;return r.data});
@@ -220,20 +272,28 @@
    return '<div class="acctadm-box"><div class="acctadm-head"><b>'+h(role)+' ('+groups[role].length+')</b></div>'
     +'<div class="acctadm-list">'+groups[role].map(function(p){
      var cur=lc(p.username)===mine;
-     return '<div class="acctadm-row'+(cur?' is-current':'')+'" style="grid-template-columns:1fr auto">'
+     var av=p.photo_url?'<img src="'+h(p.photo_url)+'" alt="" style="width:100%;height:100%;object-fit:cover">'
+       :h(String(p.full_name||p.username||"?").trim().slice(0,2).toUpperCase());
+     return '<div class="acctadm-row'+(cur?' is-current':'')+'" style="grid-template-columns:auto 1fr auto;align-items:center">'
+      +'<button type="button" data-pacc-photo="'+h(p.id)+'" title="เปลี่ยนรูปโปรไฟล์" '
+      +'style="width:42px;height:42px;border-radius:12px;border:0;padding:0;overflow:hidden;cursor:'+(manage||cur?'pointer':'default')
+      +';background:linear-gradient(135deg,#ff9d45,#ff5b18);color:#fff;font-weight:800;font-size:13px">'+av+'</button>'
       +'<div><b>'+h(p.full_name||p.username)+(p.is_active===false?' <span style="color:#b42318">· ปิดใช้งาน</span>':'')+'</b>'
       +'<small>'+h(p.username)+(p.team?' · ทีม '+h(p.team):'')+(p.technician_id?' · ช่าง: '+h(techName(p.technician_id)):'')
-      +' · เข้าล่าสุด '+h(fmtAt(p.last_sign_in_at))+'</small></div>'
+      /* last sign-in: shown to a Dev only (owner, 2026-09-28); the test site does not record it */
+      +(DEV||String((me()&&(me().role||me().permissionRole))||'')!=='Dev'?'':' · เข้าล่าสุด '+h(fmtAt(p.last_sign_in_at)))+'</small></div>'
       +(manage?'<div style="display:flex;gap:6px;flex-wrap:wrap">'
         +'<button type="button" class="soft-btn" data-pacc-edit="'+h(p.id)+'">✏ แก้ไข</button>'
         +'<button type="button" class="soft-btn" data-pacc-pw="'+h(p.id)+'">🔑 ตั้งรหัสใหม่</button>'
-        +(cur?'':'<button type="button" class="soft-btn" data-pacc-active="'+h(p.id)+'">'+(p.is_active===false?'✅ เปิดใช้':'⛔ ปิดใช้')+'</button>')
+        /* 2026-09-28: ลบ on both sites (owner). ปิดใช้ stays in the code below, unused. */
+        +(cur?'':'<button type="button" class="soft-btn" data-pacc-del="'+h(p.id)+'">🗑 ลบ</button>')
         +'</div>':'')
       +'</div>';
     }).join('')+'</div></div>';
   }).join('');
-  return '<div class="acctadm-box"><div class="acctadm-head"><b>บัญชีผู้ใช้บนเซิร์ฟเวอร์</b>'
-   +'<small>'+(manage?'คุณจัดการบัญชีได้ (Dev / Service Manager) · รหัสผ่านถูกเก็บแบบเข้ารหัสบนเซิร์ฟเวอร์ ไม่มีใครเห็นรหัสเดิมได้'
+  return '<div class="acctadm-box"><div class="acctadm-head"><b>'+(DEV?'บัญชีผู้ใช้ (เว็บเทส)':'บัญชีผู้ใช้บนเซิร์ฟเวอร์')+'</b>'
+   +'<small>'+(DEV?(manage?'คุณจัดการบัญชีได้ (Dev / Service Manager) · กดที่รูปเพื่อเปลี่ยนรูปโปรไฟล์'
+       :'ดูได้อย่างเดียว · การเพิ่ม แก้ไข ตั้งรหัสใหม่ และลบบัญชี ทำได้เฉพาะ Dev และ Service Manager'):manage?'คุณจัดการบัญชีได้ (Dev / Service Manager) · รหัสผ่านถูกเก็บแบบเข้ารหัสบนเซิร์ฟเวอร์ ไม่มีใครเห็นรหัสเดิมได้'
                :'ดูได้อย่างเดียว · การเพิ่มบัญชีและตั้งรหัสใหม่ทำได้เฉพาะ Dev และ Service Manager')+'</small></div>'
    +(manage?'<div style="margin-top:10px"><button type="button" class="primary-btn" data-pacc-new="1">＋ เพิ่มบัญชี</button></div>':'')
    +'</div>'+(body||'<p class="acctadm-empty">ยังไม่มีบัญชี</p>');
@@ -245,8 +305,7 @@
    +'<div class="field"><label>ชื่อที่แสดง</label><input id="paccName" required value="'+h(p.full_name||'')+'"></div>'
    +'<div class="field"><label>Role</label><select id="paccRole">'+options(roleNames(),p.role||'Technician')+'</select></div>'
    +'<div class="field"><label>ทีม</label><select id="paccTeam">'+options(TEAMS,p.team||'')+'</select></div>'
-   +'<div class="field"><label>ผูกกับข้อมูลช่าง (ถ้าเป็นช่างหน้างาน)</label><select id="paccTech">'
-   +options(techList().map(function(t){return {v:t.id,l:t.name+' ('+t.id+')'}}),p.technician_id||'','— ไม่ใช่ช่าง —')+'</select></div>'
+   +'<p class="acctadm-empty" style="grid-column:1/-1">Role กลุ่มช่าง (Technician, Technical Lead, R&amp;D Lead) เป็นช่างหน้างานอัตโนมัติ — มอบหมายงานและขึ้นปฏิทินได้ · สีปฏิทินกับเบอร์โทรแก้ที่หน้าทีมงาน</p>'
    +(isNew?'<div class="field"><label>รหัสผ่าน</label><input id="paccPw" type="password" required minlength="8" autocomplete="new-password"></div>'
           +'<div class="field"><label>ยืนยันรหัสผ่าน</label><input id="paccPw2" type="password" required minlength="8" autocomplete="new-password"></div>':'')
    +'<p id="paccErr" class="acctadm-empty" style="color:#b42318" hidden></p>'
@@ -268,10 +327,54 @@
  function byId(id){return staff.filter(function(p){return p.id===id})[0]}
  function busy(form,on){var btn=form&&form.querySelector('button[type=submit]');if(btn)btn.disabled=!!on}
 
+ /* 2026-09-28: the ROLE decides who is a field technician (owner's choice). A technician role
+    gets a technician record — the id cases, field logs and reports are attributed by — made
+    here, never picked by hand; its name and team follow the account. An account that already
+    points at a record keeps it, even when this device does not hold that record (js/39's
+    samak/narongsak lesson). An office role is unlinked; the record and its work stay. */
+ function techFor(old,uname,name,role,team){
+  var tech=typeof window.imodeIsTechRole==='function'&&window.imodeIsTechRole(role);
+  if(!tech||DEV)return Promise.resolve('');
+  var up=function(rec,id){
+   try{saveLocal()}catch(e){}
+   return Promise.resolve(typeof cloudUpsert==='function'?cloudUpsert('technicians',rec):null).then(function(r){
+    if(r&&r.ok===false)throw new Error(r.message||'บันทึกข้อมูลช่างไม่สำเร็จ');
+    return id;
+   });
+  };
+  var tid=old&&old.technician_id;
+  if(tid){
+   var rec=techList().filter(function(x){return x.id===tid})[0];
+   if(rec&&(rec.name!==name||(team&&rec.team!==team))){rec.name=name;if(team)rec.team=team;return up(rec,tid)}
+   return Promise.resolve(tid);
+  }
+  var base='T-'+String(uname||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(base==='T-')base='T-'+Date.now();
+  var id=base,n=2;
+  while(techList().some(function(x){return x.id===id}))id=base+'-'+(n++);
+  var rec2={id:id,name:name||uname,role:'Service Technician',team:(team==='R&D'?'R&D':'Technical'),
+   phone:'',email:'',status:'พร้อมรับงาน',skills:'',color:'blue',photo:''};
+  try{technicians.push(rec2)}catch(e){return Promise.reject(e)}
+  return up(rec2,id);
+ }
+
+ /* "เวลาไปอีก popup นึงเช่นเปลี่ยนรหัส พอกดลูกศรย้อนกลับ มันปิด pop up เลย" — the edit and
+    password forms are drawn INSIDE this popup, not stacked on it, so js/29's ‹ had nothing to
+    step back to and closed. From a form, ‹ now returns to the list. */
+ var baseBack=window.imodeModalBack;
+ window.imodeModalBack=function(){
+  var b=body();
+  if(b&&b.getAttribute('data-pacc')==='1'&&(document.getElementById('paccForm')||document.getElementById('paccPwForm'))){
+   b.removeAttribute('data-pacc-id');renderList();return;
+  }
+  if(typeof baseBack==='function')return baseBack.apply(this,arguments);
+  if(typeof window.closeModal==='function')window.closeModal();
+ };
+
  window.openAccountAdminModal=function(){
   if(typeof window.requirePermission==='function'&&!window.requirePermission('users.manage'))return;
   if(typeof window.openModal!=='function')return;
-  window.openModal('การจัดการบัญชีผู้ใช้','บัญชีเข้าสู่ระบบของพนักงาน (เก็บบนเซิร์ฟเวอร์)',
+  window.openModal('การจัดการบัญชีผู้ใช้','บัญชีเข้าสู่ระบบของพนักงาน'+(DEV?'':' (เก็บบนเซิร์ฟเวอร์)'),
    '<p class="acctadm-empty">กำลังโหลดรายชื่อ…</p>');
   var b=body();if(b)b.setAttribute('data-pacc','1');
   refreshStaff().then(renderList);
@@ -287,6 +390,29 @@
    if(b.getAttribute('data-pacc')!=='1')return;
    var t=e.target&&e.target.closest?e.target:null;if(!t)return;
    var el;
+   if((el=t.closest('[data-pacc-photo]'))){
+    var ph=byId(el.getAttribute('data-pacc-photo'));
+    if(!ph||!(canManage()||lc(ph.username)===lc(me()&&me().username))||typeof window.imodePickAccountPhoto!=='function')return;
+    window.imodePickAccountPhoto(function(data){
+     call('admin_update_staff',{p_id:ph.id,p_photo_url:data}).then(function(){
+      ph.photo_url=data;toast('เปลี่ยนรูปโปรไฟล์แล้ว');
+      var u=me();if(u&&lc(u.username)===lc(ph.username)){u.photo=data;try{saveLocal()}catch(e){}}
+      renderList();try{if(typeof renderAll==='function')renderAll()}catch(e){}
+     }).catch(function(err){toast(errText(err))});
+    });
+    return;
+   }
+   if((el=t.closest('[data-pacc-del]'))){
+    var dd=byId(el.getAttribute('data-pacc-del'));if(!dd)return;
+    var del=function(){call(DEV?'delete':'admin_delete_staff',{p_id:dd.id}).then(function(){toast('ลบบัญชีแล้ว');return refreshStaff().then(renderList)})
+     .catch(function(err){toast(errText(err))})};
+    /* The test site's delete goes to js/40's bin; the server has no bin, so there it is final. */
+    if(typeof window.imodeConfirm==='function')window.imodeConfirm({title:'ลบบัญชี '+(dd.full_name||dd.username)+'?',
+      message:DEV?'บัญชีจะไปอยู่ในถังขยะ กู้คืนได้'
+       :'ลบถาวร กู้คืนไม่ได้ ต้องสร้างบัญชีใหม่ถ้าจะใช้อีก · งานเก่าและข้อมูลช่างยังอยู่ครบ',danger:true,okText:'ลบ'}).then(function(yes){if(yes)del()});
+    else if(window.confirm('ลบบัญชี '+(dd.full_name||dd.username)+'?'))del();
+    return;
+   }
    if((el=t.closest('[data-pacc-new]'))){b.innerHTML=formHTML(null);return}
    if((el=t.closest('[data-pacc-back]'))){renderList();return}
    if((el=t.closest('[data-pacc-edit]'))){var p=byId(el.getAttribute('data-pacc-edit'));if(p){b.innerHTML=formHTML(p);b.setAttribute('data-pacc-id',p.id)}return}
@@ -315,10 +441,13 @@
     var id=b.getAttribute('data-pacc-id')||'',isNew=!document.getElementById('paccUser')?false:true;
     if(isNew&&val('paccPw')!==val('paccPw2')){showErr('รหัสผ่านทั้งสองช่องไม่ตรงกัน');return}
     busy(f,true);
-    var p=isNew
-     ?call('admin_create_staff',{p_username:val('paccUser'),p_password:document.getElementById('paccPw').value,
-        p_full_name:val('paccName'),p_role:val('paccRole'),p_team:val('paccTeam'),p_technician_id:val('paccTech')||null})
-     :call('admin_update_staff',{p_id:id,p_full_name:val('paccName'),p_role:val('paccRole'),p_team:val('paccTeam'),p_technician_id:val('paccTech')});
+    var old=isNew?null:byId(id),uname=isNew?val('paccUser'):(old&&old.username)||'';
+    var p=techFor(old,uname,val('paccName'),val('paccRole'),val('paccTeam')).then(function(tid){
+     return isNew
+      ?call('admin_create_staff',{p_username:uname,p_password:document.getElementById('paccPw').value,
+         p_full_name:val('paccName'),p_role:val('paccRole'),p_team:val('paccTeam'),p_technician_id:tid||null})
+      :call('admin_update_staff',{p_id:id,p_full_name:val('paccName'),p_role:val('paccRole'),p_team:val('paccTeam'),p_technician_id:tid});
+    });
     p.then(function(){toast(isNew?'เพิ่มบัญชีแล้ว':'บันทึกแล้ว');b.removeAttribute('data-pacc-id');return refreshStaff().then(renderList)})
      .catch(function(err){busy(f,false);showErr(errText(err))});
     return;
@@ -347,7 +476,7 @@
     imodeAccountSave. On the server the only thing that path may still change is a photo,
     through admin_update_staff, which lets a person change their own and an account admin
     change anyone's. Everything else belongs to the screen above. */
- window.imodeAccountSave=function(originalUsername,data){
+ if(!DEV)window.imodeAccountSave=function(originalUsername,data){
   var p=staff.filter(function(x){return lc(x.username)===lc(originalUsername)})[0];
   data=data||{};
   if(!p)return {ok:false,message:'ไม่พบบัญชีนี้บนเซิร์ฟเวอร์'};
@@ -361,7 +490,7 @@
   }
   return {ok:false,message:'แก้ไขบัญชีได้ที่ ตั้งค่า → การจัดการบัญชีผู้ใช้'};
  };
- window.imodeAccountDelete=function(){return {ok:false,message:'บนเซิร์ฟเวอร์ใช้ "ปิดใช้บัญชี" แทนการลบ'}};
+ if(!DEV)window.imodeAccountDelete=function(){return {ok:false,message:'บนเซิร์ฟเวอร์ใช้ "ปิดใช้บัญชี" แทนการลบ'}};
 
- if(me())refreshStaff().then(alignTechnicianName);
+ if(!DEV&&me())refreshStaff().then(alignTechnicianName);
 })();

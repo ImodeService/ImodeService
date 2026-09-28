@@ -251,6 +251,10 @@
   try{pop.scrollIntoView({block:'nearest',behavior:'smooth'})}catch(e){}
  }
  window.imodeOpenTechColorPicker=openPicker;
+ /* 2026-09-28: js/113 edits a technician's colour from the account card on ทีมงาน, now that
+    the technician register is no longer on that page. Same widget, same picker. */
+ window.imodeTechColorWidget=function(v){ensureStyles();return widgetHTML(v)};
+ window.imodeTechColorPaint=paint;
  /* a click anywhere else in the form closes it without applying */
  document.addEventListener('pointerdown',function(e){
   var p=document.getElementById('tcolPop');

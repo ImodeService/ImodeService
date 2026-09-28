@@ -21,7 +21,7 @@
   {page:'qc',           icon:'✅', th:'QC เครื่อง',            en:'Machine QC',          perm:'qc.view'},
   {page:'calendar',     icon:'📅', th:'ปฏิทินงาน',            en:'Calendar',            perm:'calendar.view'},
   {page:'field-service',icon:'🧰', th:'Field Service',        en:'Field Service',       perm:'field.view'},
-  {page:'technicians',  icon:'👨‍🔧',th:'ทีมช่าง',              en:'Service Team',        perm:'team.view'},
+  {page:'technicians',  icon:'👨‍🔧',th:'ทีมงาน',              en:'Team',        perm:'team.view'},
   {page:'warranty',     icon:'🛡', th:'ระบบประกันเครื่อง',      en:'Warranty',            perm:'warranty.view'},
   {page:'documents',    icon:'📁', th:'เอกสารเครื่องจักร',      en:'Documents',           perm:'documents.view'},
   {page:'notifications',icon:'🔔', th:'การแจ้งเตือน',          en:'Notifications',       perm:'notifications.view'},

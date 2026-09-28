@@ -204,6 +204,13 @@
 
  window.imodeAccountSave=function(originalUsername,data){
   var acc=originalUsername?find(originalUsername):null;
+  /* 2026-09-28: the ROLE decides whether an account is a field technician (owner's choice;
+     js/113 imodeIsTechRole). Applied only to a new account or a role that really changed, so
+     a photo save can never re-link or unlink anybody. A technician role with no record gets
+     one from createRecordFor() below. */
+  if(data&&data.role&&typeof window.imodeIsTechRole==='function'&&(!acc||String(acc.role||'')!==String(data.role))){
+   data=Object.assign({},data,{accountType:window.imodeIsTechRole(data.role)?'technician':'staff'});
+  }
   var uname=String(data.username||'').trim();
   if(!uname)return {ok:false,message:tl('กรุณากรอกชื่อผู้ใช้','Please enter a username')};
   if(/\s/.test(uname))return {ok:false,message:tl('ชื่อผู้ใช้ต้องไม่มีช่องว่าง','A username cannot contain spaces')};

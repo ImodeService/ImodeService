@@ -8140,3 +8140,37 @@ on the unchanged HEAD too — set `imode_v69_cloud_optout` instead, as earlier p
    localStorage.
 5. Server install guide (Ubuntu + Supabase + Caddy + backups) not written — waiting for the
    server's specs and the domain.
+
+---
+
+## Session Change Log — 2026-09-28 (part 38): one account screen, a team page of people, an empty test site
+
+Pushed together with `0ed970c` (part 37), which had not been pushed. Replies in Thai; the owner
+wants every difference between the test site and production stated when it is made (memory).
+
+| File | What |
+|---|---|
+| `js/01` | the test site holds no demo data: `IMODE_NO_DEMO`, and a ONE-TIME wipe of each device's cached business keys (marker `imode_v70_test_reset`, value `RESET`). Never runs in production |
+| `js/03`, `js/04`, `js/25` | the demo seeds are gated on `IMODE_NO_DEMO` as well as production |
+| `index.html`, `js/03`, `js/06`, `js/10` | the module is **ทีมงาน** / Team (was ทีมช่าง). ลายเซ็นทีมช่าง in the report is unchanged |
+| `js/113` | ทีมงาน shows every ACCOUNT as the big `.person-card`, grouped by role; the technician register (`#technicianGrid`, its summary, ＋ เพิ่มพนักงาน Service) is hidden, not removed. หน้าที่ = the pages the role can open. 📷 on the photo, colour/phone form for technicians |
+| `js/99` | exports `imodeTechColorWidget` / `imodeTechColorPaint` for js/113 |
+| `js/39` | the ROLE decides technician-ness (`window.imodeIsTechRole`), applied only to a new account or a changed role |
+| `js/124` | การจัดการบัญชีผู้ใช้ now runs on BOTH sites (`DEV` flag): one screen, one code. Test site stores through js/39; production through the admin_* RPCs. Dev + Service Manager only on both (`imodeCanManageAccounts`). Third button ลบ on both (test: to the bin; production: final, needs `admin_delete_staff`). Last sign-in shown to a Dev only. ‹ from a form returns to the list. Photo per row. Production creates the technician record from the role (`techFor`) |
+
+### The production folder moved
+
+`E:\ImodeService-production` → **`E:\ImodeService-main\production`** (copied; the old one was
+locked by VS Code and is the owner's to delete). It is its own private git repo and is listed as
+`/production/` in this repo's `.gitignore` — **it must never reach this public repository**
+(`database/seed/` holds real customers and staff passwords). Staging is built to
+`production\webstaging2` (`webstaging` got stuck half-deleted); `tools/build-web.js` no longer
+deletes its output folder, it writes over and prunes stale files, so Live Server can stay open.
+`database/patch-2026-09-28-delete-staff.sql` (`admin_delete_staff`) was run on staging.
+
+### Still to do
+
+- The test database (`service_Imode_test`) has **not** been emptied. When the owner runs the
+  delete SQL, bump `RESET` in js/01 and push, so every device wipes its cache once more.
+- Testing the test site and staging on one Live Server origin shares localStorage between two
+  databases whose quotation ids overlap; confusing, not a bug.

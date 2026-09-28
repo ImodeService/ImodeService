@@ -28,7 +28,7 @@
 
  function applyV68Labels(){
    const lang=settings.language==='en';
-   const techBtn=document.querySelector('.nav-item[data-page="technicians"] b');if(techBtn)techBtn.textContent=lang?'Service Team':'ทีมช่าง';
+   const techBtn=document.querySelector('.nav-item[data-page="technicians"] b');if(techBtn)techBtn.textContent=lang?'Team':'ทีมงาน';
    const onsiteBtn=document.querySelector('.nav-item[data-page="onsite"] b');if(onsiteBtn)onsiteBtn.textContent=lang?'Onsite Service':'หน้างาน';
    const ver=document.querySelector('.sidebar-version b');if(ver)ver.textContent='Version 1.0';
    const verSub=document.querySelector('.sidebar-version span');if(verSub)verSub.remove();

@@ -151,11 +151,56 @@
    .catch(function(){})
    .then(function(){tryingBack=false});
  }
- window.addEventListener('online',function(){setTimeout(reconnect,1200)});
- document.addEventListener('visibilitychange',function(){
-  if(document.visibilityState==='visible'&&navigator.onLine!==false)setTimeout(reconnect,600);
+ /* ------------------------------ 1d. signal lost WHILE the app was open (2026-09-28) --- */
+ /* The case above covers a device that booted with no signal. The common one is a phone that
+    loses signal mid-job: `supa` still exists, the writes fail (js/24 now returns at once when
+    the device knows it is offline, and gives up after 15 s on a weak signal), the rows are
+    marked — and nothing tried again until the next full sync, i.e. a reload. "แอบส่งแบบ
+    เงียบๆ": when the network is back, when the app is looked at again, and every 45 s while
+    anything is owed, the owed rows are re-sent through their own typed writer, silently. Each
+    clears its own mark through the wrapper above when it lands. A row deleted meanwhile, or in
+    the bin, is not re-sent. */
+ var flushing=false;
+ function flush(){
+  if(flushing||!client()||navigator.onLine===false)return;
+  var p=readPend(),jobs=[];
+  Object.keys(TABLES).forEach(function(tableName){
+   var t=TABLES[tableName],ids=Array.isArray(p[t.key])?p[t.key]:[],list=t.get();
+   if(!ids.length||!list)return;
+   ids.forEach(function(id){
+    /* Only a row that is no longer on this device (deleted, or moved to the bin) is dropped.
+       NOT imodeSyncWasDeleted(): that answers "has the cloud ever had it", which is true of
+       every existing case — using it here dropped an offline edit to a case instead of
+       sending it (caught by the test before it shipped). */
+    var row=list.filter(function(r){return r&&r.id===id})[0];
+    if(!row){clear(tableName,id);return}
+    /* a slow write of this row is still on its way (js/24): do not send it twice */
+    try{if(typeof window.imodeUpsertInflight==='function'&&window.imodeUpsertInflight(tableName,id))return}catch(e){}
+    jobs.push({fn:window[t.push],row:row});
+   });
+  });
+  if(!jobs.length)return;
+  flushing=true;
+  jobs.reduce(function(chain,j){
+   return chain.then(function(){return typeof j.fn==='function'?j.fn(j.row):null}).catch(function(){});
+  },Promise.resolve()).then(function(){
+   flushing=false;
+   try{console.info('[imode outbox] sent '+jobs.length+' record(s) kept while offline')}catch(e){}
+  });
+ }
+ /* js/24 lets a slow write run on in the background; when it finally lands, it is no longer owed. */
+ window.addEventListener('imode-upsert-landed',function(e){
+  try{var d=e.detail||{};clear(d.table,d.id)}catch(x){}
  });
+ function owed(){var p=readPend();return Object.keys(p).some(function(k){return Array.isArray(p[k])&&p[k].length})}
+ function backOnline(){if(client())flush();else reconnect()}
+ window.addEventListener('online',function(){setTimeout(backOnline,1200)});
+ document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState==='visible'&&navigator.onLine!==false)setTimeout(backOnline,600);
+ });
+ setInterval(function(){if(owed())backOnline()},45000);
  window.imodeReconnectCloud=reconnect;
+ window.imodeFlushOutbox=flush;
 
  /* ------------------------------------------------ 2. hold it through the sync --- */
  function stamp(r){

@@ -118,23 +118,31 @@
    gone.forEach(function(id){jobs.push({table:t.table,op:'delete',id:id})});
   });
   if(!jobs.length){snap=now;return Promise.resolve()}
+  /* 2026-09-28: offline, nothing is attempted and the snapshot is NOT moved — so everything
+     changed meanwhile is still a difference, and goes on the next push once the network is
+     back (the 'online' listener below). Before this, a push that failed on the network still
+     set snap=now, and a QC or an expense recorded with no signal was never sent at all. */
+  if(navigator.onLine===false)return Promise.resolve();
   pushing=true;
+  var failed=false;
   return jobs.reduce(function(p,j){
    return p.then(function(){
     if(j.op==='upsert')return sb.from(j.table).upsert(j.payload);
     return sb.from(j.table).delete().eq('id',j.id);
    }).then(function(res){
     if(res&&res.error){
+     failed=true;
      if(tableMissing(res.error)){missing=true;note('supabase/05-v70-operational-tables.sql has not been run yet — QC, petty cash, spare parts and purchase orders stay on this device.',res.error);}
      else note('push failed for '+j.table,res.error);
     }
    },function(e){
+    failed=true;
     if(tableMissing(e)){missing=true;note('supabase/05-v70-operational-tables.sql has not been run yet.',e)}
     else note('push threw for '+j.table,e);
    });
   },Promise.resolve()).then(function(){
    pushing=false;
-   if(!missing)snap=now;         /* only trust the snapshot when the writes really landed */
+   if(!missing&&!failed)snap=now;   /* only trust the snapshot when the writes really landed */
   },function(){pushing=false});
  }
  function schedulePush(){
@@ -142,6 +150,11 @@
   clearTimeout(timer);
   timer=setTimeout(function(){push()},400);
  }
+ /* 2026-09-28: whatever was held back offline goes when the network returns, and a failed
+    push is retried every 45 s — silently; push() sends only differences, so a pass with
+    nothing owed does nothing. */
+ window.addEventListener('online',function(){setTimeout(schedulePush,1500)});
+ setInterval(function(){if(navigator.onLine!==false)schedulePush()},45000);
 
  /* ------------------------------------------------------------------- pull ----- */
  function newer(a,b){
@@ -235,8 +248,8 @@
     exists. initCloud() runs on `load`, so the client is not there at parse time. */
  function start(){
   snap=snapshot();
-  var tries=0;
-  var wait=setInterval(function(){
+  var tries=0,wait;
+  function tick(){
    tries++;
    if(client()){
     clearInterval(wait);
@@ -245,8 +258,14 @@
      /* Anything this device already held that the cloud has not seen goes up. */
      var base=snap;snap={};push().then(function(){if(missing)snap=base});
     },function(){});
-   }else if(tries>40){clearInterval(wait)}      /* ~20s: local mode, nothing to do */
-  },500);
+   }else if(tries===40){
+    /* 2026-09-28: ~20 s with no connection is a device that booted offline, not one with
+       nothing to do — js/110 reconnects it when the signal returns, and the work recorded
+       meanwhile has to go up then. Keep waiting, slowly, instead of giving up. */
+    clearInterval(wait);wait=setInterval(tick,5000);
+   }
+  }
+  wait=setInterval(tick,500);
  }
  if(document.readyState==='complete')start();
  else window.addEventListener('load',start,{once:true});

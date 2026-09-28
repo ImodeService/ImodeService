@@ -99,14 +99,57 @@
      whether the write landed — the ส่งใบเสนอราคา popup in js/43 — can say something true
      instead of guessing. `offline` is not a failure: the record is saved locally and the
      next sync carries it. */
+  /* 2026-09-28: "ในกรณีที่ไม่มีเน็ต เก็บไว้ในเครื่องจนกว่าจะได้รับเน็ต และแอบส่งแบบเงียบๆ".
+     - The device KNOWS it is offline (navigator.onLine false): the write is not attempted —
+       it would only fail — and is reported `offline`, which js/110 keeps and sends later.
+     - A weak signal can leave a request hanging for minutes while the technician's save button
+       waits on it, so an attempt is given WRITE_WAIT and then treated as not landed. The
+       request may still land afterwards; re-sending it is an idempotent upsert.
+     - A network failure is recorded and kept, but never toasted: it is not something the
+       technician can act on, and the work is safe. A refusal by the server still is. */
+  var WRITE_WAIT = 5000;
+  /* A write that outlives WRITE_WAIT is not cancelled: it runs on, and if it lands the page is
+     told ('imode-upsert-landed', js/110 un-marks it). While it runs, js/110 does not send the
+     same row again — a 1 MB case sent twice on a weak signal is the last thing it needs. */
+  var inflight = {};
+  window.imodeUpsertInflight = function (table, id) { return !!inflight[table + ':' + id]; };
+  function isNetwork(e) {
+   var m = String((e && (e.message || e.details || e)) || '');
+   return !!e && (e.name === 'TypeError' || e.network === true
+    || /failed to fetch|networkerror|load failed|network request failed|timeout/i.test(m));
+  }
   window.cloudUpsert = async function (table, obj) {
    if (typeof supa === 'undefined' || !supa) return { ok: true, offline: true, error: null };
+   if (navigator.onLine === false) return { ok: true, offline: true, error: null };
+   var key = table + ':' + (obj && obj.id);
    try {
-    var res = await supa.from(table).upsert(obj);
+    var timer, late = false;
+    var real = Promise.resolve(supa.from(table).upsert(obj));
+    inflight[key] = true;
+    real.then(function (r) {
+     delete inflight[key];
+     if (late && r && !r.error) {
+      record(table, null);
+      try { window.dispatchEvent(new CustomEvent('imode-upsert-landed', { detail: { table: table, id: obj && obj.id } })); } catch (x) {}
+     }
+    }, function () { delete inflight[key]; });
+    var res = await Promise.race([
+     real,
+     new Promise(function (r) { timer = setTimeout(function () {
+      late = true;
+      r({ error: { message: 'timeout: no answer in ' + (WRITE_WAIT / 1000) + ' s', network: true } });
+     }, WRITE_WAIT); })
+    ]);
+    clearTimeout(timer);
     if (res.error) throw res.error;
     record(table, null);
     return { ok: true, offline: false, error: null };
    } catch (e) {
+    if (isNetwork(e)) {
+     state.failed++; state.lastError = e; state.lastTable = table;
+     console.warn('[imode cloud] ' + table + ' not sent (network) — kept on this device:', e);
+     return { ok: false, offline: false, network: true, error: e };
+    }
     record(table, e);
     return { ok: false, offline: false, error: e };
    }

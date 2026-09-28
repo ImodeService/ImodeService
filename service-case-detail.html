@@ -4658,6 +4658,10 @@ var CaseLive=(function(){
         var row=p&&p.new;
         /* Only this case. Every other row on the project streams past and is ignored. */
         if(!row||!mine||(row.id!==mine&&String(row.ticket||'')!==mine))return;
+        /* 2026-09-28: realtime cuts a row over ~1 MB (a case with photos) down to its small
+           columns and says so in p.errors — field_status_log then never arrived and the
+           technician's notes and photos waited for a reload. Read this one row back in full. */
+        if((p.errors&&p.errors.length)||!('field_status_log' in row)){pullCurrentCase(sb,mine);return}
         if(applyCase(row))repaint();
       });
       channel.on('postgres_changes',{event:'*',schema:'public',table:'quotations'},function(p){

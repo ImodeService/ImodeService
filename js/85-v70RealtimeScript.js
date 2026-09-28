@@ -217,6 +217,13 @@
    return;
   }
 
+  /* 2026-09-28: "สถานะช่าง รายละเอียดไม่เรียลไทม์ เช่นรูป ข้อความ ต้องรีหน้าเว็บก่อน". Realtime
+     sends at most ~1 MB per row; above that Supabase drops every column over 64 bytes and marks
+     the payload with errors (413). A case with the customer's photos is past that — measured:
+     SRV-20260928-002 is 1.4 MB — so field_status_log arrived missing, and mapping that row
+     REPLACED the case on screen with an empty track. A cut row is never applied; the full row
+     is read back by id instead, one row, and applied through this same function. */
+  if(truncated(cfg,payload,row)){refetch(cfg,id);return}
   var mapped=cfg.map(row);
   if(!mapped||!mapped.id)return;
   if(at>=0){
@@ -226,6 +233,24 @@
    list.unshift(mapped);
   }
   mark(cfg.describe(mapped));
+ }
+
+ /* The columns a cut row loses first are the big jsonb ones; service_cases always writes
+    field_status_log, so its absence is itself proof the row was cut. */
+ var BIG={service_cases:['field_status_log']};
+ function truncated(cfg,payload,row){
+  if(payload&&Array.isArray(payload.errors)&&payload.errors.length)return true;
+  return (BIG[cfg.name]||[]).some(function(k){return !(k in row)});
+ }
+ var fetching={};
+ function refetch(cfg,id){
+  var c=client(),key=cfg.name+':'+id;
+  if(!c||fetching[key])return;
+  fetching[key]=true;
+  Promise.resolve(c.from(cfg.name).select('*').eq('id',id).maybeSingle()).then(function(r){
+   fetching[key]=false;
+   if(r&&!r.error&&r.data)apply(cfg,{eventType:'UPDATE',new:r.data,refetched:true});
+  },function(){fetching[key]=false});
  }
 
  function mark(note){

@@ -1497,6 +1497,20 @@ function fieldCrewHTML(m,e){
    URL, so they reuse mediaTiles() and the page's existing lightbox rather than carrying a
    second copy of either. loadAttachments() pushes the very same string, so the match is an
    identity comparison in practice. */
+/* 2026-09-28: the position the technician's phone recorded at a step — Check-in (js/03) and,
+   since js/126, ถัดไป into ถึงหน้างาน both write latitude / longitude onto the entry. */
+function gpsRowHTML(e,fs){
+  var lat=e&&e.latitude,lng=e&&e.longitude;
+  if(lat!=null&&lat!==''&&lng!=null&&lng!==''){
+    var q=encodeURIComponent(lat+','+lng);
+    return '<dt>พิกัด</dt><dd>'+esc(lat)+', '+esc(lng)
+      +(e.gpsAccuracy?' <small>(±'+esc(e.gpsAccuracy)+' ม.)</small>':'')
+      +' · <a href="https://www.google.com/maps?q='+q+'" target="_blank" rel="noopener">เปิดแผนที่</a></dd>';
+  }
+  if(fs!=='ถึงหน้างาน')return '';
+  var why={denied:'ช่างไม่ได้อนุญาตให้ใช้ GPS',unavailable:'หาพิกัดไม่ได้',timeout:'หาพิกัดไม่ทันเวลา',unsupported:'อุปกรณ์ไม่รองรับ GPS'}[e&&e.gpsError];
+  return '<dt>พิกัด</dt><dd><span class="sd-empty" style="margin:0">ไม่ได้บันทึกพิกัด'+(why?' — '+esc(why):'')+'</span></dd>';
+}
 function fieldStepDetailHTML(m,k){
   var fs=FIELD_STEPS[k]||'';
   var entries=fieldLog(m).filter(function(e){return e&&e.status===fs});
@@ -1538,7 +1552,7 @@ function fieldStepDetailHTML(m,k){
       : '';
     return '<div class="sd-fentry">'
       +'<dl class="sd-kv"><dt>เวลา</dt><dd>'+esc(fmtDateTime(e.createdAt))+'</dd>'
-      +'<dt>ช่าง</dt><dd>'+fieldCrewHTML(m,e)+'</dd></dl>'
+      +'<dt>ช่าง</dt><dd>'+fieldCrewHTML(m,e)+'</dd>'+gpsRowHTML(e,fs)+'</dl>'
       +histHTML
       +(e.note?'<p class="sd-fnote">'+esc(e.note)+'</p>'
               :'<p class="sd-empty">ไม่ได้บันทึกรายละเอียดเพิ่มเติม</p>')

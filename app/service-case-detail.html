@@ -2,6 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="utf-8">
+<script src="./js/00-env.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>รายละเอียดเคสงานบริการ · I-MODE Plus Service &amp; Maintenance · Version 1.0</title>
@@ -804,7 +805,7 @@ body.scd-modal-open{overflow:hidden}
 <!-- Beta 1.0: this page can now write. The status circles change the case, so it needs the
      same Supabase client the application uses; the connection details are read from the
      config the app already stored on this device. Nothing else on the page writes. -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./vendor/supabase.min.js"></script>
 <!-- 2026-09-15: the 24-hour date + time control. Without it this page falls back to the
      browser's own datetime-local widget, which renders 12-hour (mm/dd/yyyy --:-- --) from the
      browser's UI locale whatever the document says — measured in part 19, there is no

@@ -36,7 +36,11 @@
  var DEV=!ENV.production;
  var host=String(location.hostname||'').toLowerCase();
  var CUSTOMER_HOST=String(ENV.customerHost||'').toLowerCase();
- if(CUSTOMER_HOST&&host===CUSTOMER_HOST)return;   /* the customer address: js/125 */
+ if(window.imodeCustomerMode||(CUSTOMER_HOST&&host===CUSTOMER_HOST))return;   /* the customer side: js/125 */
+ /* One hostname for both audiences (customerByUrl): the QR must open THIS app's folder in
+    customer mode, so the address is this page's own directory, never the old test site the
+    seeded settings still name. Only when there is no separate customer hostname. */
+ var APP_DIR=(ENV.customerByUrl&&!CUSTOMER_HOST)?(location.origin+location.pathname.replace(/[^\/]*$/,'')):'';
 
  var ACCOUNT_ADMIN_ROLES=['Dev','Service Manager'];
  function client(){try{return (typeof supa!=='undefined'&&supa)?supa:null}catch(e){return null}}
@@ -72,9 +76,9 @@
    if(settings.authConfig.provider!=='supabase')settings.authConfig.provider='supabase';
    /* machinePortalUrl() reads publicAppUrl directly, and a sync replaces settings wholesale,
       so the QR address is put back every time: a printed QR must open the customer address. */
-   if(CUSTOMER_HOST){
+   if(CUSTOMER_HOST||APP_DIR){
     if(!settings.lineConfig||typeof settings.lineConfig!=='object')settings.lineConfig={};
-    settings.lineConfig.publicAppUrl='https://'+CUSTOMER_HOST+'/';
+    settings.lineConfig.publicAppUrl=CUSTOMER_HOST?'https://'+CUSTOMER_HOST+'/':APP_DIR;
    }
   }catch(e){}
  }
@@ -196,10 +200,10 @@
  })();
  /* The QR printed from the office must open the customer address, never this one. */
  var basePortalUrl=window.portalBaseUrl;
- if(CUSTOMER_HOST&&typeof basePortalUrl==='function'){
+ if((CUSTOMER_HOST||APP_DIR)&&typeof basePortalUrl==='function'){
   window.portalBaseUrl=function(){
    try{if(settings.lineConfig&&settings.lineConfig.liffId)return basePortalUrl.apply(this,arguments)}catch(e){}
-   return 'https://'+CUSTOMER_HOST+'/';
+   return CUSTOMER_HOST?'https://'+CUSTOMER_HOST+'/':APP_DIR;
   };
  }
 

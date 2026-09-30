@@ -3,8 +3,9 @@
 window.IMODE_ENV=Object.freeze({
  "production": true,
  "version": "Version 1.0",
- "builtAt": "2026-09-30T22:59:54.854Z",
+ "builtAt": "2026-09-30T23:21:58.967Z",
  "customerHost": "",
+ "customerByUrl": true,
  "staffHost": "imodeservice.github.io",
  "cloud": {
   "url": "https://cwrkquzuuyhfhesozqnb.supabase.co",

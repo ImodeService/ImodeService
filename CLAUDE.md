@@ -8174,3 +8174,117 @@ deletes its output folder, it writes over and prunes stale files, so Live Server
   delete SQL, bump `RESET` in js/01 and push, so every device wipes its cache once more.
 - Testing the test site and staging on one Live Server origin shares localStorage between two
   databases whose quotation ids overlap; confusing, not a bug.
+
+---
+
+## Session Change Log — 2026-10-01 (part 39): the production build runs on GitHub Pages, with the customer QR and S/N
+
+The owner's boss wants to run the REAL system from GitHub first, before the VPS exists. Replies in
+Thai. No storage key renamed, no schema change, version untouched. **Nothing in the production
+database was changed except one test case that was written and deleted again (see Tests).**
+
+| File | What |
+|---|---|
+| `app/` (new, 174 files) | the production build, served at `https://imodeservice.github.io/ImodeService/app/` |
+| `js/01` | production: a one-time cache wipe per device; `window.imodeCustomerMode` |
+| `js/124`, `js/125` | read `imodeCustomerMode`; the QR address is this app's folder |
+| `service-case-detail.html` | step 2 lists the quotation of the case FIRST, then who / when |
+| `production/tools/build-web.js`, `production/github.config.json` | `customerByUrl` (production repo, private) |
+
+### THE DATABASE "production" MEANS
+
+The Supabase project the `production/` folder was prepared against is **`cwrkquzuuyhfhesozqnb`**
+(free plan, `production/staging.config.json`). `production.config.json` (the VPS) is still
+`REPLACE_ME`. It carries the production schema + RLS (`01-schema.sql`, `02-security.sql`) and **the
+real data is loaded**: 9 staff accounts, 152 customers (151 + `CUST-INTERNAL-IMODE`), 353 machines,
+341 warranties, 105 models, 4 technicians, 1 settings row, **0 cases**. All nine staff accounts
+share ONE password (owner's choice; it is in `production/database/seed/04-staff-accounts.sql`, which
+is private). They live in Supabase Auth as bcrypt, NOT in the source — **never write a password into
+this file, it is public** (part 32).
+
+**The old test project `ywlrlfudlxsallanoroq` is dead: Supabase answers 402
+`exceed_egress_quota`** (egress 319 % of the free plan, part 36). The test site at the repo root
+therefore cannot sync at all. Do not point the dev source (js/23) at the production project: RLS
+refuses the anon key that mode uses.
+
+### Real data checked against the Excel files (`Data/`)
+
+151 customers and 353 machines present, serials/models/customer links identical. 341 of 353
+warranties: the 12 missing (M00128, M00132, M00156, M00158, M00162, M00163, M00165, M00209, M00211,
+M00252, M00253, M00281) have **no start and no end date anywhere in the source**, so no warranty
+row can exist; the machines are there. 40 text differences are only double spaces / line breaks
+collapsed to one space. 14 machines share a serial (the customer page asks which one), 4 have no
+serial (QR only).
+
+### Two origins, one localStorage — and the wipe
+
+GitHub Pages serves every repo of the org from `imodeservice.github.io`, and **localStorage is per
+origin, not per path**. A device that ever opened the test site holds test cases; with 0 cases on the
+real server `syncCloud()` keeps a local array when the cloud returns no rows, and js/71 / js/110 read
+those rows as unsent work and upload them to the REAL database. js/01 therefore drops the business
+caches (same list as the test-site reset, plus `imode_v5_settings` and `imode_v5_tech`) ONCE per
+device, marker `imode_v70_prod_reset` = `2026-10-01`; session and cloud config stay. Bump
+`PROD_RESET` to wipe again. Tested: a planted stale case / customer / technician were gone after the
+load and the real DB stayed at 0 cases. **Residual risk:** a device that alternates between the test
+site and `/app/` re-creates test data after the marker is set — retire the old test site.
+
+### Customer page without a second hostname — `customerByUrl`
+
+The production design decided "customer" by HOSTNAME (`IMODE_ENV.customerHost`); GitHub Pages has
+one. With `customerByUrl:true` (and `customerHost:''`) js/01 sets `window.imodeCustomerMode` when the
+link that opened the tab is a customer link — `?machineToken=`, `?serial=`, `?page=customer-…`,
+`#/customer-portal|home|entry` — and remembers it in **sessionStorage `imode_v70_customer_tab`**,
+because js/28 spends the query string off the address bar and a reload would otherwise land on the
+staff door. `?staff=1` leaves the mode; a plain address in a new tab is the staff door. js/124 returns
+in customer mode, js/125 runs only in it (anon client, `portal_*` RPCs, staff pages bounced to the
+scan page). With a real `customerHost` the old hostname rule is unchanged.
+
+The QR printed by staff must open THIS folder: js/124 pins `settings.lineConfig.publicAppUrl` and
+`portalBaseUrl()` to `origin + directory of the page` (the seed still names the old test site
+`…/ImodeService/`, which is why it is overridden on every sync). QR =
+`…/app/?machineToken=<23-char random token>#/customer-portal`.
+
+### Tests (real production DB, headless Chrome, 390 and 1440)
+
+24 / 24 at both widths: `?serial=` and `?machineToken=` open the right machine; reload keeps the
+customer page; `goPage('dashboard' | 'staff-login')` bounce to the scan page; typing the S/N opens the
+machine; an unknown S/N says not found; a shared S/N asks which machine; `QR-<id>` (the old guessable
+token) shows no machine and no serial; the anon key reads **0 customers / 0 machines** (401); a plain
+address is the staff door and `?staff=1` leaves customer mode; **a real แจ้งปัญหา created one case
+(`เคสใหม่`, LINE OA) and one request in Supabase, then the test deleted both with the admin session —
+the database is back at 0 cases / 0 requests.** Staff side: 14/14 (sign-in, 152/353/341/4, 26/26 pages).
+Live site re-checked after each push.
+
+### Also recorded here (commits that had no entry)
+
+- `5f1e504` js/85 + case page: Supabase realtime drops every column over 64 bytes from a row above
+  ~1 MB and flags the payload with errors (413); a case with the customer's photos is past that, so
+  `field_status_log` never arrived and js/85 even replaced the case on screen with the cut row. A cut
+  row is now never applied; the full row is fetched by id.
+- `89d0c5d` js/126 (new): `saveFieldStatus` into ถึงหน้างาน takes the GPS position first (max 12 s)
+  and stamps latitude / longitude / gpsAccuracy on the new `fieldStatusLog` entry; a refusal never
+  blocks the status. The case page shows the พิกัด with a Google Maps link.
+- `a9635a1` js/24, js/110, js/41: no write is attempted while offline (kept, sent later); a write gets
+  5 s before the save stops waiting; network failures are never toasted; owed rows are re-sent on
+  `online`, when the app is looked at again and every 45 s; QC / petty cash / parts / POs no longer
+  mark a failed push as sent.
+
+### Open / risk
+
+1. **Free-plan egress again.** The production project is also on the free plan and js/03 still syncs
+   whole tables; more than a handful of users will hit the same 402 as the test project. Upgrade or
+   move (VPS) before real daily use.
+2. `customerByUrl` makes the staff and customer apps share one origin: a staff session, the staff
+   caches and a customer snapshot live in the same localStorage. The anon key is still limited by RLS
+   (verified), and a customer link in a staff tab puts THAT tab in customer mode until it is closed or
+   `?staff=1` is used.
+3. The staff door on `/app/` still shows the "ผู้ใช้ทดสอบ / เลือกผู้ใช้งาน" link; the door it opens
+   refuses, but it should be hidden.
+4. The old test site (repo root) stays online and cannot sync; it shares the origin with `/app/`.
+5. `app/` is a COPY of `production/webgithub/` — rebuild with
+   `node tools/build-web.js --config=github.config.json --out=webgithub --strict` (from `production/`),
+   copy over `app/`, commit. Never edit `app/` by hand.
+6. The real machine QRs have not been printed; the QR address is `…/app/` for now, so moving to the
+   VPS / a domain means reprinting (or keeping this address redirecting for ever).
+7. Unchanged: customer-portal access is by QR token or by an exact S/N (rate limited: 20 lookups per
+   10 minutes); anyone who knows a serial can open that machine's page. That is the owner's decision.

@@ -32,8 +32,8 @@
  'use strict';
  var ENV=window.IMODE_ENV;
  if(!ENV||!ENV.production)return;
- var CUSTOMER_HOST=String(ENV.customerHost||'').toLowerCase();
- if(!CUSTOMER_HOST||String(location.hostname||'').toLowerCase()!==CUSTOMER_HOST)return;
+ /* js/01 decides: the customer hostname, or (customerByUrl) a customer link in this tab */
+ if(!window.imodeCustomerMode)return;
  window.imodeIsCustomerHost=true;
 
  var REFRESH_MS=20000;

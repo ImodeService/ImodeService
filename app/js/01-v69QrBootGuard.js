@@ -16,6 +16,31 @@
      down from the server on the first sync; nothing is lost that the server does not hold.
      Session and cloud config stay (a signed-in person is not signed out). Bump PROD_RESET to
      wipe again. */
+  /* 2026-10-01: ONE hostname serves both audiences (GitHub Pages), so "is this the customer
+     page" cannot be answered by the hostname. IMODE_ENV.customerByUrl turns the customer
+     mode on when the link that opened this tab is a customer link, and remembers it for the
+     tab (sessionStorage), because js/28 spends ?machineToken= / ?serial= off the address bar
+     and a reload would otherwise land on the staff door. ?staff=1 leaves the mode. When a
+     customer hostname exists (customerHost) the old rule still applies and this is unused.
+     js/124 and js/125 read window.imodeCustomerMode; nothing else decides it. */
+  (function(){
+   var E=window.IMODE_ENV,KEY='imode_v70_customer_tab',on=false;
+   try{
+    var ch=String(E.customerHost||'').toLowerCase(),host=String(location.hostname||'').toLowerCase();
+    if(ch&&host===ch)on=true;
+    else if(E.customerByUrl){
+     var q=location.search,hs=location.hash;
+     if(/[?&]staff=1\b/.test(q))sessionStorage.removeItem(KEY);
+     else{
+      var cu=/[?&]machineToken=/.test(q)||/[?&]serial=/.test(q)||/[?&]page=customer-(entry|portal|home)\b/.test(q)
+          ||/#\/customer-(portal|home|entry)/.test(hs);
+      if(cu)sessionStorage.setItem(KEY,'1');
+      on=!!sessionStorage.getItem(KEY);
+     }
+    }
+   }catch(e){}
+   window.imodeCustomerMode=on;
+  })();
   var PROD_RESET='2026-10-01', PROD_MARK='imode_v70_prod_reset';
   try{
    if(localStorage.getItem(PROD_MARK)!==PROD_RESET){

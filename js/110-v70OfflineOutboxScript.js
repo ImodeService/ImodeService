@@ -312,4 +312,56 @@
   });
   return out;
  };
+
+ /* Repair machines that exist only in this browser. Read cloud ids first: an older local
+    copy must never overwrite a machine already maintained by another staff member. */
+ var repairButton=document.getElementById('syncLocalMachinesBtn'),repairBusy=false;
+ if(repairButton&&window.IMODE_ENV&&window.IMODE_ENV.production&&!window.imodeCustomerMode){
+  repairButton.hidden=false;
+  window.imodeSyncLocalMachines=async function(){
+   if(repairBusy)return;
+   var db=client(),rows=Array.isArray(machines)?machines.slice():[];
+   if(!db||!rows.length){toastMsg(db?'ไม่มีเครื่องในเบราว์เซอร์นี้':'ยังไม่เชื่อม Cloud');return}
+   repairBusy=true;repairButton.disabled=true;
+   var popup=window.imodeUploadProgressPopup;
+   if(popup){popup.open([],'กำลังตรวจสอบเครื่องใน Cloud…');popup.setPct(5)}
+   try{
+    var auth=await db.auth.getUser();
+    if(auth.error||!auth.data||!auth.data.user)throw new Error('กรุณาเข้าสู่ระบบใหม่');
+    var ids=rows.map(function(m){return m&&m.id}).filter(Boolean),remote=Object.create(null);
+    for(var i=0;i<ids.length;i+=100){
+     var found=await db.from('machines').select('id,qrToken').in('id',ids.slice(i,i+100));
+     if(found.error)throw found.error;
+     (found.data||[]).forEach(function(m){remote[m.id]=m});
+    }
+    var missing=rows.filter(function(m){return m&&m.id&&!remote[m.id]});
+    var deleted=missing.filter(function(m){return window.imodeSyncWasDeleted&&window.imodeSyncWasDeleted('machines',m.id)});
+    missing=missing.filter(function(m){return deleted.indexOf(m)<0});
+    var different=rows.filter(function(m){return m&&remote[m.id]&&m.qrToken&&remote[m.id].qrToken!==m.qrToken}).length;
+    var done=0,failed=[];
+    for(var j=0;j<missing.length;j++){
+     var m=missing[j];
+     if(popup){popup.phase('กำลังส่งเครื่อง '+(j+1)+'/'+missing.length+' ขึ้น Cloud…',true);popup.setPct(10+Math.round(80*j/Math.max(1,missing.length)))}
+     try{
+      if(!m.qrToken){m.qrToken=window.imodeNewQrToken();saveLocal()}
+      var sent=await window.cloudUpsert('machines',m);
+      if(!sent||!sent.ok||sent.offline)throw sent&&sent.error||new Error('Cloud ไม่รับข้อมูล');
+      var checked=await db.rpc('portal_open',{p_token:m.qrToken});
+      if(checked.error||!checked.data||!checked.data.ok)throw checked.error||new Error('QR ยังเปิดจากเครื่องอื่นไม่ได้');
+      done++;
+     }catch(e){failed.push((m.serial||m.name||m.id)+': '+(e.message||String(e)))}
+    }
+    var msg='ขึ้น Cloud และตรวจ QR แล้ว '+done+' เครื่อง';
+    if(failed.length)msg+=' · ไม่สำเร็จ '+failed.length+' เครื่อง: '+failed.slice(0,2).join('; ');
+    if(different)msg+=' · QR ในเครื่องนี้ไม่ตรง Cloud '+different+' เครื่อง (ยังไม่เปลี่ยน QR เดิม)';
+    if(deleted.length)msg+=' · ข้ามเครื่องที่เคยถูกลบจาก Cloud '+deleted.length+' เครื่อง';
+    if(popup)popup.finish({bad:!!failed.length||!!different||!!deleted.length,title:failed.length?'ซิงก์เครื่องไม่ครบ':'ตรวจสอบเครื่องเรียบร้อย',msg:msg,holdMs:6000});
+    else toastMsg(msg);
+    if(failed.length)console.warn('[machine repair] failed:',failed);
+   }catch(e){
+    var message='ตรวจสอบ Cloud ไม่สำเร็จ: '+(e.message||String(e));
+    if(popup)popup.finish({bad:true,title:'ยังไม่ได้ซิงก์เครื่อง',msg:message});else toastMsg(message);
+   }finally{repairBusy=false;repairButton.disabled=false}
+  };
+ }
 })();

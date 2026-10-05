@@ -48,6 +48,12 @@
    get:function(){return (typeof serviceReports!=='undefined'&&Array.isArray(serviceReports))?serviceReports:null},
    set:function(v){serviceReports=v},
    push:'cloudUpsertServiceReport'
+  },
+  'machines':{
+   key:'machines',
+   get:function(){return (typeof machines!=='undefined'&&Array.isArray(machines))?machines:null},
+   set:function(v){machines=v},
+   push:'imodePushMachine'
   }
  };
 

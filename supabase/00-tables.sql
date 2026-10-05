@@ -120,6 +120,10 @@ create table if not exists public.machines (
   "pmDue"         text,
   note            text,
   photo           text,       -- base64 data URL
+  "factoryNamePagePhoto" text,
+  "imodeNamePagePhoto" text,
+  "createdAt"     timestamptz,
+  "updatedAt"     timestamptz,
   source          text,
   "sourceOrder"   text,       -- present on rows imported from the demo customer database
   "qrToken"       text        -- added by ensureMasters(); keep it, printed QR codes use it

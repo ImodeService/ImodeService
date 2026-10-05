@@ -57,8 +57,14 @@
    get:function(){return (typeof lineRequests!=='undefined'&&Array.isArray(lineRequests))?lineRequests:null},
    set:function(v){lineRequests=v},
    table:'line_customer_requests',
-   push:'cloudUpsertLineRequest'}
+   push:'cloudUpsertLineRequest'},
+  {name:'machines',
+   get:function(){return (typeof machines!=='undefined'&&Array.isArray(machines))?machines:null},
+   set:function(v){machines=v},
+   table:'machines',
+   push:'imodePushMachine'}
  ];
+ window.imodePushMachine=function(row){return window.cloudUpsert('machines',row)};
 
  /* 2026-09-25: what a database has acknowledged is only true of THAT database. The record is
     stamped with the project URL and ignored under any other one — otherwise pointing a device at
@@ -309,7 +315,7 @@
     for unsent work and uploaded it again. The customer's phone that reported a problem is exactly
     that device. So a row is acknowledged the moment the cloud has it: a successful upload (the
     cloudUpsert funnel below) or a row arriving by realtime (js/85 calls imodeSyncAck). */
- var ACK_TABLES={service_cases:'cases',line_customer_requests:'lineRequests',quotations:'quotations',
+ var ACK_TABLES={service_cases:'cases',line_customer_requests:'lineRequests',machines:'machines',quotations:'quotations',
   machine_warranties:'warranties',machine_documents:'machineDocuments',service_reports:'serviceReports'};
  function ack(table,id){
   var name=ACK_TABLES[table]||table;

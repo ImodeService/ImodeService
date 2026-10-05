@@ -111,18 +111,18 @@
  /* -------------------------------------------------------------- the popup ---- */
  var box=null,shown=0,timer=0,closer=0;
 
- function open(files){
+ function open(files,title){
   ensureStyle();
   close(true);
   box=document.createElement('div');
   box.className='uprog';
   box.setAttribute('role','dialog');
   box.setAttribute('aria-modal','true');
-  box.setAttribute('aria-label',tl('กำลังเตรียมไฟล์','Preparing files'));
+  box.setAttribute('aria-label',title||tl('กำลังเตรียมไฟล์','Preparing files'));
   box.innerHTML=''
    +'<div class="uprog-card">'
    + '<div class="uprog-head"><span class="uprog-spin"></span><span data-head>'
-   +  esc(tl('กำลังเตรียมไฟล์…','Preparing your files…'))+'</span></div>'
+   +  esc(title||tl('กำลังเตรียมไฟล์…','Preparing your files…'))+'</span></div>'
    + '<div class="uprog-pct" aria-live="polite">0%</div>'
    + '<div class="uprog-phase">'+esc(tl('กำลังอ่านและย่อขนาดไฟล์','Reading and shrinking'))+'</div>'
    + '<div class="uprog-bar"><i></i></div>'
@@ -186,10 +186,10 @@
   if(spin&&spin.parentNode)spin.parentNode.removeChild(spin);
   var head=box.querySelector('.uprog-head span[data-head]');
   if(res.bad){
-   if(head)head.textContent=tl('เพิ่มไฟล์ไม่สำเร็จ','The file was not added');
+   if(head)head.textContent=res.title||tl('เพิ่มไฟล์ไม่สำเร็จ','The file was not added');
   }else{
    setPct(100);
-   if(head)head.textContent=tl('เพิ่มไฟล์เรียบร้อย','Files added');
+   if(head)head.textContent=res.title||tl('เพิ่มไฟล์เรียบร้อย','Files added');
   }
   phase('');
   var hint=box.querySelector('.uprog-hint');
@@ -209,7 +209,7 @@
    if(card)card.appendChild(btn);
    try{btn.focus()}catch(e){}
   }else{
-   closer=setTimeout(function(){close()},HOLD);
+   closer=setTimeout(function(){close()},res.holdMs||HOLD);
   }
  }
 

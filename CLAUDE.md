@@ -8288,3 +8288,25 @@ Live site re-checked after each push.
    VPS / a domain means reprinting (or keeping this address redirecting for ever).
 7. Unchanged: customer-portal access is by QR token or by an exact S/N (rate limited: 20 lookups per
    10 minutes); anyone who knows a serial can open that machine's page. That is the owner's decision.
+
+---
+
+## Session Change Log — 2026-10-06 (part 40): Codex's machine work, checked
+
+Three commits by Codex (`051cbae`, `d240655`, `b2580cc`), applied to both `js/` and `app/js/`:
+two name-plate photos per machine (`factoryNamePagePhoto`, `imodeNamePagePhoto`, plus
+`createdAt`/`updatedAt` columns — `supabase/11-machine-name-page-photos.sql`); the upload-progress
+popup on machine photo / warranty / document files and on saving a machine; `machines` added to
+js/71's and js/110's protected tables; and a production-only **☁ ซิงก์เครื่องที่ค้าง** button
+(js/110) that uploads machines that exist only in this browser, never overwriting a cloud row,
+skipping deleted ids and checking each QR with `portal_open`. Background in
+`docs/MACHINE-QR-CLOUD-RECOVERY.md`.
+
+Checked and fixed here:
+
+- `openPortalIssueForm()` (js/03:960, and app/) carried a Thai message saved as `?????` — an
+  encoding loss. Rewritten. **Grep for runs of `?` after any tool writes Thai into these files.**
+- The production database already has the four new `machines` columns (probed: a real column
+  answers 42501, an unknown one 42703). `production/database/01-schema.sql` did not, and now does.
+- Machine photos are base64 in the row, so each machine grows by hundreds of KB — more egress on
+  the free plan (part 36/39).

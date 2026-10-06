@@ -52,3 +52,7 @@ list-to-make.html
 # The production folder (its own private git repo): real customer data, staff seed passwords,
 # server config. It must never reach this PUBLIC repository or GitHub Pages.
 /production/
+
+# Test build output of tools/production (npm run build-test)
+tools/production/test/webtest/
+__pycache__/

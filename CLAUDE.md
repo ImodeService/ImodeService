@@ -8310,3 +8310,27 @@ Checked and fixed here:
   answers 42501, an unknown one 42703). `production/database/01-schema.sql` did not, and now does.
 - Machine photos are base64 in the row, so each machine grows by hundreds of KB — more egress on
   the free plan (part 36/39).
+
+### Follow-up (same day): `production/` holds only server files; the build tools moved here
+
+At the owner's request `production/` (its own private repo, gitignored here) now holds only what a
+server needs: `database/01-schema.sql`, `database/02-security.sql`, `database/seed/` (real data,
+gitignored there too) and, once built, `web/`. The seven old build folders (`webstaging*`,
+`webgithub_codex*`) were deleted, and so was `patch-2026-09-28-delete-staff.sql` (its function is
+already in `02-security.sql`).
+
+**Everything that builds or tests now lives in this repo at `tools/production/`**: `build-web.js`,
+`build-real-data.py`, `vendor/`, `test/`, and the four configs (`production`, `staging`, `github`,
+`test`). Checked first that none holds a password or real data — only anon keys, which are public
+by design and already served in `app/js/00-env.js`.
+
+- Configs no longer carry `"source"`; the source defaults to this repository. Default output is
+  `production/web`. Rebuild `/app/` with
+  `node tools/production/build-web.js --config=tools/production/github.config.json --out=app --strict`
+  — **this replaces part 39's `production/webgithub` command**.
+- **`build-web.js` had lost `customerByUrl` support** that part 39 relies on: a rebuild would have
+  written a `00-env.js` without it and broken the customer page on `/app/`. Restored (the env flag,
+  and `customerHost` not required under it). A fresh build is byte-identical to `app/` apart from
+  `builtAt`.
+- Tests re-run from the new place: security 61/61, the real-data seed, the build, and the browser
+  suite at 390px 32/32.

@@ -8334,3 +8334,54 @@ by design and already served in `app/js/00-env.js`.
   `builtAt`.
 - Tests re-run from the new place: security 61/61, the real-data seed, the build, and the browser
   suite at 390px 32/32.
+
+---
+
+## ⚠ STATE — 2026-10-06, READ FIRST IN THE NEXT SESSION: waiting for the VPS
+
+The company is **waiting for the VPS provider to send the server details**. Nothing below has
+started yet unless a later entry says so.
+
+### Where things are
+
+| | |
+|---|---|
+| Live system | `https://imodeservice.github.io/ImodeService/app/` → Supabase **`cwrkquzuuyhfhesozqnb`** (free plan). The team is using it with real data. |
+| Dead test project | `ywlrlfudlxsallanoroq` (`service_Imode_test`) — 402, egress exceeded. Only the old test site at the repo root uses it. Owner may pause/delete it; not needed. |
+| Server files | `production/` (private repo, gitignored here): `database/01-schema.sql`, `02-security.sql`, `seed/`. `web/` not built yet. |
+| Build + tests | `tools/production/` in this repo. `npm test` in `tools/production/test` (run `npm install` first). |
+| Backup tool | `tools/backup/backup-db.ps1` → `Data\backup\db\` (gitignored). PostgreSQL 18 client is installed at `C:\Program Files\PostgreSQL\18\bin`. **Never been run yet** — needs the owner's Session-pooler connection string (pasted at the prompt, never saved, never sent in chat). |
+
+### To do, in order
+
+1. **First real backup** of `cwrkquzuuyhfhesozqnb` with `backup-db.ps1` (owner runs it). Then
+   schedule it nightly with Windows Task Scheduler (offered, not done).
+2. **Check the Supabase organization**: if `cwrkquzuuyhfhesozqnb` is in the same organization as
+   the exhausted test project, the egress quota is shared — split it out or upgrade to Pro before
+   the next billing cycle, or the live system stops with 402.
+3. **When the VPS details arrive** (OS should be Ubuntu 24.04 — part 34 decision), ask for: IP,
+   SSH access, specs (CPU/RAM/disk), and the **two domains** (staff + customer, e.g.
+   `app.imode.co.th` / `service.imode.co.th`) with DNS pointed at the VPS.
+4. **Write the server install guide** (`production/INSTALL.md` or `docs/MIGRATION.md`): Ubuntu,
+   Docker, self-hosted Supabase (keeps realtime), Caddy for HTTPS (mandatory — camera QR scan,
+   GPS and the service worker need it), firewall, nightly `pg_dump` copied off the machine plus
+   one rehearsed restore.
+5. **Database on the VPS**: run `01-schema.sql` + `02-security.sql`, then **move the data with a
+   dump of `cwrkquzuuyhfhesozqnb`**, NOT `seed/03-real-data.sql` — the team has added machines,
+   cases and quotations since the seed was built (2026-09-27); the seed would lose them. Staff
+   logins come from the `-auth.sql` file of the backup.
+6. **Fill the 4 `REPLACE_ME` values** in `tools/production/production.config.json`
+   (customerHost, staffHost, supabaseUrl, supabaseAnonKey from the VPS `.env`) and build:
+   `node tools\production\build-web.js --strict` → `production/web/`. Run `npm test` first.
+7. Upload `web/`, test on the real domains (staff sign-in, customer QR/S-N, แจ้งปัญหา, phone).
+8. **QR codes**: every QR made so far points at `…github.io/ImodeService/app/`. Either reprint
+   them after the move, or keep `/app/` redirecting to the new customer domain for ever. Do not
+   switch GitHub Pages off.
+9. Then retire the old test site at the repo root (it shares localStorage with `/app/`).
+
+### Can be done while waiting (not started)
+
+- Photos/signatures out of the rows into Storage (`docs/STORAGE-PLAN.md`) — biggest egress win.
+- Sync only rows changed since the last sync; technician-scoped sync (part 36 decision).
+- Hide the "ผู้ใช้ทดสอบ / เลือกผู้ใช้งาน" link on the `/app/` staff door (part 39 open #3).
+- Owner: machine photos by model (`machinery_images/`); collect team feedback on `/app/`.

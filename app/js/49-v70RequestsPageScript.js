@@ -242,13 +242,13 @@
  function actionsHTML(r){
   var out='';
   if(r.caseId)out+='<button type="button" class="req-act" onclick="event.stopPropagation();'
-   +'imodeOpenRequestCase(&quot;'+esc2(r.caseId)+'&quot;)">'+esc2(tl('เปิดเคส','Open case'))+'</button>';
+   +'imodeOpenRequestCase('+imodeJsArg(r.caseId)+')">'+esc2(tl('เปิดเคส','Open case'))+'</button>';
   if(r.type==='service_quote'&&can('quotation.create'))
    out+='<button type="button" class="req-act" onclick="event.stopPropagation();'
-    +'prepareServiceQuoteFromRequest(&quot;'+esc2(r.id)+'&quot;)">'+esc2(tl('ทำใบเสนอราคา','Quote'))+'</button>';
+    +'prepareServiceQuoteFromRequest('+imodeJsArg(r.id)+')">'+esc2(tl('ทำใบเสนอราคา','Quote'))+'</button>';
   if(r.type==='warranty_quote'&&can('quotation.create'))
    out+='<button type="button" class="req-act" onclick="event.stopPropagation();'
-    +'prepareWarrantyQuoteFromRequest(&quot;'+esc2(r.id)+'&quot;)">'+esc2(tl('ทำใบเสนอราคา','Quote'))+'</button>';
+    +'prepareWarrantyQuoteFromRequest('+imodeJsArg(r.id)+')">'+esc2(tl('ทำใบเสนอราคา','Quote'))+'</button>';
   /* The สถานะ button is gone on purpose. A คำขอ is an inbox item, not a second place to
      track a job: once somebody picks the case up it leaves this page altogether and the
      Service Cases page is the one record of where the work stands. */
@@ -257,7 +257,7 @@
      ประวัติคำขอ delete the same way. Same key js/61 checks: line.manage. */
   if(can('line.manage')&&typeof window.imodeDeleteRequest==='function')
    out+='<button type="button" class="req-act req-act-del" onclick="event.stopPropagation();'
-    +'imodeRequestsDelete(&quot;'+esc2(r.id)+'&quot;)">🗑 '+esc2(tl('ลบ','Delete'))+'</button>';
+    +'imodeRequestsDelete('+imodeJsArg(r.id)+')">🗑 '+esc2(tl('ลบ','Delete'))+'</button>';
   return out;
  }
  window.imodeRequestsDelete=function(id){

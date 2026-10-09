@@ -212,7 +212,7 @@
  }
  function row(c){
   var fs=String(c.fieldStatus||'');
-  return '<button type="button" class="fa-row" onclick="imodeFieldAllOpen(\''+esc2(c.id)+'\')">'
+  return '<button type="button" class="fa-row" onclick="imodeFieldAllOpen('+imodeJsArg(c.id)+')">'
    +'<span class="fa-main">'
    +'<b>'+esc2(c.ticket||c.id)+'</b>'
    +'<span class="fa-chips">'

@@ -181,7 +181,7 @@
    +'<div class="work-kpi-box"><small>'+esc2(tl('ทั้งหมด','Total'))+'</small><b>'+list.length+'</b></div>'
    +'</div>'
    +'<div class="work-list">'+(list.length?list.map(function(c){
-     return caseRow(c,'<button class="mini-btn" onclick="imodeOpenAssignedCase(\''+esc2(c.id)+'\')">'+esc2(tl('รายละเอียด','Details'))+'</button>'
+     return caseRow(c,'<button class="mini-btn" onclick="imodeOpenAssignedCase('+imodeJsArg(c.id)+')">'+esc2(tl('รายละเอียด','Details'))+'</button>'
       +' <button class="mini-btn" onclick="goPage(\'field-service\')">'+esc2(tl('เริ่มงาน','Start'))+'</button>');
     }).join(''):'<div class="empty">'+esc2(tl('ยังไม่มีงานที่มอบหมายให้คุณ','Nothing has been assigned to you yet'))+'</div>')+'</div>'
    +'</div>';

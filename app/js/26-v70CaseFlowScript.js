@@ -229,7 +229,7 @@
     +'<div id="fieldStatusMediaGrid" class="status-media-grid"></div>'
     +'<div class="button-row" style="margin-top:14px">'
     +'<button type="button" class="soft-btn" onclick="closeModal()">'+esc2(tl('ยกเลิก','Cancel'))+'</button>'
-    +'<button type="button" class="soft-btn" onclick="saveFieldStatus(\''+esc2(c.id)+'\')">'
+    +'<button type="button" class="soft-btn" onclick="saveFieldStatus('+imodeJsArg(c.id)+')">'
     +esc2(tl('บันทึกสถานะที่เลือก','Save selected status'))+'</button></div>',true);
    /* One step per press: point the select the save path reads at the chosen status, then
       hand over to the untouched saveFieldStatus(). */
@@ -271,7 +271,7 @@
       +'<div class="field-closed-list">'+done.map(function(c){
         return '<div class="field-closed-row"><b>'+esc2(c.ticket||c.id)+'</b>'
          +'<small>'+esc2(c.customer||'-')+' · '+esc2(c.machine||'-')+'</small>'
-         +'<button type="button" class="mini-btn" onclick="imodeOpenCase(\''+esc2(c.id)+'\')">'
+         +'<button type="button" class="mini-btn" onclick="imodeOpenCase('+imodeJsArg(c.id)+')">'
          +esc2(tl('รายละเอียด','Details'))+'</button></div>';
        }).join('')+'</div>';
     host.parentNode.insertBefore(box,host.nextSibling);

@@ -304,7 +304,7 @@
    bottom='<div class="person-stat"><span>'+esc2(tl('งานเปิด','Open jobs'))+'</span><b>'+techCaseCount(tech.id)+'</b></div>'
     +'<div class="person-actions">'
     +'<button class="soft-btn" type="button" data-tacc-jobs="'+esc2(tech.id)+'">'+esc2(tl('งานหน้างาน','Field jobs'))+'</button>'
-    +'<button class="soft-btn" type="button" onclick="openTechnicianDetail(\''+esc2(tech.id)+'\')">'+esc2(tl('รายละเอียด','Details'))+'</button>'
+    +'<button class="soft-btn" type="button" onclick="openTechnicianDetail('+imodeJsArg(tech.id)+')">'+esc2(tl('รายละเอียด','Details'))+'</button>'
     +(mayEdit(a)?'<button class="primary-btn" type="button" data-tacc-techedit="'+idx+'">'+esc2(tl('แก้ไข','Edit'))+'</button>':'')
     +'</div>';
   }else{

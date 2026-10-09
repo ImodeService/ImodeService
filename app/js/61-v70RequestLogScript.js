@@ -165,16 +165,16 @@
   var media=Array.isArray(r.media)?r.media.length:0;
   var acts='';
   if(c)acts+='<button type="button" class="rl-act" onclick="event.stopPropagation();'
-   +'imodeOpenCase(&quot;'+esc2(c.id)+'&quot;)">'+esc2(tl('เปิดเคส','Open case'))+'</button>';
+   +'imodeOpenCase('+imodeJsArg(c.id)+')">'+esc2(tl('เปิดเคส','Open case'))+'</button>';
   if(r.type==='service_quote'&&can('quotation.create'))
    acts+='<button type="button" class="rl-act" onclick="event.stopPropagation();'
-    +'prepareServiceQuoteFromRequest(&quot;'+esc2(r.id)+'&quot;)">'+esc2(tl('ทำใบเสนอราคา','Quote'))+'</button>';
+    +'prepareServiceQuoteFromRequest('+imodeJsArg(r.id)+')">'+esc2(tl('ทำใบเสนอราคา','Quote'))+'</button>';
   if(r.type==='warranty_quote'&&can('quotation.create'))
    acts+='<button type="button" class="rl-act" onclick="event.stopPropagation();'
-    +'prepareWarrantyQuoteFromRequest(&quot;'+esc2(r.id)+'&quot;)">'+esc2(tl('ทำใบเสนอราคา','Quote'))+'</button>';
+    +'prepareWarrantyQuoteFromRequest('+imodeJsArg(r.id)+')">'+esc2(tl('ทำใบเสนอราคา','Quote'))+'</button>';
   if(can('line.manage'))
    acts+='<button type="button" class="rl-act is-danger" onclick="event.stopPropagation();'
-    +'imodeDeleteRequest(&quot;'+esc2(r.id)+'&quot;)">🗑 '+esc2(tl('ลบประวัติ','Delete'))+'</button>';
+    +'imodeDeleteRequest('+imodeJsArg(r.id)+')">🗑 '+esc2(tl('ลบประวัติ','Delete'))+'</button>';
 
   return '<tr data-req="'+esc2(r.id)+'">'
    +'<td>'+esc2(fmtAt(r.createdAt))+'</td>'
@@ -205,7 +205,7 @@
 
   function card(id,icon,label,n){
    return '<button type="button" class="module-kpi-card" aria-pressed="'+(state.type===id)+'"'
-    +' onclick="imodeReqLogSet(\'type\',\''+esc2(id)+'\')">'
+    +' onclick="imodeReqLogSet(\'type\','+imodeJsArg(id)+')">'
     +'<i class="rl-ico" aria-hidden="true">'+icon+'</i>'
     +'<small class="rl-name">'+esc2(label)+'</small>'
     +'<b>'+n+'</b><span>'+esc2(tl('รายการ','items'))+'</span></button>';

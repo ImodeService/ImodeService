@@ -186,7 +186,11 @@
   if(!w){if(typeof toastMsg==='function')toastMsg('Browser บล็อกหน้าต่างพิมพ์ กรุณาอนุญาต Pop-up');return}
   var logo=logoUrl();
   var url=addUrl();
-  w.document.write('<!doctype html><html lang="th"><head><meta charset="utf-8"><title>LINE OA '+oaId()+'</title>'
+  /* oaId() and addUrl() come from settings.lineConfig, which any staff role can write: escape the
+     id for HTML, and keep the URL from closing the inline <script> (</script> -> <\/script>). */
+  var e=(typeof esc==='function')?esc:function(v){return String(v==null?'':v)};
+  var urlJs=JSON.stringify(String(url==null?'':url)).replace(/</g,'\\u003c');
+  w.document.write('<!doctype html><html lang="th"><head><meta charset="utf-8"><title>LINE OA '+e(oaId())+'</title>'
    +'<scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></scr'+'ipt>'
    +'<style>body{font-family:Arial,sans-serif;text-align:center;padding:24px}'
    +'.label{width:340px;margin:auto;border:2px solid #06c755;border-radius:20px;padding:18px}'
@@ -199,9 +203,9 @@
    +'<div class="label"><img class="logo" src="'+logo+'"><div class="brand">LINE</div>'
    +'<div class="title">เพิ่มเพื่อนเพื่อรับบริการ</div>'
    +'<div class="small">แจ้งงาน • ติดตามสถานะ • ติดต่อทีม Service</div>'
-   +'<div id="q"></div><div class="id">'+oaId()+'</div>'
+   +'<div id="q"></div><div class="id">'+e(oaId())+'</div>'
    +'<div class="small">I-MODE Plus Service &amp; Maintenance</div></div>'
-   +'<scr'+'ipt>window.onload=function(){new QRCode(document.getElementById("q"),{text:'+JSON.stringify(url)
+   +'<scr'+'ipt>window.onload=function(){new QRCode(document.getElementById("q"),{text:'+urlJs
    +',width:210,height:210,colorDark:"#06c755"});setTimeout(function(){window.print()},600)}</scr'+'ipt>'
    +'</body></html>');
   w.document.close();

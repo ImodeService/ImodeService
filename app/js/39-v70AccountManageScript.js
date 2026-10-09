@@ -510,7 +510,7 @@
      work without losing your place in it. */
   function row(call,id,head,sub){
    if(!id)return '<div>'+'<b>'+esc2(head)+'</b><small>'+esc2(sub)+'</small></div>';
-   return '<button type="button" class="accthist-row" onclick="'+esc2(call)+'(&#39;'+esc2(id)+'&#39;)">'
+   return '<button type="button" class="accthist-row" onclick="'+esc2(call)+'('+imodeJsArg(id)+')">'
     +'<b>'+esc2(head)+'</b><small>'+esc2(sub)+'</small><i aria-hidden="true">›</i></button>';
   }
   return '<div class="accthist-head"><div><b>'+esc2(acc.username||'-')+'</b><small>'+esc2(acc.name||'-')+' · '+esc2(acc.role||'-')+' · '+esc2(acc.team||'-')+'</small></div>'

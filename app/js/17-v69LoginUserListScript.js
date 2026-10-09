@@ -126,7 +126,7 @@
   var avatar=(typeof loginAvatarHTML==='function')?loginAvatarHTML(u):'';
   var none=!hasAccount(u);
   return '<div class="login-user-item'+(none?' is-accountless':'')+'">'
-   +'<div class="left" onclick="chooseUser(\''+esc2(u.id)+'\')">'+avatar
+   +'<div class="left" onclick="chooseUser('+imodeJsArg(u.id)+')">'+avatar
    +'<div><b>'+esc2(u.name)+'</b>'
    +(u.nameTh?'<small class="login-user-th">'+esc2(u.nameTh)+'</small>':'')
    +'<small>'+esc2(u.role||'')+'</small></div></div>'
@@ -134,7 +134,7 @@
    +(none?'<span class="login-noaccount">'+esc2(tl('ไม่มีบัญชี','no account'))+'</span>':'')
    +'<button type="button" class="login-user-del" title="'+esc2(tl('ลบออกจากรายชื่อ','Remove from the list'))+'"'
    +' aria-label="'+esc2(tl('ลบ','Remove'))+' '+esc2(u.name)+'"'
-   +' onclick="imodeRemoveLoginUser(\''+esc2(u.id)+'\')">✕</button>'
+   +' onclick="imodeRemoveLoginUser('+imodeJsArg(u.id)+')">✕</button>'
    +'</div>';
  }
 

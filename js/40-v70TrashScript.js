@@ -567,7 +567,7 @@
      compact card they were designed with. */
   function card(kind,icon,label,n){
    return '<button type="button" class="module-kpi-card" data-kind="'+esc2(kind)+'"'
-    +' aria-pressed="'+(filterType===kind)+'" onclick="imodeTrashFilter(\''+esc2(kind)+'\')">'
+    +' aria-pressed="'+(filterType===kind)+'" onclick="imodeTrashFilter('+imodeJsArg(kind)+')">'
     +'<i class="tk-ico" aria-hidden="true">'+esc2(icon)+'</i>'
     +'<small class="tk-name">'+esc2(label)+'</small>'
     +'<b>'+n+'</b><span>'+esc2(tl('รายการ','items'))+'</span></button>';

@@ -33,10 +33,10 @@
   if(km){
    qDistance.value=km;
    try{quoteDistanceSource='customer_setting';quoteRouteDurationMinutes=0}catch(e){}
-   if(st)st.innerHTML='📍 ใช้ระยะทางที่ตั้งไว้ของลูกค้านี้: <b>'+fmtKm(km)+' km</b> (เที่ยวเดียว) · <button type="button" class="link-button" onclick="openCustomerDistanceModal(\''+esc2(cid)+'\')">แก้ในตั้งค่า</button>';
+   if(st)st.innerHTML='📍 ใช้ระยะทางที่ตั้งไว้ของลูกค้านี้: <b>'+fmtKm(km)+' km</b> (เที่ยวเดียว) · <button type="button" class="link-button" onclick="openCustomerDistanceModal('+imodeJsArg(cid)+')">แก้ในตั้งค่า</button>';
    try{calcQuote()}catch(e){}
   }else if(st){
-   st.innerHTML='ยังไม่ได้ตั้งระยะทางของลูกค้านี้ · กรอกเองในช่อง (km) หรือ <button type="button" class="link-button" onclick="openCustomerDistanceModal(\''+esc2(cid)+'\')">ตั้งระยะทางถาวร</button>';
+   st.innerHTML='ยังไม่ได้ตั้งระยะทางของลูกค้านี้ · กรอกเองในช่อง (km) หรือ <button type="button" class="link-button" onclick="openCustomerDistanceModal('+imodeJsArg(cid)+')">ตั้งระยะทางถาวร</button>';
   }
  }
  ['quoteCustomerChanged','loadCaseIntoQuote'].forEach(function(name){
@@ -70,7 +70,7 @@
    return '<tr data-cdist-row data-q="'+esc2((c.name+' '+c.id+' '+addr).toLowerCase())+'">'
     +'<td><b>'+esc2(c.name||c.id)+'</b><br><small style="color:#6b7890">'+esc2(c.id)+(addr?' · '+esc2(addr):'')+'</small></td>'
     +'<td class="cdist-cell"><div class="cdist-box"><input type="number" min="0" step="0.1" inputmode="decimal" data-cdist="'+esc2(c.id)+'" value="'+(km||'')+'" placeholder="—"><span>km</span></div>'
-    +(mapUrl(c)?'<button type="button" class="cdist-map" title="เปิดเส้นทางใน Google Maps แล้วนำระยะทางมากรอก" onclick="imodeCustomerDistanceMap(\x27'+esc2(c.id)+'\x27)">📍 Maps</button>':'<span class="cdist-nomap">ไม่มีที่อยู่</span>')+'</td></tr>';
+    +(mapUrl(c)?'<button type="button" class="cdist-map" title="เปิดเส้นทางใน Google Maps แล้วนำระยะทางมากรอก" onclick="imodeCustomerDistanceMap('+imodeJsArg(c.id)+')">📍 Maps</button>':'<span class="cdist-nomap">ไม่มีที่อยู่</span>')+'</td></tr>';
   }).join('');
   openModal('ระยะทางลูกค้า (Auto)','กรอกระยะทางเที่ยวเดียวจากบริษัทถึงลูกค้า (km) ครั้งเดียว — เวลาเลือกลูกค้าในใบเสนอราคา ระบบจะเติมให้เอง',
    '<div class="field"><input id="cdistSearch" placeholder="ค้นหาลูกค้า / รหัส / ที่อยู่" oninput="imodeFilterCustomerDistance(this.value)"></div>'
@@ -90,7 +90,9 @@
    var dest=quoteMapsPoint(googleRouteDestination(c));
    if(dest)return 'https://www.google.com/maps/dir/?api=1&travelmode=driving&origin='+encodeURIComponent(quoteMapsPoint(googleRouteOrigin()))+'&destination='+encodeURIComponent(dest);
   }catch(e){}
-  return c&&c.mapUrl||'';
+  /* 2026-10-09 security: a stored mapUrl is opened only if it is http(s) (js/03 imodeSafeUrl) */
+  var u=c&&c.mapUrl||'';
+  return typeof window.imodeSafeUrl==='function'?window.imodeSafeUrl(u):(/^https?:\/\//i.test(u)?u:'');
  }
  window.imodeCustomerDistanceMap=function(id){
   var c=null;try{c=customerById(id)}catch(e){}

@@ -116,16 +116,16 @@
  /* Builds the stage: one SVG of connector lines plus one absolutely placed node per item. */
  function buildStage(items,opts){
   const o=opts||{},mobile=mobileQuery.matches,lay=layout(items.length,mobile);
-  const lines=lay.nodes.map((p,i)=>`<line class="rhome-link" data-i="${i}" x1="${lay.cx}" y1="${lay.cy}" x2="${p.x.toFixed(1)}" y2="${p.y.toFixed(1)}"></line>`).join('');
+  const lines=lay.nodes.map((p,i)=>`<line class="rhome-link" data-i="${esc(String(i))}" x1="${lay.cx}" y1="${lay.cy}" x2="${p.x.toFixed(1)}" y2="${p.y.toFixed(1)}"></line>`).join('');
   const dots=lay.nodes.map(p=>{
    const mx=lay.cx+(p.x-lay.cx)*.55,my=lay.cy+(p.y-lay.cy)*.55;
    return `<circle class="rhome-link-dot" cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="4"></circle>`;
   }).join('');
   const nodes=items.map((it,i)=>{
    const p=lay.nodes[i],label=esc(L(it.th,it.en));
-   return `<button type="button" class="rhome-node${o.nodeClass?' '+o.nodeClass:''}" data-i="${i}"${it.page?` data-page="${esc(it.page)}"`:''}
+   return `<button type="button" class="rhome-node${o.nodeClass?' '+o.nodeClass:''}" data-i="${esc(String(i))}"${it.page?` data-page="${esc(it.page)}"`:''}
      style="left:${(p.x/lay.W*100).toFixed(2)}%;top:${(p.y/lay.H*100).toFixed(2)}%"
-     aria-label="${label}" title="${label}"><span class="rhome-node-icon" aria-hidden="true">${it.icon}</span><span class="rhome-node-label">${label}</span></button>`;
+     aria-label="${label}" title="${esc(String(label))}"><span class="rhome-node-icon" aria-hidden="true">${it.icon}</span><span class="rhome-node-label">${label}</span></button>`;
   }).join('');
   return `<div class="rhome-stage${mobile?' is-mobile':''}" style="--rhome-w:${lay.W};--rhome-h:${lay.H}">
     <svg class="rhome-links" viewBox="0 0 ${lay.W} ${lay.H}" preserveAspectRatio="none" aria-hidden="true">${lines}${dots}</svg>
@@ -316,7 +316,7 @@
 
  function moduleCard(m,i){
   const label=esc(L(m.th,m.en));
-  return `<button type="button" class="rhome-modcard" data-page="${esc(m.page)}" data-i="${i}" aria-label="${label}">
+  return `<button type="button" class="rhome-modcard" data-page="${esc(m.page)}" data-i="${esc(String(i))}" aria-label="${label}">
     <span class="rhome-modcard-icon" aria-hidden="true">${m.icon}</span>
     <span class="rhome-modcard-label">${label}</span>
    </button>`;

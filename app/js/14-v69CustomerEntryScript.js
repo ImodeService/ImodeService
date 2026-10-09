@@ -516,6 +516,8 @@
   }
   var cfg={};try{cfg=settings.lineConfig||{}}catch(e){}
   var url=String(cfg.addFriendUrl||'').trim();
+  /* 2026-10-09 security: never navigate to a stored javascript:/data: link (js/03 imodeSafeUrl) */
+  if(url)url=typeof window.imodeSafeUrl==='function'?window.imodeSafeUrl(url):(/^https?:\/\//i.test(url)?url:'');
   if(!url){
    var id=String(cfg.officialAccountId||'').trim();
    if(id)url='https://line.me/R/ti/p/'+encodeURIComponent(id.charAt(0)==='@'?id:'@'+id);

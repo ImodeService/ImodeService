@@ -292,7 +292,7 @@
   try{id=(String(qr.getAttribute('onclick')).match(/openCustomerPortalForMachine\('([^']+)'\)/)||[])[1]||''}catch(e){}
   if(!id)return;
   qr.insertAdjacentHTML('afterend','<button type="button" class="soft-btn" data-pwr-renew '
-   +'onclick="closeModal();imodeRenewWarranty(&#39;'+esc2(id)+'&#39;)">🛡 '
+   +'onclick="closeModal();imodeRenewWarranty('+imodeJsArg(id)+')">🛡 '
    +esc2(tl('ออก / ต่อประกัน','Issue or renew warranty'))+'</button>');
  }
  var baseModal=window.openModal;

@@ -188,7 +188,7 @@
  /* ----------------------------------------------------------- the buttons ---- */
  function binBtn(fn,id,label){
   return '<button type="button" class="soft-btn ra-del" data-ra-del="'+esc2(id)+'"'
-   +' onclick="'+fn+'(&quot;'+esc2(id)+'&quot;)">🗑 '+esc2(label)+'</button>';
+   +' onclick="'+fn+'('+imodeJsArg(id)+')">🗑 '+esc2(label)+'</button>';
  }
 
  /* The machine popup. openMachineDetail() draws its own .button-row; the delete is appended
@@ -257,7 +257,7 @@
       +esc2(id)+'&quot;)">✏ '+esc2(tl('แก้ไข','Edit'))+'</button>');
     box.insertAdjacentHTML('beforeend',
       '<button type="button" class="'+cls+' ra-del" data-ra-del="'+esc2(id)+'"'
-      +' onclick="event.stopPropagation();imodeDeleteQuotation(&quot;'+esc2(id)+'&quot;)">🗑 '
+      +' onclick="event.stopPropagation();imodeDeleteQuotation('+imodeJsArg(id)+')">🗑 '
       +esc2(tl('ลบ','Delete'))+'</button>');
    });
  }

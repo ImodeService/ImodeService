@@ -269,7 +269,7 @@
       +'<div class="button-row"><button type="button" class="soft-btn" onclick="closeModal()">'
       +esc2(tl('เก็บเป็นร่างไว้ก่อน','Keep it as a draft'))+'</button>'
       +'<button type="button" class="primary-btn action-3d-orange" '
-      +'onclick="closeModal();imodeSendQuoteToCustomer(\''+esc2(q.id)+'\')">'
+      +'onclick="closeModal();imodeSendQuoteToCustomer('+imodeJsArg(q.id)+')">'
       +esc2(tl('📤 ส่งให้ลูกค้า','📤 Send to the customer'))+'</button></div>',true);
     }catch(e){}
    };
@@ -411,7 +411,7 @@
    +'</div>'
    +'<div class="qv-row-side"><b class="qv-amount">'+money2(q.grand)+'</b>'
    +(draft&&can('quotation.create')
-     ?'<button type="button" class="qv-send" onclick="event.stopPropagation();imodeSendQuoteToCustomer(\''+esc2(q.id)+'\')">'
+     ?'<button type="button" class="qv-send" onclick="event.stopPropagation();imodeSendQuoteToCustomer('+imodeJsArg(q.id)+')">'
       +esc2(tl('📤 ส่งให้ลูกค้า','📤 Send'))+'</button>'
      :'<span class="qv-go">'+esc2(tl('ดูใบ','Open'))+' ›</span>')
    +'</div></div>';
@@ -537,14 +537,14 @@
    +'<button type="button" class="soft-btn" onclick="printQuotation()">🖨 '
    +esc2(tl('พิมพ์ / Save PDF','Print / Save PDF'))+'</button>'
    +(can('quotation.approve')
-     ?'<button type="button" class="soft-btn" onclick="openQuotationStatus(\''+esc2(q.id)+'\')">'
+     ?'<button type="button" class="soft-btn" onclick="openQuotationStatus('+imodeJsArg(q.id)+')">'
       +esc2(tl('สถานะ','Status'))+'</button>':'')
    +(can('quotation.create')
-     ?'<button type="button" class="soft-btn" onclick="closeModal();loadQuotation(\''+esc2(q.id)+'\')">✏ '
+     ?'<button type="button" class="soft-btn" onclick="closeModal();loadQuotation('+imodeJsArg(q.id)+')">✏ '
       +esc2(tl('แก้ไขในเครื่องคิดราคา','Edit in the calculator'))+'</button>':'')
    +(draft&&can('quotation.create')
      ?'<button type="button" class="primary-btn action-3d-orange" '
-      +'onclick="closeModal();imodeSendQuoteToCustomer(\''+esc2(q.id)+'\')">📤 '
+      +'onclick="closeModal();imodeSendQuoteToCustomer('+imodeJsArg(q.id)+')">📤 '
       +esc2(tl('ส่งให้ลูกค้า','Send to the customer'))+'</button>':'')
    +'</div>';
   window.openModal(tl('ใบเสนอราคา ','Quotation ')+q.id,

@@ -23,7 +23,7 @@
  var CLOSED={'เสร็จสิ้น':1,'ปิดเคส':1};
 
  function rowHTML(c){
-  return '<button type="button" class="tcase-row" onclick="imodeOpenCase(&#39;'+esc2(c.id)+'&#39;)">'
+  return '<button type="button" class="tcase-row" onclick="imodeOpenCase('+imodeJsArg(c.id)+')">'
    +'<b>'+esc2(c.ticket||c.id)+'</b>'
    +'<small>'+esc2(c.customer||'')+(c.machine?' · '+esc2(c.machine):'')+'</small>'
    +'<span class="tcase-st">'+esc2(c.status||'')+'</span>'
@@ -47,7 +47,7 @@
                 :'<p class="tcase-empty">'+esc2(tl('ยังไม่มีงานที่เปิดอยู่','No open jobs'))+'</p>')
    +(done.length?'<h4>'+esc2(tl('ปิดแล้ว','Closed'))+'</h4>'+done.map(rowHTML).join(''):'')
    +'<div class="button-row" style="margin-top:14px">'
-   +'<button type="button" class="soft-btn" onclick="closeModal();openFieldService(&#39;'+esc2(tid)+'&#39;)">'
+   +'<button type="button" class="soft-btn" onclick="closeModal();openFieldService('+imodeJsArg(tid)+')">'
    +esc2(tl('เปิดหน้างานของช่างคนนี้','Open their field workspace'))+'</button></div>'
    +'</div>';
   if(typeof window.openModal!=='function')return;

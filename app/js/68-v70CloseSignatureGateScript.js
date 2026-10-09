@@ -132,7 +132,7 @@
    + '<p class="signgate-note">'+esc(tl('ต้องให้ลูกค้าเซ็นรับงานในใบตรวจงานช่างก่อน จึงจะจบงานได้',
         'The customer must sign the inspection sheet before the job can be finished.'))+'</p>'
    + '<div class="signgate-acts">'
-   +  '<button type="button" class="primary-btn" onclick="imodeSignGateReport(\''+esc(c.id)+'\')">'
+   +  '<button type="button" class="primary-btn" onclick="imodeSignGateReport('+imodeJsArg(c.id)+')">'
    +   esc(tl('📝 เปิดใบตรวจ / ให้ลูกค้าเซ็น','Open the sheet to sign'))+'</button>'
    +  '<button type="button" class="soft-btn" onclick="closeModal()">'+esc(tl('ปิด','Close'))+'</button>'
    + '</div>'

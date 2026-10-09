@@ -55,11 +55,11 @@
  if(typeof baseHTML==='function'){
   window.signaturePadHTML=function(id,label){
    var html=baseHTML.apply(this,arguments);
-   var clear='<button type="button" class="mini-btn" onclick="clearSignaturePad(\''+id+'\')">ล้างลายเซ็น</button>';
+   var clear='<button type="button" class="mini-btn" onclick="clearSignaturePad('+imodeJsArg(id)+')">ล้างลายเซ็น</button>';
    /* If js/03's markup ever changes, leave it alone rather than corrupting it. */
    if(String(html).indexOf(clear)<0)return html;
    var undo='<button type="button" class="mini-btn sig-undo" id="'+id+'Undo" disabled'
-     +' onclick="imodeSignatureUndo(\''+id+'\')" title="ลบเส้นล่าสุด">↶ ย้อนกลับ</button>';
+     +' onclick="imodeSignatureUndo('+imodeJsArg(id)+')" title="ลบเส้นล่าสุด">↶ ย้อนกลับ</button>';
    /* A <div>, not a <span>: the ≤640px rule sets .signature-actions span{font-size:9.5px;
       max-width:65%} for the hint text, and a span wrapper would shrink both buttons with it. */
    return String(html).replace(clear,'<div class="sig-btns">'+undo+clear+'</div>');

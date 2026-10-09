@@ -72,7 +72,7 @@
   var body=rows.length
    ? '<div class="related-list">'+rows.map(function(c){
        return '<div class="related-item" style="cursor:pointer"'
-        +' onclick="closeModal();imodeOpenCase(&quot;'+esc2(c.id)+'&quot;)">'
+        +' onclick="closeModal();imodeOpenCase('+imodeJsArg(c.id)+')">'
         +'<b>📋 '+esc2(c.ticket||c.id)+' · '+esc2(c.status||'-')+'</b>'
         +'<small>'+esc2(c.customer||'-')+' · '+esc2(c.machine||'-')+' · '+esc2(fmtAt(c.createdAt))+'</small>'
         +'</div>';
@@ -89,7 +89,7 @@
    var body=list.length
     ? '<div class="related-list">'+list.map(function(b){
         return '<div class="related-item'+(b.n?'':' is-muted')+'"'
-         +(b.n?' style="cursor:pointer" onclick="imodeReportDrill(&quot;'+esc2(type)+'&quot;,&quot;'
+         +(b.n?' style="cursor:pointer" onclick="imodeReportDrill('+imodeJsArg(type)+',&quot;'
                +esc2(b.key)+'&quot;)"':'')
          +'><b>'+esc2(b.label)+'</b><small>'+b.n+' '+esc2(tl('รายการ','items'))
          +(b.n?' · '+esc2(tl('กดเพื่อดูรายชื่อเคส','tap for the cases')):'')+'</small></div>';

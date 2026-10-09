@@ -29,13 +29,11 @@
  var clientFor='';
 
  function cloudConfig(){
-  /* Auth may point at a different project than the data sync if authConfig says so.
-     `settings` is a global lexical binding, not a window property — see auth-core. */
-  var override={};
-  try{var s=window.ImodeAuth.appSettings();override=(s&&s.authConfig)||{}}catch(e){}
-  if(override.supabaseUrl&&override.supabaseKey){
-   return {url:String(override.supabaseUrl).trim(),key:String(override.supabaseKey).trim()};
-  }
+  /* 2026-10-09 security: sign-in talks ONLY to this device's own cloud config (imode_v5_cloud,
+     which js/23 pins to the shipped endpoint on the production build). It used to prefer
+     settings.authConfig.supabaseUrl/supabaseKey, but `settings` is the shared system_settings
+     row any staff role can write, so one account could send everyone's password to a server of
+     its choosing whenever the data client was not up yet. No screen ever set those two keys. */
   try{
    var raw=localStorage.getItem(CLOUD_KEY);
    var c=raw?JSON.parse(raw):null;

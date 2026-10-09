@@ -116,7 +116,7 @@
     survives until the chip itself is removed, which is precisely when the clock stops. */
  function buttonHTML(id){
   return '<button type="button" class="case-sla-done" data-sla-done="'+esc2(id)+'"'
-   +' onclick="event.stopPropagation();imodeMarkResponded(&quot;'+esc2(id)+'&quot;)">'
+   +' onclick="event.stopPropagation();imodeMarkResponded('+imodeJsArg(id)+')">'
    +esc2(tl('ตอบกลับแล้ว','Responded'))+'</button>';
  }
  function doneChipHTML(c){
@@ -185,7 +185,7 @@
     if(c.respondedAt)row.insertAdjacentHTML('afterbegin',doneChipHTML(c));
     else if(c.status==='เคสใหม่'&&can('case.assign'))row.insertAdjacentHTML('afterbegin',
      '<button type="button" class="soft-btn" data-sla-done="'+esc2(c.id)+'"'
-     +' onclick="imodeMarkResponded(&quot;'+esc2(c.id)+'&quot;)">⏱ '
+     +' onclick="imodeMarkResponded('+imodeJsArg(c.id)+')">⏱ '
      +esc2(tl('ตอบกลับแล้ว','Responded'))+'</button>');
    }catch(e){}
    return r;

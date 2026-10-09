@@ -201,7 +201,7 @@
      ['no',tl('ยังไม่ได้อนุมัติ','Not approved'),pending]].map(function(o){
      return '<button type="button" class="pqa-fbtn pqa-f-'+o[0]+(filter===o[0]?' is-on':'')+'"'
       +' aria-pressed="'+(filter===o[0]?'true':'false')+'"'
-      +' onclick="imodePortalQuoteFilter(\''+o[0]+'\')">'+esc2(o[1])+' ('+o[2]+')</button>';
+      +' onclick="imodePortalQuoteFilter('+imodeJsArg(o[0])+')">'+esc2(o[1])+' ('+o[2]+')</button>';
     }).join('')
    +'</div>';
   if(head)head.insertAdjacentHTML('afterend',bar);

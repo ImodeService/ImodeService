@@ -143,7 +143,7 @@
    var mine=a.username===me;
    return '<button type="button" class="acctsw-btn'+(mine?' is-current':'')+'"'
     +(mine?' aria-current="true"':'')
-    +' onclick="imodeQuickSwitch(\''+esc2(a.username)+'\')">'
+    +' onclick="imodeQuickSwitch('+imodeJsArg(a.username)+')">'
     +'<b>'+esc2(a.username)+'</b><small>'+sub+'</small>'
     +(mine?'<i>'+esc2(tl('ใช้งานอยู่','signed in'))+'</i>':'')
     +'</button>';

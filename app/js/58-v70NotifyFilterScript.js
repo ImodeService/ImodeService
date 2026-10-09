@@ -50,7 +50,7 @@
 
  function rowHTML(n){
   return '<div class="notification-row '+(n.read?'':'unread')+'" style="cursor:pointer"'
-   +' onclick="openNotificationDetail(\''+esc2(n.key)+'\')">'
+   +' onclick="openNotificationDetail('+imodeJsArg(n.key)+')">'
    +'<span class="stack-icon">'+(n.icon||'🔔')+'</span>'
    +'<div><h4>'+esc2(n.title)+'</h4><p>'+esc2(n.message)+'</p></div>'
    +'<small>'+esc2(fmtAt(n.createdAt))+'</small></div>';
@@ -61,7 +61,7 @@
   list.forEach(function(n){var c=catOf(n);counts[c]=(counts[c]||0)+1});
   function card(id,icon,label,n){
    return '<button type="button" class="module-kpi-card" aria-pressed="'+(state.cat===id)+'"'
-    +' onclick="imodeNotifyCat(\''+esc2(id)+'\')">'
+    +' onclick="imodeNotifyCat('+imodeJsArg(id)+')">'
     +'<i class="nk-ico" aria-hidden="true">'+icon+'</i>'
     +'<small class="nk-name">'+esc2(label)+'</small>'
     +'<b>'+n+'</b><span>'+esc2(tl('รายการ','items'))+'</span></button>';

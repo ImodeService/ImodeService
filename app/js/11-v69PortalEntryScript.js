@@ -48,7 +48,10 @@
  /* ---------- 2. LINE OA exit target ---------- */
  function lineOaUrl(){
   var c=cfg();
+  /* 2026-10-09 security: a stored link is opened only if it is http(s)/line (js/03 imodeSafeUrl) */
   var add=String(c.addFriendUrl||'').trim();
+  if(add&&typeof window.imodeSafeUrl==='function')add=window.imodeSafeUrl(add);
+  else if(add&&!/^https?:\/\//i.test(add))add='';
   if(add)return add;
   var id=String(c.officialAccountId||'').trim();
   if(!id)return'';

@@ -33,14 +33,22 @@
   }
   function lineOfficialUrl(){
     var cfg=getConfig();
-    var add=String(cfg.addFriendUrl||'').trim();
+    var add=safeUrl(String(cfg.addFriendUrl||'').trim());
     if(add)return add;
     var id=String(cfg.officialAccountId||'').trim();
     if(!id)return'';
     if(id.charAt(0)!=='@')id='@'+id;
     return 'https://line.me/R/ti/p/'+encodeURIComponent(id);
   }
+  /* 2026-10-09 security: addFriendUrl is a stored, staff-editable link. A "javascript:" value
+     must never be opened - and the location.href fallback below always runs, because
+     window.open with 'noopener' returns null. js/03 imodeSafeUrl keeps http(s)/line/tel/mailto. */
+  function safeUrl(u){
+    if(typeof window.imodeSafeUrl==='function')return window.imodeSafeUrl(u);
+    return /^https?:\/\//i.test(String(u||''))?String(u):'';
+  }
   function openExternal(url){
+    url=safeUrl(url);
     if(!url)return false;
     try{
       if(typeof liff!=='undefined'&&liff&&typeof liff.isInClient==='function'&&liff.isInClient()&&typeof liff.openWindow==='function'){

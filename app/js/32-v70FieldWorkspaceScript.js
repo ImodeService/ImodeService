@@ -232,7 +232,7 @@
     +esc2(tl('ถัดไป: ','Next: '))+esc2(nx)+' →</button>';
   else btns+='<span class="fw-final">'+esc2(tl('งานหน้างานถึงขั้นสุดท้ายแล้ว','The field job is at its last step'))+'</span>';
   if(cur!==hold&&nx)btns+='<button type="button" class="soft-btn fw-next" data-status="'+esc2(hold)+'">📦 '+esc2(hold)+'</button>';
-  btns+='<button type="button" class="soft-btn" onclick="openFieldStatusModal(\''+esc2(c.id)+'\')">📷 '
+  btns+='<button type="button" class="soft-btn" onclick="openFieldStatusModal('+imodeJsArg(c.id)+')">📷 '
     +esc2(tl('บันทึกสถานะพร้อมรูป','Save status with evidence'))+'</button>';
   return '<div class="fw-statusbar">'
    +'<div class="fw-statusnow"><small>'+esc2(tl('สถานะหน้างาน','Field status'))+'</small>'
@@ -261,9 +261,9 @@
      technician's own screen it read as an action that had happened when none had. The
      function is untouched and still reachable from the coordinator's case list. */
   var b=[
-   ['📍',tl('Check-in','Check-in'),'fieldCheckIn(\''+esc2(c.id)+'\')',''],
-   ['🗺',tl('นำทาง','Navigate'),'openMapForCase(\''+esc2(c.id)+'\')',mapReady?'':' muted-btn'],
-   ['📞',tl('โทรลูกค้า','Call'),'callCaseCustomer(\''+esc2(c.id)+'\')',''],
+   ['📍',tl('Check-in','Check-in'),'fieldCheckIn('+imodeJsArg(c.id)+')',''],
+   ['🗺',tl('นำทาง','Navigate'),'openMapForCase('+imodeJsArg(c.id)+')',mapReady?'':' muted-btn'],
+   ['📞',tl('โทรลูกค้า','Call'),'callCaseCustomer('+imodeJsArg(c.id)+')',''],
    ['📅',tl('ปฏิทินงาน','Calendar'),'goPage(\'calendar\')','']
   ];
   return '<div class="fw-actions">'+b.map(function(x){

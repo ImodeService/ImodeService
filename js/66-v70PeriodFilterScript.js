@@ -76,13 +76,13 @@
    +'<div class="imp-modes">'+MODES.map(function(m){
      var on=s.mode===m[0];
      return '<button type="button" class="imp-mode'+(on?' is-on':'')+'" aria-pressed="'+on+'"'
-      +' onclick="imodePeriodSet(\''+esc2(key)+'\',\''+m[0]+'\')">'+esc2(tl(m[1],m[2]))+'</button>';
+      +' onclick="imodePeriodSet('+imodeJsArg(key)+','+imodeJsArg(m[0])+')">'+esc2(tl(m[1],m[2]))+'</button>';
     }).join('')+'</div>'
    +(s.mode==='all'?'':'<div class="imp-step">'
-     +'<button type="button" class="imp-arrow" onclick="imodePeriodStep(\''+esc2(key)+'\',-1)" aria-label="'+esc2(tl('ช่วงก่อนหน้า','Previous'))+'">‹</button>'
+     +'<button type="button" class="imp-arrow" onclick="imodePeriodStep('+imodeJsArg(key)+',-1)" aria-label="'+esc2(tl('ช่วงก่อนหน้า','Previous'))+'">‹</button>'
      +'<b class="imp-label">'+esc2(label(key))+'</b>'
-     +'<button type="button" class="imp-arrow" onclick="imodePeriodStep(\''+esc2(key)+'\',1)" aria-label="'+esc2(tl('ช่วงถัดไป','Next'))+'">›</button>'
-     +(isNow(key)?'':'<button type="button" class="imp-now" onclick="imodePeriodNow(\''+esc2(key)+'\')">'+esc2(tl('ปัจจุบัน','Now'))+'</button>')
+     +'<button type="button" class="imp-arrow" onclick="imodePeriodStep('+imodeJsArg(key)+',1)" aria-label="'+esc2(tl('ช่วงถัดไป','Next'))+'">›</button>'
+     +(isNow(key)?'':'<button type="button" class="imp-now" onclick="imodePeriodNow('+imodeJsArg(key)+')">'+esc2(tl('ปัจจุบัน','Now'))+'</button>')
      +'</div>')
    +'</div>';
  }

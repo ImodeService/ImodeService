@@ -3,6 +3,9 @@
 
        node tools/build-web.js            build; placeholders in production.config.json are a warning
        node tools/build-web.js --strict   build for real upload; a placeholder is an error
+       node tools/build-web.js --strict --audience=customer
+                                          the customer domain's folder (web-customer/), the one
+                                          search engines may index; the default is the staff one
 
    web/ is GENERATED. Do not edit it: change the source in the development repository and build
    again, or the next build throws the change away. One source is the whole point — two copies
@@ -35,7 +38,13 @@ const ROOT = __dirname;                         // tools/production: configs + v
 const REPO = path.resolve(__dirname, '../..');     // the repository root (the source)
 // --config=<file> and --out=<dir> exist for test builds only; a real upload uses the defaults.
 const arg = k => (process.argv.find(a => a.startsWith('--' + k + '=')) || '').split('=').slice(1).join('=');
-const OUT = path.resolve(arg('out') || path.join(REPO, 'production', 'web'));
+/* --audience=customer builds the folder the CUSTOMER hostname serves (default web-customer/):
+   the same app, but its front page is open to search engines (title, description, canonical,
+   robots.txt that allows it, sitemap.xml). The default audience, staff, is hidden from them
+   (noindex + robots Disallow) — the back office must never show up in a Google result. */
+const AUDIENCE = arg('audience') || 'staff';
+if (!/^(staff|customer)$/.test(AUDIENCE)) { console.error('--audience must be staff or customer'); process.exit(1); }
+const OUT = path.resolve(arg('out') || path.join(REPO, 'production', AUDIENCE === 'customer' ? 'web-customer' : 'web'));
 const CFG = JSON.parse(fs.readFileSync(path.resolve(arg('config') || path.join(ROOT, 'production.config.json')), 'utf8'));
 const SRC = path.resolve(CFG.source || REPO);
 const STRICT = process.argv.includes('--strict');
@@ -81,7 +90,53 @@ function html(text, file) {
   text = text.replace(/https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/qrcodejs\/1\.0\.0\/qrcode\.min\.js/g, './vendor/qrcode.min.js');
   if (!/<meta charset[^>]*>/i.test(text)) problems.push(file + ': no <meta charset> to put 00-env.js after');
   text = text.replace(/(<meta charset[^>]*>)/i, '$1\n' + ENV_TAG);
-  return text;
+  return searchHead(text, file);
+}
+
+// ---------- 2b. what search engines see ----------
+const placeholder = v => !v || /REPLACE_ME/.test(String(v));
+const SITE = AUDIENCE === 'customer' && !placeholder(CFG.customerHost) ? 'https://' + CFG.customerHost + '/' : '';
+if (AUDIENCE === 'customer' && !SITE) problems.push('--audience=customer needs customerHost in the config (the customer domain)');
+if (AUDIENCE === 'customer' && CFG.customerByUrl) problems.push('--audience=customer needs its own customer domain; customerByUrl serves both audiences from one');
+const htmlEsc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+function searchHead(text, file) {
+  if (!(AUDIENCE === 'customer' && file === 'index.html')) {
+    // the staff app, and service-case-detail.html everywhere: never in a search result
+    return text.replace(/(<meta charset[^>]*>)/i, '$1\n  <meta name="robots" content="noindex, nofollow">');
+  }
+  const title = 'แจ้งซ่อม เช็คประกัน สแกน QR เครื่อง | I-MODE Plus Service';
+  const desc = 'บริการหลังการขาย I-MODE Plus: สแกน QR บนเครื่องหรือกรอก Serial No. เพื่อแจ้งปัญหา ขอใบเสนอราคา ตรวจสอบการรับประกัน ดูประวัติซ่อมและคู่มือเครื่อง โทร 02-727-0130';
+  const logo = SITE + 'assets/imode-document-logo.webp';
+  const org = {
+    '@context': 'https://schema.org', '@type': 'Organization',
+    name: 'I-MODE Plus Co., Ltd.', alternateName: 'บริษัท ไอโมด พลัส จำกัด',
+    url: SITE, logo: logo,
+    address: { '@type': 'PostalAddress', streetAddress: '241/46 Kanchanaphisek Rd., Dokmai', addressLocality: 'Prawes', addressRegion: 'Bangkok', postalCode: '10250', addressCountry: 'TH' },
+    contactPoint: { '@type': 'ContactPoint', telephone: '+66-2-727-0130', contactType: 'customer service', availableLanguage: ['Thai', 'English'] },
+  };
+  const head = [
+    '<title>' + htmlEsc(title) + '</title>',
+    '  <meta name="description" content="' + htmlEsc(desc) + '">',
+    '  <link rel="canonical" href="' + SITE + '">',
+    CFG.googleSiteVerification ? '  <meta name="google-site-verification" content="' + htmlEsc(CFG.googleSiteVerification) + '">' : '',
+    '  <meta property="og:type" content="website">',
+    '  <meta property="og:site_name" content="I-MODE Plus Service">',
+    '  <meta property="og:title" content="' + htmlEsc(title) + '">',
+    '  <meta property="og:description" content="' + htmlEsc(desc) + '">',
+    '  <meta property="og:url" content="' + SITE + '">',
+    '  <meta property="og:image" content="' + logo + '">',
+    '  <meta property="og:locale" content="th_TH">',
+    '  <script type="application/ld+json">' + JSON.stringify(org) + '</script>',
+  ].filter(Boolean).join('\n');
+  // Readable without JavaScript; the app draws the real scan / serial page over it as usual.
+  const noscript = '<noscript><div style="max-width:640px;margin:24px auto;padding:0 16px;font-family:sans-serif;color:#0b2f8f">'
+    + '<h1>I-MODE Plus Service · บริการหลังการขาย</h1>'
+    + '<p>สแกน QR บนเครื่องจักร หรือกรอก Serial No. เพื่อแจ้งปัญหา ขอใบเสนอราคา ตรวจสอบการรับประกัน ดูประวัติงานซ่อม และดาวน์โหลดคู่มือเครื่อง</p>'
+    + '<p>Scan the QR code on your machine or enter its serial number to report a problem, request a quotation, check the warranty, see the service history and open the machine documents.</p>'
+    + '<p>บริษัท ไอโมด พลัส จำกัด · 241/46 ถนนกาญจนาภิเษก แขวงดอกไม้ เขตประเวศ กรุงเทพฯ 10250 · โทร <a href="tel:027270130">02-727-0130</a></p>'
+    + '<p>เปิด JavaScript ในเบราว์เซอร์เพื่อใช้งานหน้านี้</p></div></noscript>';
+  if (!/<title>[^<]*<\/title>/.test(text)) problems.push(file + ': no <title> to replace');
+  return text.replace(/<title>[^<]*<\/title>/, head).replace(/(<body[^>]*>)/i, '$1\n' + noscript);
 }
 const DOCS = ['index.html', 'service-case-detail.html'];
 DOCS.forEach(f => copy(path.join(SRC, f), path.join(OUT, f), html));
@@ -100,7 +155,6 @@ files.forEach(f => copy(path.join(SRC, f), path.join(OUT, f), /\.(js|css|html)$/
   copy(path.join(ROOT, 'vendor', f), path.join(OUT, 'vendor', f)));
 
 // ---------- 4. js/00-env.js ----------
-const placeholder = v => !v || /REPLACE_ME/.test(String(v));
 ['customerHost', 'staffHost', 'supabaseUrl', 'supabaseAnonKey'].forEach(k => {
   if (k === 'customerHost' && CFG.customerByUrl) return;   // one host: the link decides (CLAUDE.md part 39)
   if (placeholder(CFG[k])) (STRICT ? problems : warnings).push('production.config.json: ' + k + ' is not set yet');
@@ -137,7 +191,19 @@ const assetsCopied = [];
 
 // ---------- extras ----------
 written.add(path.resolve(OUT, 'robots.txt'));
-fs.writeFileSync(path.join(OUT, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
+if (SITE) {
+  /* The front page only. Google must still fetch js/ css/ assets/ to render it, so those stay
+     open; every address with a query (?machineToken= / ?serial= from a QR) and the staff-only
+     case page stay out. */
+  fs.writeFileSync(path.join(OUT, 'robots.txt'),
+    'User-agent: *\nDisallow: /*?\nDisallow: /service-case-detail.html\nAllow: /\n\nSitemap: ' + SITE + 'sitemap.xml\n');
+  written.add(path.resolve(OUT, 'sitemap.xml'));
+  fs.writeFileSync(path.join(OUT, 'sitemap.xml'),
+    '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+    '  <url><loc>' + SITE + '</loc><lastmod>' + new Date().toISOString().slice(0, 10) + '</lastmod></url>\n</urlset>\n');
+} else {
+  fs.writeFileSync(path.join(OUT, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
+}
 
 // ---------- 6b. remove what a previous build left and this one did not produce ----------
 (function prune(dir) {

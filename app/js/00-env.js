@@ -3,7 +3,7 @@
 window.IMODE_ENV=Object.freeze({
  "production": true,
  "version": "Version 1.0",
- "builtAt": "2026-10-09T04:45:43.329Z",
+ "builtAt": "2026-10-09T16:59:08.228Z",
  "customerHost": "",
  "customerByUrl": true,
  "staffHost": "imodeservice.github.io",

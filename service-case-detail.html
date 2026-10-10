@@ -1,6 +1,21 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
+<!--@dev-only-->
+<script>
+/* 2026-10-10 — the old test site is retired (owner: "แบบนี้มันงงมาก", one live link only).
+   GitHub Pages serves this repository's root as well as the production build in app/, and the
+   root still talks to the shut-down test database — a technician who opened it lost their
+   ใบตรวจ there. On that one address this page now forwards to app/, keeping ?… and #… so a
+   link to a case still lands on that case. Localhost and every other copy are untouched, and
+   the build strips this block (@dev-only), so app/ never carries it. */
+(function(){
+ if(location.hostname!=='imodeservice.github.io')return;
+ if(location.pathname!=='/ImodeService/service-case-detail.html')return;
+ location.replace('/ImodeService/app/service-case-detail.html'+location.search+location.hash);
+})();
+</script>
+<!--@end-dev-only-->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">

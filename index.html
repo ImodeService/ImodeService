@@ -1,6 +1,21 @@
 <!doctype html>
 <html lang="th">
 <head>
+<!--@dev-only-->
+<script>
+/* 2026-10-10 — the old test site is retired (owner: "แบบนี้มันงงมาก", one live link only).
+   GitHub Pages serves this repository's root as well as the production build in app/, and the
+   root still talks to the shut-down test database — a technician who opened it lost their
+   ใบตรวจ there. On that one address this page now forwards to app/, keeping ?… and #… so a
+   link to a case still lands on that case. Localhost and every other copy are untouched, and
+   the build strips this block (@dev-only), so app/ never carries it. */
+(function(){
+ if(location.hostname!=='imodeservice.github.io')return;
+ if(!/^\/ImodeService\/(index\.html)?$/.test(location.pathname))return;
+ location.replace('/ImodeService/app/'+location.search+location.hash);
+})();
+</script>
+<!--@end-dev-only-->
   <!-- The UI is white by design. Without this, Chrome/Samsung Internet "auto dark theme"
        on Android repaints the customer page dark and inverts the machine photos. -->
   <meta name="color-scheme" content="light">

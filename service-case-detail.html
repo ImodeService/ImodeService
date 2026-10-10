@@ -2233,6 +2233,13 @@ function printQuoteDoc(){
   if(!host){toast('ยังไม่มีใบเสนอราคาให้พิมพ์');return}
   var q=caseQuote();
   var clone=host.cloneNode(true);
+  /* 2026-10-10: "ไม่ต้องเอาขนาดหน้าจอมา" — the on-screen A4 viewer (bar, fit window, scaled
+     stage, added below) was copied into the print window with the paper: the "A4 · 210 × 297
+     mm · พอดีจอ / 100%" bar printed above the quotation. Only the paper is printed, at 100%. */
+  [].forEach.call(clone.querySelectorAll('.scd-a4-bar'),function(b){b.parentNode.removeChild(b)});
+  [].forEach.call(clone.querySelectorAll('.scd-a4-fit,.scd-a4-stage'),function(el){
+    el.style.height='';el.style.transform='';el.style.overflow='visible';
+  });
   [].forEach.call(clone.querySelectorAll('img[src]'),function(im){
     try{im.setAttribute('src',new URL(im.getAttribute('src'),location.href).href)}catch(e){}
   });

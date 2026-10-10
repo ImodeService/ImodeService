@@ -89,6 +89,8 @@
    name:profile.full_name||profile.username||authUser.email||'',
    role:role||'User',
    permissionRole:role||'User',
+   /* 2026-10-10: the roles held besides the main one (database/04); js/124 adds their permissions */
+   extraRoles:Array.isArray(profile.extra_roles)?profile.extra_roles.slice():[],
    team:profile.team||'',
    accountType:accountType,
    technicianId:profile.technician_id||'',

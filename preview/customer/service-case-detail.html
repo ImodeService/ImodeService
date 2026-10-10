@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
+
 <meta charset="utf-8">
   <meta name="robots" content="noindex, nofollow">
 <script src="./js/00-env.js"></script>
@@ -2235,6 +2236,13 @@ function printQuoteDoc(){
   if(!host){toast('ยังไม่มีใบเสนอราคาให้พิมพ์');return}
   var q=caseQuote();
   var clone=host.cloneNode(true);
+  /* 2026-10-10: "ไม่ต้องเอาขนาดหน้าจอมา" — the on-screen A4 viewer (bar, fit window, scaled
+     stage, added below) was copied into the print window with the paper: the "A4 · 210 × 297
+     mm · พอดีจอ / 100%" bar printed above the quotation. Only the paper is printed, at 100%. */
+  [].forEach.call(clone.querySelectorAll('.scd-a4-bar'),function(b){b.parentNode.removeChild(b)});
+  [].forEach.call(clone.querySelectorAll('.scd-a4-fit,.scd-a4-stage'),function(el){
+    el.style.height='';el.style.transform='';el.style.overflow='visible';
+  });
   [].forEach.call(clone.querySelectorAll('img[src]'),function(im){
     try{im.setAttribute('src',new URL(im.getAttribute('src'),location.href).href)}catch(e){}
   });
@@ -4589,6 +4597,24 @@ var CaseLive=(function(){
     return true;
   }
 
+  /* 2026-10-10 — "ตรงสถานะต้องกดรีเฟรชก่อนสถานะถึงจะอัปเดต".
+     applyCase() decides whether to repaint by comparing the row with LOCALSTORAGE. When the
+     technician's update is made in another tab of this same browser (เปิดหน้างานช่าง opens one),
+     that tab has already written the new status to localStorage, so the realtime echo looked
+     like "nothing changed" and the page kept showing the old track until a reload. What
+     matters is what is ON SCREEN, so that is compared too. */
+  function shownDiffers(row){
+    try{
+      var c=caseDetailModel&&caseDetailModel.case;
+      if(!c||!row||(row.id!==c.id&&String(row.ticket||'')!==String(c.ticket||c.id||'')))return false;
+      if('status' in row&&String(row.status||'')!==String(c.status||''))return true;
+      if('field_status' in row&&String(row.field_status||'')!==String(c.fieldStatus||''))return true;
+      if('appointment' in row&&String(row.appointment||'')!==String(c.appointment||''))return true;
+      if('field_status_log' in row&&Array.isArray(row.field_status_log)
+         &&logPrint(row.field_status_log)!==logPrint(c.fieldStatusLog))return true;
+    }catch(e){}
+    return false;
+  }
   function applyQuote(row){
     if(!row||!row.id)return false;
     var list=readJ(K.quotes,[])||[],hit=null;
@@ -4665,7 +4691,72 @@ var CaseLive=(function(){
       return findBy('ticket');
     }).then(function(r){
       if(!r||r.error||!r.data)return;
-      if(applyCase(r.data))repaint();
+      var moved=applyCase(r.data);
+      if(moved||shownDiffers(r.data))repaint();
+    },function(){});
+  }
+
+  /* 2026-10-10 — "หลังแอดมินปิดเคสแล้ว การประเมินความพึงพอใจและใบตรวจขึ้นมาช้ามาก".
+     The ใบตรวจ and the customer's rating were only ever read from THIS DEVICE's copy, which
+     only the main application's sync fills — with the case page open on its own, they came
+     when something else happened to sync. The page now reads this case's reports and its
+     rating from the server itself: on realtime, on the 10 s check, and when it is looked at
+     again. The report shape is js/03 fromServiceReportDb(), copied, because this document
+     does not load js/03 (the same rule as every other copy in this file). */
+  function mapReport(r){
+    return {id:r.id,reportNo:r.report_no,caseId:r.case_id||'',customerId:r.customer_id||'',
+      machineId:r.machine_id||'',techId:r.tech_id||'',serviceType:r.service_type||'',
+      workType:r.work_type||'',checkInAt:r.check_in_at||'',appointment:r.appointment||'',
+      checklist:r.checklist||[],diagnosis:r.diagnosis||'',workPerformed:r.work_performed||'',
+      recommendation:r.recommendation||'',parts:r.parts||[],beforePhotos:r.before_photos||[],
+      afterPhotos:r.after_photos||[],videos:r.videos||[],statusLog:r.status_log||[],
+      customerAccept:r.customer_accept||'',customerSignature:r.customer_signature||'',
+      techSignature:r.tech_signature||'',nextPm:r.next_pm||'',lineSentAt:r.line_sent_at||'',
+      lineSendStatus:r.line_send_status||'',status:r.status||'Completed',
+      createdAt:r.created_at,updatedAt:r.updated_at};
+  }
+  function shownCaseId(){try{return (caseDetailModel&&caseDetailModel.case&&caseDetailModel.case.id)||''}catch(e){return ''}}
+  function pullReports(sb){
+    var cid=shownCaseId();
+    if(!sb||!cid)return;
+    Promise.resolve(sb.from('service_reports').select('*').eq('case_id',cid)).then(function(r){
+      if(!r||r.error||!Array.isArray(r.data)||!r.data.length)return;
+      var list=readJ(K.reports,[])||[],moved=false;
+      r.data.forEach(function(row){
+        var m=mapReport(row),at=-1;
+        for(var i=0;i<list.length;i++)if(list[i]&&list[i].id===m.id){at=i;break}
+        if(at<0){list.push(m);moved=true}
+        else if(String(list[at].updatedAt||'')!==String(m.updatedAt||'')){list[at]=m;moved=true}
+      });
+      if(moved&&writeJ(K.reports,list))repaint();
+    },function(){});
+  }
+  /* A report this device does not hold, or holds an older copy of — a few bytes to find out. */
+  function checkReports(sb){
+    var cid=shownCaseId();
+    if(!sb||!cid)return;
+    Promise.resolve(sb.from('service_reports').select('id,updated_at').eq('case_id',cid)).then(function(r){
+      if(!r||r.error||!Array.isArray(r.data))return;
+      var local=readJ(K.reports,[])||[],stale=r.data.some(function(row){
+        var hit=local.filter(function(x){return x&&x.id===row.id})[0];
+        return !hit||String(hit.updatedAt||'')!==String(row.updated_at||'');
+      });
+      if(stale)pullReports(sb);
+    },function(){});
+  }
+  /* The rating lives in settings.caseFeedback (js/77). Asked for only while this case is
+     closed and has none on this device, and only that one entry is read. */
+  function checkFeedback(sb){
+    var cid=shownCaseId();
+    if(!sb||!cid)return;
+    var c=caseDetailModel&&caseDetailModel.case;
+    if(!c||['เสร็จสิ้น','ปิดเคส'].indexOf(c.status)<0)return;
+    var s=readJ(K.settings,{})||{};
+    if(s.caseFeedback&&s.caseFeedback[cid])return;
+    Promise.resolve(sb.from('system_settings').select('fb:data->caseFeedback').eq('id','main').maybeSingle()).then(function(r){
+      var map=r&&!r.error&&r.data&&r.data.fb;
+      if(!map||typeof map!=='object'||!map[cid])return;
+      if(applySettings({data:{caseFeedback:map}}))repaint();
     },function(){});
   }
 
@@ -4685,7 +4776,13 @@ var CaseLive=(function(){
            columns and says so in p.errors — field_status_log then never arrived and the
            technician's notes and photos waited for a reload. Read this one row back in full. */
         if((p.errors&&p.errors.length)||!('field_status_log' in row)){pullCurrentCase(sb,mine);return}
-        if(applyCase(row))repaint();
+        var moved=applyCase(row);
+        if(moved||shownDiffers(row))repaint();
+      });
+      channel.on('postgres_changes',{event:'*',schema:'public',table:'service_reports'},function(p){
+        state.events++;
+        var row=p&&p.new;
+        if(row&&row.case_id&&row.case_id===shownCaseId())pullReports(sb);
       });
       channel.on('postgres_changes',{event:'*',schema:'public',table:'quotations'},function(p){
         state.events++;
@@ -4698,10 +4795,53 @@ var CaseLive=(function(){
       channel.subscribe(function(st){
         state.status=String(st||'');
         state.on=(state.status==='SUBSCRIBED');
-        if(state.on)pullCurrentCase(sb,mine);
+        if(state.on){pullCurrentCase(sb,mine);checkReports(sb);checkFeedback(sb)}
       });
     }catch(e){state.status='error'}
+    /* A phone that slept or a tab left in the background can miss events; one read of this
+       row when the page is looked at again closes the gap. */
+    document.addEventListener('visibilitychange',function(){
+      if(document.visibilityState==='visible'){pullCurrentCase(sb,mine);checkReports(sb);checkFeedback(sb)}
+    });
+    /* 2026-10-10 (second report, on the server build): "ไม่เห็นนะ ต้องรีเฟรช เหมือนเดิม".
+       Whatever stops the stream on a given network or device, the page must not depend on
+       it alone. Every 10 s, while the page is on screen, it reads this ONE case's small
+       columns (a few hundred bytes); only when they moved does it fetch the full row with
+       the technician's log. Realtime still delivers first when it works. */
+    var col=null,lastAt='';
+    function small(c){
+      try{return Promise.resolve(sb.from('service_cases')
+        .select('id,ticket,status,field_status,appointment,assignee,updated_at').eq(c,mine).maybeSingle())}
+      catch(e){return Promise.resolve({error:e})}
+    }
+    setInterval(function(){
+      if(document.visibilityState!=='visible'||!mine)return;
+      checkReports(sb);checkFeedback(sb);
+      (col?small(col):small('id').then(function(r){
+        if(r&&!r.error&&r.data){col='id';return r}
+        return small('ticket').then(function(r2){if(r2&&!r2.error&&r2.data)col='ticket';return r2});
+      })).then(function(r){
+        var row=r&&!r.error&&r.data;
+        if(!row)return;
+        var at=String(row.updated_at||'');
+        if(at!==lastAt||shownDiffers(row)){
+          var first=!lastAt;
+          lastAt=at;
+          if(!first||shownDiffers(row))pullCurrentCase(sb,mine);
+        }
+      },function(){});
+    },10000);
   }
+
+  /* Another tab of this browser (หน้างาน, the main application) wrote the cases, quotations
+     or settings: the browser says so with a 'storage' event, and the page repaints from what
+     is now stored. Works with no network and no realtime at all. */
+  var storageTimer=null;
+  window.addEventListener('storage',function(e){
+    if(!e||(e.key!==K.cases&&e.key!==K.quotes&&e.key!==K.settings))return;
+    clearTimeout(storageTimer);
+    storageTimer=setTimeout(repaint,250);
+  });
 
   return {start:start,state:function(){return state}};
 })();

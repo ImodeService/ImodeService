@@ -101,8 +101,22 @@
   });
   return out;
  }
+ /* 2026-10-10: an account may hold several roles — its duties are those of all of them. */
+ function rolesOfAcc(a){
+  var seen={};
+  return [a&&a.role].concat((a&&a.extraRoles)||[]).filter(function(r){if(!r||seen[r])return false;seen[r]=1;return true});
+ }
+ function teamsOfAcc(a){
+  var l=String((a&&a.team)||'').split(',').map(function(x){return x.trim()}).filter(Boolean);
+  return l.length?l:['Technical'];
+ }
+ function dutiesAll(a){
+  var seen={},out=[];
+  rolesOfAcc(a).forEach(function(r){duties(r).forEach(function(d){if(!seen[d]){seen[d]=1;out.push(d)}})});
+  return out;
+ }
  function dutyHTML(role){
-  var d=duties(role);if(!d.length)return '';
+  var d=Array.isArray(role)?role:duties(role);if(!d.length)return '';
   var MAX=8,more=d.length>MAX?'<span>+'+(d.length-MAX)+'</span>':'';
   return '<div class="tacc-duty"><em>'+esc2(tl('หน้าที่','Duties'))+'</em>'
    +d.slice(0,MAX).map(function(x){return '<span>'+esc2(x)+'</span>'}).join('')+more+'</div>';
@@ -198,6 +212,11 @@
   if((el=t.closest('[data-tacc-techedit]'))){
    a=lastList[+el.getAttribute('data-tacc-techedit')];if(a){wireModal();openTechEdit(a)}return;
   }
+  if((el=t.closest('[data-tacc-move]'))){
+   a=lastList[+el.getAttribute('data-tacc-move')];
+   if(a&&typeof window.imodeOpenAccountEdit==='function')window.imodeOpenAccountEdit(a.username);
+   return;
+  }
   if((el=t.closest('[data-tacc-jobs]'))){
    if(typeof window.imodeTechCases==='function')window.imodeTechCases(el.getAttribute('data-tacc-jobs'));
   }
@@ -261,7 +280,9 @@
     +'font-size:34px;font-weight:800;color:#fff;background:linear-gradient(135deg,#ff9d45,#ff5b18);border-radius:18px}',
    '.tacc-photo-btn{position:absolute;right:6px;bottom:6px;width:32px;height:32px;border-radius:50%;border:0;'
     +'background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.25);cursor:pointer;font-size:15px;line-height:1}',
-   '@media(max-width:640px){.tacc-grid{grid-template-columns:1fr}}'
+   '@media(max-width:640px){.tacc-grid{grid-template-columns:1fr}}',
+   /* four buttons on a technician card (ย้ายทีม added 2026-10-10) go two per row on a phone */
+   '@media(max-width:640px){.tacc-people .person-actions>*{flex:1 1 calc(50% - 10px)}}'
   ].join('');
   document.head.appendChild(s);
  }
@@ -275,7 +296,7 @@
   var tech=techById2(a.technicianId);
   var name=a.name||a.username||'-';
   var isTech=!!(a.technicianId&&tech);
-  var techRole=isTechRole(a.role);
+  var techRole=rolesOfAcc(a).some(isTechRole);
   var test=/_test\d*$/i.test(String(a.username||''));
   var idx=lastList.length;lastList.push(a);
   var photo=a.photo||(tech&&tech.photo)||'';
@@ -284,7 +305,7 @@
   if(!hero)hero=photo?'<img class="person-photo" src="'+esc2(photo)+'" alt="">':'<div class="tacc-big-initials">'+esc2(initials(name))+'</div>';
   var badges='';
   var tm=a.team||(tech&&tech.team)||'';
-  try{if(tm)badges+=typeof teamBadge==='function'?teamBadge(tm):''}catch(e){}
+  try{if(tm&&typeof teamBadge==='function')teamsOfAcc({team:tm}).forEach(function(x){badges+=teamBadge(x)})}catch(e){}
   if(isTech){
    try{badges+='<span class="tech-status-dot '+(typeof techStatusClass==='function'?techStatusClass(tech.status):'')+'">'+esc2(tech.status||'พร้อมรับงาน')+'</span>'}catch(e){}
    badges+='<span class="tacc-colbadge"><i style="background:'+esc2(techColor(tech))+'"></i>'+esc2(tl('สีปฏิทิน','Calendar'))+'</span>';
@@ -299,17 +320,22 @@
    +esc2(tl('ยังไม่มีข้อมูลช่าง — บันทึกบัญชีนี้ใน จัดการบัญชี อีกครั้ง','No technician data yet — save this account once'))+'</span>';
   var photoBtn=mayEdit(a)?'<button type="button" class="tacc-photo-btn" data-tacc-photo="'+idx+'" title="'
    +esc2(tl('เปลี่ยนรูปโปรไฟล์','Change photo'))+'">📷</button>':'';
+  /* 2026-10-10: ย้ายทีม — Dev and Service Manager only (manageAcc). Opens js/124's edit form for
+     this person, where changing the team also picks the role that goes with it. */
+  var moveBtn=manageAcc()&&typeof window.imodeOpenAccountEdit==='function'
+   ?'<button class="soft-btn" type="button" data-tacc-move="'+idx+'">'+esc2(tl('ย้ายทีม','Move team'))+'</button>':'';
   var bottom;
   if(isTech){
    bottom='<div class="person-stat"><span>'+esc2(tl('งานเปิด','Open jobs'))+'</span><b>'+techCaseCount(tech.id)+'</b></div>'
     +'<div class="person-actions">'
     +'<button class="soft-btn" type="button" data-tacc-jobs="'+esc2(tech.id)+'">'+esc2(tl('งานหน้างาน','Field jobs'))+'</button>'
     +'<button class="soft-btn" type="button" onclick="openTechnicianDetail('+imodeJsArg(tech.id)+')">'+esc2(tl('รายละเอียด','Details'))+'</button>'
+    +moveBtn
     +(mayEdit(a)?'<button class="primary-btn" type="button" data-tacc-techedit="'+idx+'">'+esc2(tl('แก้ไข','Edit'))+'</button>':'')
     +'</div>';
   }else{
-   bottom='<div class="person-stat"><span>'+esc2(tl('เมนูที่เข้าได้','Menus'))+'</span><b>'+duties(a.role).length+'</b></div>'
-    +'<div class="person-actions">'
+   bottom='<div class="person-stat"><span>'+esc2(tl('เมนูที่เข้าได้','Menus'))+'</span><b>'+dutiesAll(a).length+'</b></div>'
+    +'<div class="person-actions">'+moveBtn
     +(manageAcc()&&typeof window.openAccountAdminModal==='function'
       ?'<button class="primary-btn" type="button" onclick="openAccountAdminModal()">'+esc2(tl('แก้ไข','Edit'))+'</button>':'')
     +'</div>';
@@ -317,11 +343,11 @@
   return '<div class="person-card'+(isTech?' tacc-colcard':'')+'"'+(isTech?' style="--tacc-col:'+esc2(techColor(tech))+'"':'')+'>'
    +'<div class="person-card-top"><div class="person-card-main">'
    +'<h4>'+esc2(name)+'</h4>'
-   +'<p class="person-role">'+esc2(a.role||tl('ไม่ระบุบทบาท','No role'))+'</p>'
+   +'<p class="person-role">'+esc2(rolesOfAcc(a).join(' · ')||tl('ไม่ระบุบทบาท','No role'))+'</p>'
    +'<p class="tacc-user" style="display:block;margin:-2px 0 6px">'+esc2(a.username||'')+'</p>'
    +'<div class="person-badges">'+badges+'</div>'
    +(isTech?'<p class="person-phone">'+esc2(tech.phone||'-')+'</p>':'')
-   +'</div><div class="person-hero tacc-hero">'+hero+photoBtn+'</div></div>'+dutyHTML(a.role)
+   +'</div><div class="person-hero tacc-hero">'+hero+photoBtn+'</div></div>'+dutyHTML(dutiesAll(a))
    +'<div class="person-bottom">'+bottom+'</div></div>';
  }
 
@@ -359,7 +385,13 @@
      page, is grouped by role, and follows the team chips above it (ทั้งหมด shows everyone). */
   var team='all';try{team=techTeamFilter||'all'}catch(e){}
   var TEAMS=[];try{TEAMS=TEAM_LIST.slice()}catch(e){}
-  if(team!=='all'&&TEAMS.indexOf(team)>=0)list=list.filter(function(a){return (a.team||'Technical')===team});
+  /* 2026-10-10: "บัญชีทดสอบ แปลกๆ ... ตอนนี้มันเป็นบัญชีจริง". js/104's บัญชีทดสอบ chip sets the
+     filter to '__test__', which is not in TEAM_LIST, so this list was left unfiltered and the
+     chip showed every real account. It now shows only the test accounts (the _test / _testN
+     naming cardHTML already badges), and a team chip leaves them out, as js/104 does. */
+  var isTestAcc=function(a){return /_test\d*$/i.test(String(a.username||''))};
+  if(team==='__test__')list=list.filter(isTestAcc);
+  else if(team!=='all'&&TEAMS.indexOf(team)>=0)list=list.filter(function(a){return !isTestAcc(a)&&teamsOfAcc(a).indexOf(team)>=0});
   list.sort(function(a,b){
    return String(a.name||a.username||'').localeCompare(String(b.name||b.username||''),'th');
   });

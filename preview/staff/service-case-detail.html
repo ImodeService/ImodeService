@@ -4596,6 +4596,24 @@ var CaseLive=(function(){
     return true;
   }
 
+  /* 2026-10-10 — "ตรงสถานะต้องกดรีเฟรชก่อนสถานะถึงจะอัปเดต".
+     applyCase() decides whether to repaint by comparing the row with LOCALSTORAGE. When the
+     technician's update is made in another tab of this same browser (เปิดหน้างานช่าง opens one),
+     that tab has already written the new status to localStorage, so the realtime echo looked
+     like "nothing changed" and the page kept showing the old track until a reload. What
+     matters is what is ON SCREEN, so that is compared too. */
+  function shownDiffers(row){
+    try{
+      var c=caseDetailModel&&caseDetailModel.case;
+      if(!c||!row||(row.id!==c.id&&String(row.ticket||'')!==String(c.ticket||c.id||'')))return false;
+      if('status' in row&&String(row.status||'')!==String(c.status||''))return true;
+      if('field_status' in row&&String(row.field_status||'')!==String(c.fieldStatus||''))return true;
+      if('appointment' in row&&String(row.appointment||'')!==String(c.appointment||''))return true;
+      if('field_status_log' in row&&Array.isArray(row.field_status_log)
+         &&logPrint(row.field_status_log)!==logPrint(c.fieldStatusLog))return true;
+    }catch(e){}
+    return false;
+  }
   function applyQuote(row){
     if(!row||!row.id)return false;
     var list=readJ(K.quotes,[])||[],hit=null;
@@ -4672,7 +4690,8 @@ var CaseLive=(function(){
       return findBy('ticket');
     }).then(function(r){
       if(!r||r.error||!r.data)return;
-      if(applyCase(r.data))repaint();
+      var moved=applyCase(r.data);
+      if(moved||shownDiffers(r.data))repaint();
     },function(){});
   }
 
@@ -4692,7 +4711,8 @@ var CaseLive=(function(){
            columns and says so in p.errors — field_status_log then never arrived and the
            technician's notes and photos waited for a reload. Read this one row back in full. */
         if((p.errors&&p.errors.length)||!('field_status_log' in row)){pullCurrentCase(sb,mine);return}
-        if(applyCase(row))repaint();
+        var moved=applyCase(row);
+        if(moved||shownDiffers(row))repaint();
       });
       channel.on('postgres_changes',{event:'*',schema:'public',table:'quotations'},function(p){
         state.events++;
@@ -4708,7 +4728,22 @@ var CaseLive=(function(){
         if(state.on)pullCurrentCase(sb,mine);
       });
     }catch(e){state.status='error'}
+    /* A phone that slept or a tab left in the background can miss events; one read of this
+       row when the page is looked at again closes the gap. */
+    document.addEventListener('visibilitychange',function(){
+      if(document.visibilityState==='visible')pullCurrentCase(sb,mine);
+    });
   }
+
+  /* Another tab of this browser (หน้างาน, the main application) wrote the cases, quotations
+     or settings: the browser says so with a 'storage' event, and the page repaints from what
+     is now stored. Works with no network and no realtime at all. */
+  var storageTimer=null;
+  window.addEventListener('storage',function(e){
+    if(!e||(e.key!==K.cases&&e.key!==K.quotes&&e.key!==K.settings))return;
+    clearTimeout(storageTimer);
+    storageTimer=setTimeout(repaint,250);
+  });
 
   return {start:start,state:function(){return state}};
 })();

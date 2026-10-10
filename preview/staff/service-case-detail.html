@@ -4695,6 +4695,70 @@ var CaseLive=(function(){
     },function(){});
   }
 
+  /* 2026-10-10 — "หลังแอดมินปิดเคสแล้ว การประเมินความพึงพอใจและใบตรวจขึ้นมาช้ามาก".
+     The ใบตรวจ and the customer's rating were only ever read from THIS DEVICE's copy, which
+     only the main application's sync fills — with the case page open on its own, they came
+     when something else happened to sync. The page now reads this case's reports and its
+     rating from the server itself: on realtime, on the 10 s check, and when it is looked at
+     again. The report shape is js/03 fromServiceReportDb(), copied, because this document
+     does not load js/03 (the same rule as every other copy in this file). */
+  function mapReport(r){
+    return {id:r.id,reportNo:r.report_no,caseId:r.case_id||'',customerId:r.customer_id||'',
+      machineId:r.machine_id||'',techId:r.tech_id||'',serviceType:r.service_type||'',
+      workType:r.work_type||'',checkInAt:r.check_in_at||'',appointment:r.appointment||'',
+      checklist:r.checklist||[],diagnosis:r.diagnosis||'',workPerformed:r.work_performed||'',
+      recommendation:r.recommendation||'',parts:r.parts||[],beforePhotos:r.before_photos||[],
+      afterPhotos:r.after_photos||[],videos:r.videos||[],statusLog:r.status_log||[],
+      customerAccept:r.customer_accept||'',customerSignature:r.customer_signature||'',
+      techSignature:r.tech_signature||'',nextPm:r.next_pm||'',lineSentAt:r.line_sent_at||'',
+      lineSendStatus:r.line_send_status||'',status:r.status||'Completed',
+      createdAt:r.created_at,updatedAt:r.updated_at};
+  }
+  function shownCaseId(){try{return (caseDetailModel&&caseDetailModel.case&&caseDetailModel.case.id)||''}catch(e){return ''}}
+  function pullReports(sb){
+    var cid=shownCaseId();
+    if(!sb||!cid)return;
+    Promise.resolve(sb.from('service_reports').select('*').eq('case_id',cid)).then(function(r){
+      if(!r||r.error||!Array.isArray(r.data)||!r.data.length)return;
+      var list=readJ(K.reports,[])||[],moved=false;
+      r.data.forEach(function(row){
+        var m=mapReport(row),at=-1;
+        for(var i=0;i<list.length;i++)if(list[i]&&list[i].id===m.id){at=i;break}
+        if(at<0){list.push(m);moved=true}
+        else if(String(list[at].updatedAt||'')!==String(m.updatedAt||'')){list[at]=m;moved=true}
+      });
+      if(moved&&writeJ(K.reports,list))repaint();
+    },function(){});
+  }
+  /* A report this device does not hold, or holds an older copy of — a few bytes to find out. */
+  function checkReports(sb){
+    var cid=shownCaseId();
+    if(!sb||!cid)return;
+    Promise.resolve(sb.from('service_reports').select('id,updated_at').eq('case_id',cid)).then(function(r){
+      if(!r||r.error||!Array.isArray(r.data))return;
+      var local=readJ(K.reports,[])||[],stale=r.data.some(function(row){
+        var hit=local.filter(function(x){return x&&x.id===row.id})[0];
+        return !hit||String(hit.updatedAt||'')!==String(row.updated_at||'');
+      });
+      if(stale)pullReports(sb);
+    },function(){});
+  }
+  /* The rating lives in settings.caseFeedback (js/77). Asked for only while this case is
+     closed and has none on this device, and only that one entry is read. */
+  function checkFeedback(sb){
+    var cid=shownCaseId();
+    if(!sb||!cid)return;
+    var c=caseDetailModel&&caseDetailModel.case;
+    if(!c||['เสร็จสิ้น','ปิดเคส'].indexOf(c.status)<0)return;
+    var s=readJ(K.settings,{})||{};
+    if(s.caseFeedback&&s.caseFeedback[cid])return;
+    Promise.resolve(sb.from('system_settings').select('fb:data->caseFeedback').eq('id','main').maybeSingle()).then(function(r){
+      var map=r&&!r.error&&r.data&&r.data.fb;
+      if(!map||typeof map!=='object'||!map[cid])return;
+      if(applySettings({data:{caseFeedback:map}}))repaint();
+    },function(){});
+  }
+
   function start(){
     var sb=null;
     try{sb=CaseWrite.client()}catch(e){}
@@ -4714,6 +4778,11 @@ var CaseLive=(function(){
         var moved=applyCase(row);
         if(moved||shownDiffers(row))repaint();
       });
+      channel.on('postgres_changes',{event:'*',schema:'public',table:'service_reports'},function(p){
+        state.events++;
+        var row=p&&p.new;
+        if(row&&row.case_id&&row.case_id===shownCaseId())pullReports(sb);
+      });
       channel.on('postgres_changes',{event:'*',schema:'public',table:'quotations'},function(p){
         state.events++;
         if(applyQuote(p&&p.new))repaint();
@@ -4725,13 +4794,13 @@ var CaseLive=(function(){
       channel.subscribe(function(st){
         state.status=String(st||'');
         state.on=(state.status==='SUBSCRIBED');
-        if(state.on)pullCurrentCase(sb,mine);
+        if(state.on){pullCurrentCase(sb,mine);checkReports(sb);checkFeedback(sb)}
       });
     }catch(e){state.status='error'}
     /* A phone that slept or a tab left in the background can miss events; one read of this
        row when the page is looked at again closes the gap. */
     document.addEventListener('visibilitychange',function(){
-      if(document.visibilityState==='visible')pullCurrentCase(sb,mine);
+      if(document.visibilityState==='visible'){pullCurrentCase(sb,mine);checkReports(sb);checkFeedback(sb)}
     });
     /* 2026-10-10 (second report, on the server build): "ไม่เห็นนะ ต้องรีเฟรช เหมือนเดิม".
        Whatever stops the stream on a given network or device, the page must not depend on
@@ -4746,6 +4815,7 @@ var CaseLive=(function(){
     }
     setInterval(function(){
       if(document.visibilityState!=='visible'||!mine)return;
+      checkReports(sb);checkFeedback(sb);
       (col?small(col):small('id').then(function(r){
         if(r&&!r.error&&r.data){col='id';return r}
         return small('ticket').then(function(r2){if(r2&&!r2.error&&r2.data)col='ticket';return r2});

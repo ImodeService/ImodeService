@@ -326,7 +326,9 @@
  function formHTML(p){
   var isNew=!p;p=p||{};
   return '<form id="paccForm" class="form-grid" autocomplete="off">'
-   +(isNew?'<div class="field"><label>ชื่อผู้ใช้ (ใช้ตอนเข้าสู่ระบบ)</label><input id="paccUser" required pattern="[A-Za-z0-9._&-]{3,40}"></div>':'')
+   +(isNew?'<div class="field"><label>ชื่อผู้ใช้ (ใช้ตอนเข้าสู่ระบบ)</label><input id="paccUser" required pattern="[A-Za-z0-9._&-]{3,40}"></div>'
+     /* 2026-10-10: "อยากให้หน้านี้แสดง Username ด้วย" — shown on the edit form too, read only */
+     :'<div class="field"><label>ชื่อผู้ใช้ (ใช้ตอนเข้าสู่ระบบ)</label><input value="'+h(p.username||'')+'" readonly></div>')
    +'<div class="field"><label>ชื่อที่แสดง</label><input id="paccName" required value="'+h(p.full_name||'')+'"></div>'
    +'<div class="field"><label>Role</label><select id="paccRole">'+options(roleNames(),p.role||'Technician')+'</select></div>'
    +'<div class="field"><label>ทีม</label><select id="paccTeam">'+options(TEAMS,p.team||'')+'</select>'

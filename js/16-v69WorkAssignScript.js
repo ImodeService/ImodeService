@@ -216,7 +216,9 @@
     null and therefore sees every team, which is what makes a cross-team crew possible. */
  function pickableTechs(){
   var team=(typeof window.imodeTeamScope==='function')?window.imodeTeamScope():null;
-  return techList().filter(function(t){return !team||(t.team||'Technical')===team});
+  return techList().filter(function(t){
+   if(typeof window.imodeInTeamScope==='function')return window.imodeInTeamScope(t.team||'Technical',team);
+   return !team||(t.team||'Technical')===team});
  }
  function teamsOf(list){
   var seen={},out=[];

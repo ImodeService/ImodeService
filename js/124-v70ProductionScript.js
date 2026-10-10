@@ -51,7 +51,10 @@
  /* Dev and Service Manager only, on BOTH sites (owner, 2026-09-27 for production and
     2026-09-28 for the test site: "DEV manager"). js/113 asks the same question. */
  function canManage(){
-  var u=me();return !!(u&&ACCOUNT_ADMIN_ROLES.indexOf(String(u.role||u.permissionRole||''))>=0)}
+  var u=me();if(!u)return false;
+  /* 2026-10-10: an account may hold several roles (extraRoles); any of them counts. */
+  var all=[String(u.role||u.permissionRole||'')].concat(Array.isArray(u.extraRoles)?u.extraRoles:[]);
+  return all.some(function(r){return ACCOUNT_ADMIN_ROLES.indexOf(String(r))>=0})}
  window.imodeCanManageAccounts=canManage;
  function techList(){try{return Array.isArray(technicians)?technicians:[]}catch(e){return []}}
  function roleNames(){
@@ -98,6 +101,7 @@
   var tid=p.technician_id||'';
   return {
    username:p.username,name:p.full_name||p.username,role:p.role||'',team:p.team||'',
+   extraRoles:Array.isArray(p.extra_roles)?p.extra_roles.slice():[],
    technicianId:tid,accountType:tid?'technician':'staff',userId:'SB-'+p.id,authId:p.id,
    photo:p.photo_url||'',active:p.is_active!==false,lastSignInAt:p.last_sign_in_at||'',builtIn:false
   };
@@ -109,6 +113,7 @@
   return list.map(function(a){
    var t=a.technicianId?techList().filter(function(x){return x.id===a.technicianId})[0]:null;
    return {id:lc(a.username),username:a.username,full_name:a.name||a.username,role:a.role||'',team:a.team||'',
+    extra_roles:Array.isArray(a.extraRoles)?a.extraRoles.slice():[],
     technician_id:a.technicianId||'',photo_url:a.photo||(t&&t.photo)||'',is_active:true,last_sign_in_at:'',_acc:a};
   });
  }
@@ -217,7 +222,9 @@
   cannot_delete_self:'ลบบัญชีของตัวเองไม่ได้',
   'admin_delete_staff':'เซิร์ฟเวอร์ยังไม่มีคำสั่งลบบัญชี — รัน database/patch-2026-09-28-delete-staff.sql ก่อน',
   last_account_admin:'ต้องเหลือ Dev หรือ Service Manager ที่ใช้งานได้อย่างน้อย 1 บัญชี',
-  not_found:'ไม่พบบัญชีนี้'
+  not_found:'ไม่พบบัญชีนี้',
+  'admin_set_staff_roles':'เซิร์ฟเวอร์ยังไม่รองรับหลาย Role — รัน database/04-multi-role-rename-2026-10-10.sql ก่อน',
+  'admin_rename_staff':'เซิร์ฟเวอร์ยังไม่รองรับการเปลี่ยนชื่อผู้ใช้ — รัน database/04-multi-role-rename-2026-10-10.sql ก่อน'
  };
  function errText(err){
   var m=String(err&&(err.message||err.hint||err)||'');
@@ -239,14 +246,18 @@
     if(fn==='delete')r=window.imodeAccountDelete(acc.username);
     else{
      var d={username:acc.username,name:acc.name,role:acc.role,team:acc.team||'',
+      extraRoles:Array.isArray(acc.extraRoles)?acc.extraRoles.slice():[],
       accountType:acc.accountType||(acc.technicianId?'technician':'staff'),technicianId:acc.technicianId||''};
-     if(fn==='admin_update_staff'){
+     if(fn==='admin_set_staff_roles')d.extraRoles=(a.p_extra_roles||[]).filter(function(r){return r&&r!==d.role});
+     else if(fn==='admin_rename_staff')d.username=String(a.p_username||'').trim().toLowerCase();
+     if(fn==='admin_set_staff_roles'||fn==='admin_rename_staff'){r=window.imodeAccountSave(acc.username,d)}
+     else if(fn==='admin_update_staff'){
       if(a.p_full_name!=null)d.name=a.p_full_name;
       if(a.p_role!=null)d.role=a.p_role;
       if(a.p_team!=null)d.team=a.p_team;
       if(typeof a.p_photo_url==='string')d.photo=a.p_photo_url;
      }else if(fn==='admin_set_password')d.password=a.p_password;
-     r=window.imodeAccountSave(acc.username,d);
+     if(!r)r=window.imodeAccountSave(acc.username,d);
     }
    }
    if(r&&r.ok===false)rej(new Error(r.message||'ทำรายการไม่สำเร็จ'));else res(r);
@@ -278,6 +289,43 @@
  var TEAM_ROLES={'Technical':['Technician','Technical Lead'],'R&D':['R&D','R&D Lead'],
   'Admin':['Admin','Admin / Coordinator','Sale / Admin'],'Sales':['Sales','Sale / Admin'],
   'Management':['Service Manager','CEO'],'Dev':['Dev']};
+ /* 2026-10-10: "1 บัญชีอยู่ได้หลายทีม ... ใส่ได้หลาย Role ... ถ้ามี Role manager หรือ Dev จะยังคงอยู่".
+    Teams travel as a comma list in profiles.team ("Technical,R&D"); roles as profiles.role (the
+    MAIN one, which the server's checks read) plus profiles.extra_roles. The main role is the
+    highest in ROLE_RANK, so a Dev who is also a Technician signs in as Dev. */
+ var ROLE_RANK=['Dev','Service Manager','CEO','Admin','Admin / Coordinator','Sale / Admin','Sales',
+  'Technical Lead','R&D Lead','Technician','R&D'];
+ var KEEP_ROLES=['Dev','Service Manager'];
+ function splitTeams(v){
+  var seen={};
+  return String(v||'').split(',').map(function(x){return x.trim()}).filter(function(x){
+   if(!x||seen[x])return false;seen[x]=1;return true});
+ }
+ window.imodeSplitTeams=splitTeams;
+ function rolesOf(p){
+  var seen={};
+  return [p&&p.role].concat((p&&p.extra_roles)||[]).filter(function(r){
+   if(!r||seen[r])return false;seen[r]=1;return true});
+ }
+ function mainRole(list){
+  return list.slice().sort(function(a,b){
+   var i=ROLE_RANK.indexOf(a),j=ROLE_RANK.indexOf(b);return (i<0?99:i)-(j<0?99:j);
+  })[0]||'';
+ }
+ /* The roles that go with these teams: Dev / Service Manager always stay; a role the person
+    already holds that belongs to a chosen team stays; otherwise the team's own role. */
+ function rolesForTeams(teams,cur){
+  var out=[],add=function(r){if(r&&out.indexOf(r)<0)out.push(r)};
+  cur.forEach(function(r){if(KEEP_ROLES.indexOf(r)>=0)add(r)});
+  var lead=cur.filter(function(r){return /lead$/i.test(r)})[0]||'';
+  teams.forEach(function(tm){
+   var own=cur.filter(function(r){return (TEAM_ROLES[tm]||[]).indexOf(r)>=0});
+   if(own.length){own.forEach(add);return}
+   var d=roleForTeam(tm,lead);
+   if(d&&(TEAM_ROLES[tm]||[]).indexOf(d)>=0)add(d);
+  });
+  return out.length?out:cur.slice();
+ }
  function roleForTeam(team,cur){
   var list=TEAM_ROLES[team],have=roleNames();
   if(!list||list.indexOf(cur)>=0)return cur;
@@ -304,7 +352,7 @@
       +'style="width:42px;height:42px;border-radius:12px;border:0;padding:0;overflow:hidden;cursor:'+(manage||cur?'pointer':'default')
       +';background:linear-gradient(135deg,#ff9d45,#ff5b18);color:#fff;font-weight:800;font-size:13px">'+av+'</button>'
       +'<div><b>'+h(p.full_name||p.username)+(p.is_active===false?' <span style="color:#b42318">· ปิดใช้งาน</span>':'')+'</b>'
-      +'<small>'+h(p.username)+(p.team?' · ทีม '+h(p.team):'')+(p.technician_id?' · ช่าง: '+h(techName(p.technician_id)):'')
+      +'<small>'+h(p.username)+(rolesOf(p).length>1?' · Role '+h(rolesOf(p).join(', ')):'')+(p.team?' · ทีม '+h(splitTeams(p.team).join(', ')):'')+(p.technician_id?' · ช่าง: '+h(techName(p.technician_id)):'')
       /* last sign-in: shown to a Dev only (owner, 2026-09-28); the test site does not record it */
       +(DEV||String((me()&&(me().role||me().permissionRole))||'')!=='Dev'?'':' · เข้าล่าสุด '+h(fmtAt(p.last_sign_in_at)))+'</small></div>'
       +(manage?'<div style="display:flex;gap:6px;flex-wrap:wrap">'
@@ -325,14 +373,25 @@
  }
  function formHTML(p){
   var isNew=!p;p=p||{};
-  return '<form id="paccForm" class="form-grid" autocomplete="off">'
-   +(isNew?'<div class="field"><label>ชื่อผู้ใช้ (ใช้ตอนเข้าสู่ระบบ)</label><input id="paccUser" required pattern="[A-Za-z0-9._&-]{3,40}"></div>'
-     /* 2026-10-10: "อยากให้หน้านี้แสดง Username ด้วย" — shown on the edit form too, read only */
-     :'<div class="field"><label>ชื่อผู้ใช้ (ใช้ตอนเข้าสู่ระบบ)</label><input value="'+h(p.username||'')+'" readonly></div>')
+  /* 2026-10-10: the username is shown and, for an account admin, editable on an existing
+     account too (admin_rename_staff); teams and roles are tick boxes — several of each. */
+  var myTeams=splitTeams(p.team),myRoles=isNew?['Technician']:rolesOf(p);
+  var names=roleNames();myRoles.forEach(function(r){if(names.indexOf(r)<0)names.push(r)});
+  var box=function(name,v,l,on){
+   return '<label class="pacc-tick"><input type="checkbox" name="'+name+'" value="'+h(v)+'"'+(on?' checked':'')+'> '+h(l)+'</label>'};
+  return '<form id="paccForm" class="form-grid" autocomplete="off" data-no-i18n="true"'+(isNew?' data-new="1"':'')+' data-old-user="'+h(p.username||'')+'">'
+   +'<style>.pacc-ticks{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:4px}'
+   +'.pacc-tick{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;cursor:pointer}'
+   +'.pacc-tick input{width:16px;height:16px;margin:0}</style>'
+   +'<div class="field"><label>ชื่อผู้ใช้ (ใช้ตอนเข้าสู่ระบบ)</label><input id="paccUser" required pattern="[A-Za-z0-9._&-]{3,40}" value="'+h(p.username||'')+'">'
+   +(isNew?'':'<small class="field-help">เปลี่ยนชื่อผู้ใช้ได้ · รหัสผ่านเดิมยังใช้ได้ · คนนั้นต้องเข้าสู่ระบบครั้งถัดไปด้วยชื่อใหม่</small>')+'</div>'
    +'<div class="field"><label>ชื่อที่แสดง</label><input id="paccName" required value="'+h(p.full_name||'')+'"></div>'
-   +'<div class="field"><label>Role</label><select id="paccRole">'+options(roleNames(),p.role||'Technician')+'</select></div>'
-   +'<div class="field"><label>ทีม</label><select id="paccTeam">'+options(TEAMS,p.team||'')+'</select>'
-   +'<small class="field-help">เปลี่ยนทีมแล้ว Role จะเปลี่ยนตามให้อัตโนมัติ · แก้ Role เองได้ก่อนกดบันทึก</small></div>'
+   +'<div class="field full" style="grid-column:1/-1"><label>ทีม (เลือกได้หลายทีม)</label><div class="pacc-ticks" id="paccTeams">'
+   +TEAMS.filter(function(o){return o.v}).map(function(o){return box('paccTeam',o.v,o.l,myTeams.indexOf(o.v)>=0)}).join('')+'</div>'
+   +'<small class="field-help">เลือกทีมแล้ว Role จะเปลี่ยนตามให้อัตโนมัติ · Dev กับ Service Manager จะคงอยู่เสมอ · แก้ Role เองได้ก่อนกดบันทึก</small></div>'
+   +'<div class="field full" style="grid-column:1/-1"><label>Role (เลือกได้หลาย Role)</label><div class="pacc-ticks" id="paccRoles">'
+   +names.map(function(r){return box('paccRole',r,r,myRoles.indexOf(r)>=0)}).join('')+'</div>'
+   +'<small class="field-help">สิทธิ์ที่ได้ = สิทธิ์ของทุก Role ที่เลือกรวมกัน</small></div>'
    +'<p class="acctadm-empty" style="grid-column:1/-1">Role กลุ่มช่าง (Technician, Technical Lead, R&amp;D Lead) เป็นช่างหน้างานอัตโนมัติ — มอบหมายงานและขึ้นปฏิทินได้ · สีปฏิทินกับเบอร์โทรแก้ที่หน้าทีมงาน</p>'
    +(isNew?'<div class="field"><label>รหัสผ่าน</label><input id="paccPw" type="password" required minlength="8" autocomplete="new-password"></div>'
           +'<div class="field"><label>ยืนยันรหัสผ่าน</label><input id="paccPw2" type="password" required minlength="8" autocomplete="new-password"></div>':'')
@@ -350,6 +409,10 @@
    +'<button type="button" class="soft-btn" data-pacc-back="1">ยกเลิก</button></div></form>';
  }
  function body(){return document.getElementById('modalBody')}
+ function ticked(name){
+  var b=body();if(!b)return [];
+  return [].filter.call(b.querySelectorAll('input[name="'+name+'"]'),function(x){return x.checked}).map(function(x){return x.value});
+ }
  function showErr(t){var e=document.getElementById('paccErr');if(e){e.textContent=t;e.hidden=false}}
  function renderList(){var b=body();if(b)b.innerHTML=listHTML()}
  function byId(id){return staff.filter(function(p){return p.id===id})[0]}
@@ -361,7 +424,9 @@
     points at a record keeps it, even when this device does not hold that record (js/39's
     samak/narongsak lesson). An office role is unlinked; the record and its work stay. */
  function techFor(old,uname,name,role,team){
-  var tech=typeof window.imodeIsTechRole==='function'&&window.imodeIsTechRole(role);
+  var rl=Array.isArray(role)?role:[role];
+  if(Array.isArray(team))team=team.filter(function(x){return x==='Technical'||x==='R&D'})[0]||team[0]||'';
+  var tech=typeof window.imodeIsTechRole==='function'&&rl.some(function(r){return window.imodeIsTechRole(r)});
   if(!tech||DEV)return Promise.resolve('');
   var up=function(rec,id){
    try{saveLocal()}catch(e){}
@@ -409,6 +474,24 @@
  };
  /* The ย้ายทีม button on a ทีมงาน card (js/113): the same popup, opened straight on that
     person's edit form, so the move is saved through the one path above. */
+ /* 2026-10-10: several roles — a permission is granted when ANY of the account's roles has it.
+    An individual override (settings.userPermissions) still decides on its own, as before. */
+ var baseCan=window.canPermission;
+ if(typeof baseCan==='function'){
+  window.canPermission=function(key){
+   if(baseCan.apply(this,arguments))return true;
+   var u=me();
+   var extra=u&&Array.isArray(u.extraRoles)?u.extraRoles:[];
+   if(!extra.length)return false;
+   try{
+    var key2=String(u.id||u.name||'').trim();   /* js/03 permissionUserKey(), which is inside its IIFE */
+    var entry=settings.userPermissions&&settings.userPermissions[key2];
+    if(entry&&entry.enabled)return false;
+    return (settings.roles||[]).some(function(r){
+     return r&&extra.indexOf(r.name)>=0&&Array.isArray(r.permissions)&&r.permissions.indexOf(key)>=0});
+   }catch(e){return false}
+  };
+ }
  window.imodeOpenAccountEdit=function(username){
   if(!canManage()||typeof window.openModal!=='function')return;
   window.openModal('การจัดการบัญชีผู้ใช้','ย้ายทีม / แก้ไขบัญชี','<p class="acctadm-empty">กำลังโหลด…</p>');
@@ -476,27 +559,49 @@
    }
   });
   b.addEventListener('change',function(e){
-   if(b.getAttribute('data-pacc')!=='1'||!e.target||e.target.id!=='paccTeam')return;
-   var rs=document.getElementById('paccRole');if(!rs)return;
-   var next=roleForTeam(e.target.value,rs.value);
-   if(next&&next!==rs.value&&[].some.call(rs.options,function(o){return o.value===next})){
-    rs.value=next;toast('Role เปลี่ยนเป็น '+next+' ตามทีม');
-   }
+   if(b.getAttribute('data-pacc')!=='1'||!e.target||e.target.name!=='paccTeam')return;
+   var teams=ticked('paccTeam'),cur=ticked('paccRole');
+   var next=rolesForTeams(teams,cur);
+   [].forEach.call(b.querySelectorAll('input[name="paccRole"]'),function(x){x.checked=next.indexOf(x.value)>=0});
+   if(next.join()!==cur.join())toast('Role: '+next.join(', '));
   });
   b.addEventListener('submit',function(e){
    if(b.getAttribute('data-pacc')!=='1')return;
    var f=e.target;e.preventDefault();
    var val=function(id){var x=document.getElementById(id);return x?String(x.value||'').trim():''};
    if(f.id==='paccForm'){
-    var id=b.getAttribute('data-pacc-id')||'',isNew=!document.getElementById('paccUser')?false:true;
+    var id=b.getAttribute('data-pacc-id')||'',isNew=f.getAttribute('data-new')==='1';
     if(isNew&&val('paccPw')!==val('paccPw2')){showErr('รหัสผ่านทั้งสองช่องไม่ตรงกัน');return}
+    var roles=ticked('paccRole'),teams=ticked('paccTeam');
+    if(!roles.length){showErr('เลือก Role อย่างน้อย 1 Role');return}
+    var main=mainRole(roles),extras=roles.filter(function(r){return r!==main}),teamStr=teams.join(',');
+    var old=isNew?null:byId(id);
+    var oldUser=isNew?'':(old&&old.username)||'';
+    var newUser=val('paccUser').toLowerCase();
+    if(!/^[a-z0-9._&-]{3,40}$/.test(newUser)){showErr('ชื่อผู้ใช้ใช้ได้เฉพาะ a-z 0-9 . _ - & ยาว 3–40 ตัว');return}
+    var oldExtras=old?rolesOf(old).filter(function(r){return r!==old.role}):[];
     busy(f,true);
-    var old=isNew?null:byId(id),uname=isNew?val('paccUser'):(old&&old.username)||'';
-    var p=techFor(old,uname,val('paccName'),val('paccRole'),val('paccTeam')).then(function(tid){
+    var uname=isNew?newUser:oldUser;
+    var p=techFor(old,uname,val('paccName'),roles,teams).then(function(tid){
      return isNew
       ?call('admin_create_staff',{p_username:uname,p_password:document.getElementById('paccPw').value,
-         p_full_name:val('paccName'),p_role:val('paccRole'),p_team:val('paccTeam'),p_technician_id:tid||null})
-      :call('admin_update_staff',{p_id:id,p_full_name:val('paccName'),p_role:val('paccRole'),p_team:val('paccTeam'),p_technician_id:tid});
+         p_full_name:val('paccName'),p_role:main,p_team:teamStr,p_technician_id:tid||null})
+      :call('admin_update_staff',{p_id:id,p_full_name:val('paccName'),p_role:main,p_team:teamStr,p_technician_id:tid});
+    }).then(function(res){
+     /* the main role first, then the extra ones (the server drops the main role from them),
+        then the name — so "the last Dev / Service Manager" is never briefly nobody. */
+     var pid=isNew?(res&&res.id)||'':id;
+     if(isNew&&DEV)pid=lc(uname);
+     if(!extras.length&&!oldExtras.length)return pid;
+     if(extras.slice().sort().join()===oldExtras.slice().sort().join())return pid;
+     return (DEV?refreshStaff():Promise.resolve()).then(function(){
+      return call('admin_set_staff_roles',{p_id:pid,p_extra_roles:extras});
+     }).then(function(){return pid});
+    }).then(function(pid){
+     if(isNew||newUser===lc(oldUser))return;
+     return (DEV?refreshStaff():Promise.resolve()).then(function(){
+      return call('admin_rename_staff',{p_id:pid,p_username:newUser});
+     });
     });
     p.then(function(){toast(isNew?'เพิ่มบัญชีแล้ว':'บันทึกแล้ว');b.removeAttribute('data-pacc-id');return refreshStaff().then(renderList)})
      .then(function(){try{if(typeof window.imodeRenderTeamAccounts==='function')window.imodeRenderTeamAccounts()}catch(x){}})

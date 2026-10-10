@@ -78,10 +78,17 @@
     Admin / Coordinator role carries teamScope 'Admin', so every assign picker for an admin came
     out EMPTY ("ไม่มีช่างในขอบเขตของบัญชีนี้") while ทีมช่าง listed four technicians. A real team
     lead still gets their own team; only a scope matching nobody falls back to everyone. */
- function teamScope(){var s=rawTeamScope();if(!s)return null;try{if(!technicians.some(function(t){return (t.team||'Technical')===s}))return null}catch(e){}return s}
+ function teamScope(){var s=rawTeamScope();if(!s)return null;try{if(!technicians.some(function(t){return inScope(t.team||'Technical',s)}))return null}catch(e){}return s}
+ /* 2026-10-10: one account may be in several teams (js/124 keeps them as "Technical,R&D").
+    Such a technician's scope is the LIST of their teams; a single team stays a plain string,
+    so every caller that compares with === keeps working for everybody else. */
+ function inScope(team,s){return Array.isArray(s)?s.indexOf(team)>=0:team===s}
+ window.imodeInTeamScope=function(team,s){if(s===undefined)s=teamScope();return !s||inScope(team||'Technical',s)};
  function rawTeamScope(){
   var u=(typeof currentUser!=='undefined'&&currentUser)||null;
   if(!u)return null;
+  var many=String(u.team||'').split(',').map(function(x){return x.trim()}).filter(Boolean);
+  if(many.length>1&&(u.accountType==='technician'||u.technicianId))return many;
   var rec=techRecord();
   if(rec&&rec.team)return rec.team;
   var role=(settings.roles||[]).filter(function(r){return r.name===(u.permissionRole||u.role)})[0];
@@ -94,7 +101,7 @@
  function scopeList(list){
   var team=teamScope();
   if(!team||!Array.isArray(list))return list;
-  return list.filter(function(t){return (t.team||'Technical')===team});
+  return list.filter(function(t){return inScope(t.team||'Technical',team)});
  }
 
  /* ---------- 4. apply the scope to the three places work is listed ---------- */
@@ -116,7 +123,7 @@
    var sel=document.getElementById('fieldTechSelect');
    if(team&&sel){
     var allowed={};
-    technicians.forEach(function(t){if((t.team||'Technical')===team)allowed[t.id]=1});
+    technicians.forEach(function(t){if(inScope(t.team||'Technical',team))allowed[t.id]=1});
     Array.prototype.slice.call(sel.options).forEach(function(o){if(!allowed[o.value])o.remove()});
     var mine=(typeof currentUser!=='undefined'&&currentUser&&currentUser.technicianId)||'';
     if(mine&&allowed[mine])sel.value=mine;

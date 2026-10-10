@@ -266,7 +266,28 @@
    return '<option value="'+h(v)+'"'+(String(v)===String(cur||'')?' selected':'')+'>'+h(l)+'</option>';
   }).join('');
  }
- var TEAMS=[{v:'',l:'— ไม่ระบุ —'},{v:'Technical',l:'Technical'},{v:'R&D',l:'R&D'},{v:'Dev',l:'Dev'},{v:'Admin',l:'Admin'}];
+ /* 2026-10-10: Sales and Management added — the ทีมงาน page has had เซลส์ and ผู้จัดการ chips
+    (js/03 TEAM_META) but nobody could be put in them from here. */
+ var TEAMS=[{v:'',l:'— ไม่ระบุ —'},{v:'Technical',l:'Technical'},{v:'R&D',l:'R&D'},{v:'Dev',l:'Dev'},{v:'Admin',l:'Admin'},
+  {v:'Sales',l:'Sales'},{v:'Management',l:'Management (ผู้จัดการ)'}];
+ /* 2026-10-10: "อยากให้ย้ายทีมของแต่ละคนได้ ... ย้ายแล้วเปลี่ยน Role auto". Changing the team on the
+    account form picks the role that goes with it; the role select stays editable before
+    saving. A role that already belongs to the new team is kept (CEO in Management, Sale / Admin
+    in Sales), a lead stays a lead between Technical and R&D, and a role this system does not
+    have is never chosen — then the role is left as it was. */
+ var TEAM_ROLES={'Technical':['Technician','Technical Lead'],'R&D':['R&D','R&D Lead'],
+  'Admin':['Admin','Admin / Coordinator','Sale / Admin'],'Sales':['Sales','Sale / Admin'],
+  'Management':['Service Manager','CEO'],'Dev':['Dev']};
+ function roleForTeam(team,cur){
+  var list=TEAM_ROLES[team],have=roleNames();
+  if(!list||list.indexOf(cur)>=0)return cur;
+  if(/lead$/i.test(String(cur||''))){
+   var lead=team==='Technical'?'Technical Lead':team==='R&D'?'R&D Lead':'';
+   if(lead&&have.indexOf(lead)>=0)return lead;
+  }
+  for(var i=0;i<list.length;i++)if(have.indexOf(list[i])>=0)return list[i];
+  return cur;
+ }
 
  function listHTML(){
   var manage=canManage(),mine=lc(me()&&me().username);
@@ -308,7 +329,8 @@
    +(isNew?'<div class="field"><label>ชื่อผู้ใช้ (ใช้ตอนเข้าสู่ระบบ)</label><input id="paccUser" required pattern="[A-Za-z0-9._&-]{3,40}"></div>':'')
    +'<div class="field"><label>ชื่อที่แสดง</label><input id="paccName" required value="'+h(p.full_name||'')+'"></div>'
    +'<div class="field"><label>Role</label><select id="paccRole">'+options(roleNames(),p.role||'Technician')+'</select></div>'
-   +'<div class="field"><label>ทีม</label><select id="paccTeam">'+options(TEAMS,p.team||'')+'</select></div>'
+   +'<div class="field"><label>ทีม</label><select id="paccTeam">'+options(TEAMS,p.team||'')+'</select>'
+   +'<small class="field-help">เปลี่ยนทีมแล้ว Role จะเปลี่ยนตามให้อัตโนมัติ · แก้ Role เองได้ก่อนกดบันทึก</small></div>'
    +'<p class="acctadm-empty" style="grid-column:1/-1">Role กลุ่มช่าง (Technician, Technical Lead, R&amp;D Lead) เป็นช่างหน้างานอัตโนมัติ — มอบหมายงานและขึ้นปฏิทินได้ · สีปฏิทินกับเบอร์โทรแก้ที่หน้าทีมงาน</p>'
    +(isNew?'<div class="field"><label>รหัสผ่าน</label><input id="paccPw" type="password" required minlength="8" autocomplete="new-password"></div>'
           +'<div class="field"><label>ยืนยันรหัสผ่าน</label><input id="paccPw2" type="password" required minlength="8" autocomplete="new-password"></div>':'')
@@ -383,6 +405,20 @@
   var b=body();if(b)b.setAttribute('data-pacc','1');
   refreshStaff().then(renderList);
  };
+ /* The ย้ายทีม button on a ทีมงาน card (js/113): the same popup, opened straight on that
+    person's edit form, so the move is saved through the one path above. */
+ window.imodeOpenAccountEdit=function(username){
+  if(!canManage()||typeof window.openModal!=='function')return;
+  window.openModal('การจัดการบัญชีผู้ใช้','ย้ายทีม / แก้ไขบัญชี','<p class="acctadm-empty">กำลังโหลด…</p>');
+  var b=body();if(!b)return;
+  b.setAttribute('data-pacc','1');
+  refreshStaff().then(function(){
+   var p=staff.filter(function(x){return lc(x.username)===lc(username)})[0];
+   if(!p||b.getAttribute('data-pacc')!=='1'){renderList();return}
+   b.innerHTML=formHTML(p);b.setAttribute('data-pacc-id',p.id);
+   var t=document.getElementById('paccTeam');if(t)try{t.focus()}catch(e){}
+  });
+ };
 
  /* js/05 stops propagation at #modalPanel, so a listener on document never sees a click
     inside a popup (CLAUDE.md part 26). The listener is on #modalBody itself. */
@@ -437,6 +473,14 @@
     else if(window.confirm('ปิดใช้บัญชี '+(r.full_name||r.username)+'?'))go();
    }
   });
+  b.addEventListener('change',function(e){
+   if(b.getAttribute('data-pacc')!=='1'||!e.target||e.target.id!=='paccTeam')return;
+   var rs=document.getElementById('paccRole');if(!rs)return;
+   var next=roleForTeam(e.target.value,rs.value);
+   if(next&&next!==rs.value&&[].some.call(rs.options,function(o){return o.value===next})){
+    rs.value=next;toast('Role เปลี่ยนเป็น '+next+' ตามทีม');
+   }
+  });
   b.addEventListener('submit',function(e){
    if(b.getAttribute('data-pacc')!=='1')return;
    var f=e.target;e.preventDefault();
@@ -453,6 +497,7 @@
       :call('admin_update_staff',{p_id:id,p_full_name:val('paccName'),p_role:val('paccRole'),p_team:val('paccTeam'),p_technician_id:tid});
     });
     p.then(function(){toast(isNew?'เพิ่มบัญชีแล้ว':'บันทึกแล้ว');b.removeAttribute('data-pacc-id');return refreshStaff().then(renderList)})
+     .then(function(){try{if(typeof window.imodeRenderTeamAccounts==='function')window.imodeRenderTeamAccounts()}catch(x){}})
      .catch(function(err){busy(f,false);showErr(errText(err))});
     return;
    }

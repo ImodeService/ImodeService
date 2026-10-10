@@ -198,6 +198,11 @@
   if((el=t.closest('[data-tacc-techedit]'))){
    a=lastList[+el.getAttribute('data-tacc-techedit')];if(a){wireModal();openTechEdit(a)}return;
   }
+  if((el=t.closest('[data-tacc-move]'))){
+   a=lastList[+el.getAttribute('data-tacc-move')];
+   if(a&&typeof window.imodeOpenAccountEdit==='function')window.imodeOpenAccountEdit(a.username);
+   return;
+  }
   if((el=t.closest('[data-tacc-jobs]'))){
    if(typeof window.imodeTechCases==='function')window.imodeTechCases(el.getAttribute('data-tacc-jobs'));
   }
@@ -261,7 +266,9 @@
     +'font-size:34px;font-weight:800;color:#fff;background:linear-gradient(135deg,#ff9d45,#ff5b18);border-radius:18px}',
    '.tacc-photo-btn{position:absolute;right:6px;bottom:6px;width:32px;height:32px;border-radius:50%;border:0;'
     +'background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.25);cursor:pointer;font-size:15px;line-height:1}',
-   '@media(max-width:640px){.tacc-grid{grid-template-columns:1fr}}'
+   '@media(max-width:640px){.tacc-grid{grid-template-columns:1fr}}',
+   /* four buttons on a technician card (ย้ายทีม added 2026-10-10) go two per row on a phone */
+   '@media(max-width:640px){.tacc-people .person-actions>*{flex:1 1 calc(50% - 10px)}}'
   ].join('');
   document.head.appendChild(s);
  }
@@ -299,17 +306,22 @@
    +esc2(tl('ยังไม่มีข้อมูลช่าง — บันทึกบัญชีนี้ใน จัดการบัญชี อีกครั้ง','No technician data yet — save this account once'))+'</span>';
   var photoBtn=mayEdit(a)?'<button type="button" class="tacc-photo-btn" data-tacc-photo="'+idx+'" title="'
    +esc2(tl('เปลี่ยนรูปโปรไฟล์','Change photo'))+'">📷</button>':'';
+  /* 2026-10-10: ย้ายทีม — Dev and Service Manager only (manageAcc). Opens js/124's edit form for
+     this person, where changing the team also picks the role that goes with it. */
+  var moveBtn=manageAcc()&&typeof window.imodeOpenAccountEdit==='function'
+   ?'<button class="soft-btn" type="button" data-tacc-move="'+idx+'">'+esc2(tl('ย้ายทีม','Move team'))+'</button>':'';
   var bottom;
   if(isTech){
    bottom='<div class="person-stat"><span>'+esc2(tl('งานเปิด','Open jobs'))+'</span><b>'+techCaseCount(tech.id)+'</b></div>'
     +'<div class="person-actions">'
     +'<button class="soft-btn" type="button" data-tacc-jobs="'+esc2(tech.id)+'">'+esc2(tl('งานหน้างาน','Field jobs'))+'</button>'
     +'<button class="soft-btn" type="button" onclick="openTechnicianDetail('+imodeJsArg(tech.id)+')">'+esc2(tl('รายละเอียด','Details'))+'</button>'
+    +moveBtn
     +(mayEdit(a)?'<button class="primary-btn" type="button" data-tacc-techedit="'+idx+'">'+esc2(tl('แก้ไข','Edit'))+'</button>':'')
     +'</div>';
   }else{
    bottom='<div class="person-stat"><span>'+esc2(tl('เมนูที่เข้าได้','Menus'))+'</span><b>'+duties(a.role).length+'</b></div>'
-    +'<div class="person-actions">'
+    +'<div class="person-actions">'+moveBtn
     +(manageAcc()&&typeof window.openAccountAdminModal==='function'
       ?'<button class="primary-btn" type="button" onclick="openAccountAdminModal()">'+esc2(tl('แก้ไข','Edit'))+'</button>':'')
     +'</div>';

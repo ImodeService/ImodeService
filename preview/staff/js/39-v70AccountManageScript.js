@@ -249,6 +249,8 @@
     technicianId:data.accountType==='technician'?String(data.technicianId||'').trim():''};
   /* Same rule: only a caller that really sent a photo may change one. */
   if(data.photo!==undefined)fields.photo=String(data.photo||'');
+  /* 2026-10-10: several roles per account (js/124); kept only when the caller sent them. */
+  if(Array.isArray(data.extraRoles))fields.extraRoles=data.extraRoles.slice();
 
   if(!acc){
    var row=Object.assign({},fields,{hash:hash,createdAt:new Date().toISOString(),createdBy:meName()});

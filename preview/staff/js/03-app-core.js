@@ -1326,7 +1326,11 @@ function techAccountLabel(tid){
   if(!tid)return '-';
   let list=[];
   try{
-    const all=(window.uatAuth&&typeof window.uatAuth.allAccounts==='function')
+    /* 2026-10-10: imodeAccountList() first — on the server build it is the server's account
+       list (js/124); uatAuth only knows the test site's built-in accounts, so every technician
+       read "ยังไม่มีบัญชี" there although their logins existed. */
+    const all=(typeof window.imodeAccountList==='function')?(window.imodeAccountList()||[])
+      :(window.uatAuth&&typeof window.uatAuth.allAccounts==='function')
       ? window.uatAuth.allAccounts() : [];
     list=all.filter(a=>a&&a.technicianId===tid).map(a=>a.username);
   }catch(e){}

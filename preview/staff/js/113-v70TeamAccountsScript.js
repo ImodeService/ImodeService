@@ -371,7 +371,13 @@
      page, is grouped by role, and follows the team chips above it (ทั้งหมด shows everyone). */
   var team='all';try{team=techTeamFilter||'all'}catch(e){}
   var TEAMS=[];try{TEAMS=TEAM_LIST.slice()}catch(e){}
-  if(team!=='all'&&TEAMS.indexOf(team)>=0)list=list.filter(function(a){return (a.team||'Technical')===team});
+  /* 2026-10-10: "บัญชีทดสอบ แปลกๆ ... ตอนนี้มันเป็นบัญชีจริง". js/104's บัญชีทดสอบ chip sets the
+     filter to '__test__', which is not in TEAM_LIST, so this list was left unfiltered and the
+     chip showed every real account. It now shows only the test accounts (the _test / _testN
+     naming cardHTML already badges), and a team chip leaves them out, as js/104 does. */
+  var isTestAcc=function(a){return /_test\d*$/i.test(String(a.username||''))};
+  if(team==='__test__')list=list.filter(isTestAcc);
+  else if(team!=='all'&&TEAMS.indexOf(team)>=0)list=list.filter(function(a){return !isTestAcc(a)&&(a.team||'Technical')===team});
   list.sort(function(a,b){
    return String(a.name||a.username||'').localeCompare(String(b.name||b.username||''),'th');
   });

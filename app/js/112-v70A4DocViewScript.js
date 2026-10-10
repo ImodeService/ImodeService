@@ -114,6 +114,12 @@
   fit.style.height=full?'':Math.max(40,Math.round(h))+'px';
   var bar=fit.previousElementSibling;
   if(bar&&bar.classList.contains('imode-a4-bar')){
+   /* 2026-10-10: "ปุ่มในกรอบกดแล้วไม่มีอะไรเกิดขึ้น ... เปิดเต็มจอคอมอยู่". พอดีจอ / 100% only
+      matter when the A4 page is wider than the window (a phone, a narrow popup). On a wide
+      screen the page already shows whole at 100%, both buttons draw the same thing, and the
+      bar is hidden; it comes back as soon as the window is too narrow. */
+   var useless=avail>=paperW-1;
+   if(bar.hidden!==useless)bar.hidden=useless;
    var pct=Math.round(scale*100);
    var label=bar.querySelector('.imode-a4-size');
    if(label)label.textContent='A4 · 210 × 297 mm · '+pct+'%';

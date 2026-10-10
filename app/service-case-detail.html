@@ -4895,7 +4895,7 @@ load().then(function(res){
    '.scd-a4-bar .scd-a4-size{font-weight:700;color:#274a8c}',
    '.scd-a4-bar button{border:1px solid #ccd8ea;background:#fff;color:#274a8c;border-radius:999px;'
     + 'padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;min-height:32px}',
-   '.scd-a4-bar button[aria-pressed="true"]{background:#1d55c9;border-color:#1d55c9;color:#fff}'
+   '.scd-a4-bar button[aria-pressed="true"]{background:#1d55c9;border-color:#1d55c9;color:#fff}','.scd-a4-bar[hidden]{display:none}'
   ].join('');
   document.head.appendChild(st);
  }
@@ -4914,6 +4914,12 @@ load().then(function(res){
   fit.style.height=full?'':Math.max(40,Math.round(paper.offsetHeight*sc))+'px';
   var bar=fit.previousElementSibling;
   if(bar&&bar.classList.contains('scd-a4-bar')){
+   /* 2026-10-10: "ปุ่มในกรอบกดแล้วไม่มีอะไรเกิดขึ้น ... เปิดเต็มจอคอมอยู่". พอดีจอ / 100% only
+      matter when the A4 page is wider than the window (a phone, a narrow popup). On a wide
+      screen the page already shows whole at 100%, both buttons draw the same thing, and the
+      bar is hidden; it comes back as soon as the window is too narrow. */
+   var useless=avail>=w-1;
+   if(bar.hidden!==useless)bar.hidden=useless;
    var lab=bar.querySelector('.scd-a4-size');
    /* only when it really changes: a textContent write is a childList mutation, the observer
       below re-ran apply() on it, apply() scheduled fitAll() again — one frame after another,

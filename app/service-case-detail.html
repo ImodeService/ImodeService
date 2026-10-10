@@ -4732,6 +4732,33 @@ var CaseLive=(function(){
     document.addEventListener('visibilitychange',function(){
       if(document.visibilityState==='visible')pullCurrentCase(sb,mine);
     });
+    /* 2026-10-10 (second report, on the server build): "ไม่เห็นนะ ต้องรีเฟรช เหมือนเดิม".
+       Whatever stops the stream on a given network or device, the page must not depend on
+       it alone. Every 10 s, while the page is on screen, it reads this ONE case's small
+       columns (a few hundred bytes); only when they moved does it fetch the full row with
+       the technician's log. Realtime still delivers first when it works. */
+    var col=null,lastAt='';
+    function small(c){
+      try{return Promise.resolve(sb.from('service_cases')
+        .select('id,ticket,status,field_status,appointment,assignee,updated_at').eq(c,mine).maybeSingle())}
+      catch(e){return Promise.resolve({error:e})}
+    }
+    setInterval(function(){
+      if(document.visibilityState!=='visible'||!mine)return;
+      (col?small(col):small('id').then(function(r){
+        if(r&&!r.error&&r.data){col='id';return r}
+        return small('ticket').then(function(r2){if(r2&&!r2.error&&r2.data)col='ticket';return r2});
+      })).then(function(r){
+        var row=r&&!r.error&&r.data;
+        if(!row)return;
+        var at=String(row.updated_at||'');
+        if(at!==lastAt||shownDiffers(row)){
+          var first=!lastAt;
+          lastAt=at;
+          if(!first||shownDiffers(row))pullCurrentCase(sb,mine);
+        }
+      },function(){});
+    },10000);
   }
 
   /* Another tab of this browser (หน้างาน, the main application) wrote the cases, quotations

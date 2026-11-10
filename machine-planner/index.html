@@ -195,6 +195,76 @@ body{background:var(--page)!important;color:var(--ink)}
 .busy{pointer-events:none;opacity:.65}
 @media(max-width:650px){.manual-machine-fields{grid-template-columns:1fr}}
 </style>
+<style id="imode-sidebar-brand-v14">
+.brand{
+  position:fixed!important;
+  left:14px!important;
+  top:14px!important;
+  width:210px!important;
+  height:auto!important;
+  padding:10px 10px 12px!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:0!important;
+  text-align:center!important;
+  overflow:hidden!important;
+  background:#fff!important;
+  border-bottom:1px solid #e7eaee!important;
+}
+.brand img{
+  display:block!important;
+  width:auto!important;
+  height:62px!important;
+  max-width:184px!important;
+  margin:0 auto 8px!important;
+  object-fit:contain!important;
+}
+.brand>div{
+  width:100%!important;
+  max-width:100%!important;
+  min-width:0!important;
+  overflow:hidden!important;
+  text-align:center!important;
+}
+.brand h1{
+  width:100%!important;
+  max-width:100%!important;
+  margin:0!important;
+  font-size:17px!important;
+  line-height:1.2!important;
+  font-weight:800!important;
+  color:#182434!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere!important;
+  word-break:normal!important;
+}
+.brand small{
+  display:block!important;
+  width:100%!important;
+  margin-top:4px!important;
+  font-size:10px!important;
+  line-height:1.3!important;
+  color:#7a8490!important;
+  white-space:normal!important;
+}
+.steps{padding-top:176px!important}
+.catalog-ready-only{display:flex;align-items:center;justify-content:center;min-height:38px;padding:0 6px}
+#panel-machines .catalog-tools{grid-template-columns:minmax(220px,1fr) 180px auto!important}
+@media(max-width:1000px){
+  .brand{position:static!important;width:auto!important;height:auto!important;display:flex!important;flex-direction:row!important;align-items:center!important;text-align:left!important;border:0!important;padding:0!important;overflow:visible!important}
+  .brand img{height:44px!important;max-width:130px!important;margin:0 12px 0 0!important}
+  .brand>div{text-align:left!important;width:auto!important;overflow:visible!important}
+  .brand h1{text-align:left!important;font-size:16px!important}
+  .brand small{text-align:left!important}
+  .steps{padding-top:0!important}
+}
+@media(max-width:650px){
+  #panel-machines .catalog-tools{grid-template-columns:1fr!important}
+  .catalog-ready-only{justify-content:flex-start;padding:0}
+}
+</style>
 </head>
 <body>
 <div class="app" id="app">
@@ -258,7 +328,7 @@ body{background:var(--page)!important;color:var(--ink)}
         <div class="catalog-tools">
           <input id="catalogSearch" placeholder="ค้นหาชื่อ / รุ่น..." style="border:1px solid #cbd5e1;border-radius:10px;padding:10px">
           <select id="categoryFilter" style="border:1px solid #cbd5e1;border-radius:10px;padding:10px"><option value="">ทุกประเภท</option></select>
-          <select id="readyFilter" style="border:1px solid #cbd5e1;border-radius:10px;padding:10px"><option value="">ทั้งหมด</option><option value="ready">ข้อมูลไฟพร้อม</option><option value="needs">ต้องกรอกเพิ่ม</option></select>
+          <input id="readyFilter" type="hidden" value="ready"><div class="catalog-ready-only"><span class="status ready">แสดงเฉพาะข้อมูลพร้อมใช้งาน</span></div>
         </div>
         <div class="catalog-list" id="catalogList"></div>
       </div>
@@ -400,7 +470,7 @@ function projectResult(){
   return {branches,R,S,T,max,mainDesign,mainBreaker,mainCable,connected,knownPower,imb,assign,allPf};
 }
 function setStep(step){state.step=step;$$('.step').forEach(b=>b.classList.toggle('active',b.dataset.step===step));$$('.panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+step));const i=STEPS.indexOf(step),labels=['ต่อไป: เครื่องจักร','ต่อไป: ผังติดตั้ง','ต่อไป: สรุป','กลับไปแก้เครื่อง'];$('#prevBtn').disabled=step===STEPS[0];$('#nextBtn').textContent=labels[i]||'ถัดไป';renderAll();window.scrollTo({top:0,behavior:'smooth'})}
-function renderCatalog(){const q=$('#catalogSearch').value.trim().toLowerCase(),cat=$('#categoryFilter').value,rf=$('#readyFilter').value;const list=CATALOG.filter(r=>(!q||[r.name,r.model,r.name_th,r.category].join(' ').toLowerCase().includes(q))&&(!cat||r.category===cat)&&(!rf||(rf==='ready'?isCatalogReady(r):!isCatalogReady(r))));$('#catalogList').innerHTML=list.length?list.map(r=>`<div class="catalog-item"><div class="cat">${escapeHtml(r.category)}</div><div class="name">${escapeHtml(r.name)}</div><div class="model">${escapeHtml(r.model||'')}</div><div class="elec">${escapeHtml([r.phase||'Phase ?',voltageText(r),r.current?`${r.current} A`:'',r.power_kw?`${r.power_kw} kW`:''].filter(Boolean).join(' • '))}</div><div class="row">${readinessBadge(r)}<button class="btn primary add-cat" data-id="${r.id}" type="button">เพิ่ม</button></div></div>`).join(''):'<div class="empty">ไม่พบเครื่องที่ค้นหา</div>';$$('.add-cat').forEach(b=>b.addEventListener('click',()=>addCatalogMachine(CATALOG.find(r=>r.id===b.dataset.id))))}
+function renderCatalog(){const q=$('#catalogSearch').value.trim().toLowerCase(),cat=$('#categoryFilter').value;const list=CATALOG.filter(isCatalogReady).filter(r=>(!q||[r.name,r.model,r.name_th,r.category].join(' ').toLowerCase().includes(q))&&(!cat||r.category===cat));$('#catalogList').innerHTML=list.length?list.map(r=>`<div class="catalog-item"><div class="cat">${escapeHtml(r.category)}</div><div class="name">${escapeHtml(r.name)}</div><div class="model">${escapeHtml(r.model||'')}</div><div class="elec">${escapeHtml([r.phase||'',voltageText(r),r.current?`${r.current} A`:'',r.power_kw?`${Math.round(r.power_kw*1000)} W`:''].filter(Boolean).join(' • '))}</div><div class="row"><span class="status ready">ข้อมูลพร้อม</span><button class="btn primary add-cat" data-id="${r.id}" type="button">เพิ่ม</button></div></div>`).join(''):'<div class="empty">ไม่พบเครื่องที่มีข้อมูลไฟพร้อมใช้งาน</div>';$('.add-cat').forEach(b=>b.addEventListener('click',()=>addCatalogMachine(CATALOG.find(r=>r.id===b.dataset.id))))}
 function machineStatus(m,r){if(m.consistency==='CONFLICT'&&!Number.isFinite(m.ratedCurrent))return '<span class="status block">ต้องยืนยัน Nameplate</span>';if(!Number.isFinite(r.ib))return '<span class="status warn">ข้อมูลไม่ครบ</span>';if(r.cable&&r.cable.status==='AMPACITY_ONLY')return '<span class="status warn">ต้องกรอก PF เพื่อตรวจ VD</span>';if(r.ready)return '<span class="status ready">คำนวณได้</span>';return '<span class="status warn">ตรวจข้อมูล</span>'}
 function renderMachines(){
   $('#machineCount').textContent=`${state.machines.reduce((s,m)=>s+(m.qty||1),0)} เครื่อง`;
@@ -483,9 +553,9 @@ function updateSiteCheck(){const n=Object.values(state.project.checks).filter(Bo
 function exportProject(){const blob=new Blob([JSON.stringify({app:'IMODE_MACHINE_INSTALLATION_PLANNER_V1',version:1,savedAt:new Date().toISOString(),state},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`IMODE_${(state.project.customer||'Project').replace(/[^a-zA-Z0-9ก-๙_-]+/g,'_')}.json`;a.click();URL.revokeObjectURL(a.href);toast('บันทึกไฟล์โครงการแล้ว')}
 function importProject(file){const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);if(!d.state||!Array.isArray(d.state.machines))throw new Error();Object.assign(state,d.state);hydrateInputs();setStep(state.step||'project');renderAll();toast('เปิดโครงการแล้ว')}catch(e){alert('ไฟล์โครงการไม่ถูกต้อง')}};rd.readAsText(file)}
 function hydrateInputs(){$('#customer').value=state.project.customer||'';$('#customerContact').value=state.project.customerContact||'';$('#customerPhone').value=state.project.customerPhone||'';$('#customerSearch').value=state.project.customer||'';$('#projectName').value=state.project.projectName||'';$('#site').value=state.project.site||'';renderCustomerMeta();$('#system').value=state.project.system||'3P4W';$('#voltagePreset').value=state.project.vLl===400?'400/230':state.project.system==='1P2W'?String(state.project.vLn||220):'380/220';$('#existingMainA').value=state.project.existingMainA??'';renderBreakerPhoto();$('#mainCableLengthM').value=state.project.mainCableLengthM??10;$('#ambient').value=state.project.ambient??35;$('#grouping').value=state.project.grouping??1;$('#vdLimit').value=state.project.vdLimit??5;$('#futureMargin').value=state.project.futureMargin??0;$('#floorW').value=state.floor.w;$('#floorH').value=state.floor.h;$('#routeAllowance').value=state.floor.allowance;$$('#siteChecks input').forEach(c=>c.checked=!!state.project.checks[c.dataset.check])}
-function init(){const cats=[...new Set(CATALOG.map(r=>r.category))].sort((a,b)=>a.localeCompare(b));$('#categoryFilter').innerHTML='<option value="">ทุกประเภท</option>'+cats.map(c=>`<option>${escapeHtml(c)}</option>`).join('');renderCatalog();hydrateInputs();renderAll();setStep('project');
+function init(){const cats=[...new Set(CATALOG.filter(isCatalogReady).map(r=>r.category))].sort((a,b)=>a.localeCompare(b));$('#categoryFilter').innerHTML='<option value="">ทุกประเภท</option>'+cats.map(c=>`<option>${escapeHtml(c)}</option>`).join('');renderCatalog();hydrateInputs();renderAll();setStep('project');
   $$('.step').forEach(b=>b.addEventListener('click',()=>setStep(b.dataset.step)));$('#prevBtn').onclick=()=>setStep(STEPS[Math.max(0,STEPS.indexOf(state.step)-1)]);$('#nextBtn').onclick=()=>{if(state.step===STEPS.at(-1))setStep('machines');else setStep(STEPS[Math.min(STEPS.length-1,STEPS.indexOf(state.step)+1)])};
-  $('#modeSales').onclick=()=>{state.mode='sales';renderAll()};$('#modeTech').onclick=()=>{state.mode='tech';renderAll()};$('#saveBtn').onclick=exportProject;$('#loadInput').onchange=e=>{if(e.target.files[0])importProject(e.target.files[0]);e.target.value=''};$('#resetBtn').onclick=()=>{if(confirm('เริ่มโครงการใหม่และล้างข้อมูลทั้งหมด?'))location.reload()};$('#printBtn').onclick=()=>window.print();$('#mainBreakerImageInput').onchange=e=>{const f=e.target.files&&e.target.files[0];if(!f)return;if(f.size>5*1024*1024){alert('รูปใหญ่เกิน 5 MB');e.target.value='';return}const rd=new FileReader();rd.onload=()=>{state.project.mainBreakerImage=rd.result;renderBreakerPhoto();toast('เพิ่มรูป Main Breaker แล้ว')};rd.readAsDataURL(f)};$('#removeBreakerImageBtn').onclick=()=>{state.project.mainBreakerImage=null;renderBreakerPhoto()};$('#manualMachineBtn').onclick=addManualMachine;['catalogSearch','categoryFilter','readyFilter'].forEach(id=>$('#'+id).addEventListener(id==='catalogSearch'?'input':'change',renderCatalog));
+  $('#modeSales').onclick=()=>{state.mode='sales';renderAll()};$('#modeTech').onclick=()=>{state.mode='tech';renderAll()};$('#saveBtn').onclick=exportProject;$('#loadInput').onchange=e=>{if(e.target.files[0])importProject(e.target.files[0]);e.target.value=''};$('#resetBtn').onclick=()=>{if(confirm('เริ่มโครงการใหม่และล้างข้อมูลทั้งหมด?'))location.reload()};$('#printBtn').onclick=()=>window.print();$('#mainBreakerImageInput').onchange=e=>{const f=e.target.files&&e.target.files[0];if(!f)return;if(f.size>5*1024*1024){alert('รูปใหญ่เกิน 5 MB');e.target.value='';return}const rd=new FileReader();rd.onload=()=>{state.project.mainBreakerImage=rd.result;renderBreakerPhoto();toast('เพิ่มรูป Main Breaker แล้ว')};rd.readAsDataURL(f)};$('#removeBreakerImageBtn').onclick=()=>{state.project.mainBreakerImage=null;renderBreakerPhoto()};$('#manualMachineBtn').onclick=addManualMachine;['catalogSearch','categoryFilter'].forEach(id=>$('#'+id).addEventListener(id==='catalogSearch'?'input':'change',renderCatalog));
   $('#customerSearch').addEventListener('input',renderCustomerResults);$('#customerSearch').addEventListener('focus',renderCustomerResults);$('#addCustomerBtn').onclick=openCustomerModal;$('#saveNewCustomerBtn').onclick=createCustomer;$$('[data-close-customer-modal]').forEach(x=>x.onclick=closeCustomerModal);document.addEventListener('click',e=>{if(!e.target.closest('.customer-picker'))$('#customerResults').innerHTML=''});
   ['customer','customerContact','customerPhone','projectName','site','system','voltagePreset','existingMainA','mainCableLengthM','ambient','grouping','vdLimit','futureMargin'].forEach(id=>$('#'+id).addEventListener('change',syncProject));$('#ambient').addEventListener('input',syncProject);$$('#siteChecks input').forEach(c=>c.addEventListener('change',()=>{state.project.checks[c.dataset.check]=c.checked;updateSiteCheck()}));
   $('#floorW').onchange=e=>{state.floor.w=Math.max(2,Number(e.target.value)||12);state.machines.forEach(m=>m.x=clamp(m.x||0,0,state.floor.w-m.widthM));renderAll()};$('#floorH').onchange=e=>{state.floor.h=Math.max(2,Number(e.target.value)||8);state.machines.forEach(m=>m.y=clamp(m.y||0,0,state.floor.h-m.depthM));renderAll()};$('#routeAllowance').onchange=e=>{state.floor.allowance=Number(e.target.value)||1;renderAll()};$('#autoPlaceBtn').onclick=()=>{state.machines.forEach(m=>{m.x=null;m.y=null});autoPlaceMachines();renderAll()};window.addEventListener('resize',()=>{if(state.step==='layout')renderLayout()});

@@ -271,6 +271,26 @@ body{background:var(--page)!important;color:var(--ink)}
 @media(max-width:1100px){#summaryKpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:650px){#summaryKpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
+<style id="imode-layout-drawing-tools-v16">
+.drawing-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 12px;padding:8px 10px;border:1px solid #dfe4ea;background:#fff;border-radius:5px}
+.drawing-tools,.drawing-options{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.drawing-tools{flex:1}
+.draw-tool,.draw-action{min-height:34px;border:1px solid #d9dfe6;background:#fff;color:#394454;border-radius:4px;padding:6px 9px;font-size:12px;font-weight:700;cursor:pointer}
+.draw-tool:hover,.draw-action:hover{background:#f4f6f8;border-color:#bcc7d3}
+.draw-tool.active{background:#173f73;color:#fff;border-color:#173f73}
+.draw-tool span{margin-left:3px}
+.draw-action.danger{color:#a63333}
+.draw-color{width:36px;height:34px;border:1px solid #d9dfe6;border-radius:4px;overflow:hidden;background:#fff;padding:2px;display:block}
+.draw-color input{width:100%;height:100%;border:0;padding:0;background:transparent;cursor:pointer}
+.drawing-options select{height:34px;border:1px solid #d9dfe6;border-radius:4px;background:#fff;padding:0 7px;font-size:11px}
+.drawing-hint{flex-basis:100%;font-size:10px;color:#77818d;padding-top:2px}
+.annotation-layer{position:absolute;inset:0;width:100%;height:100%;z-index:4;pointer-events:none;overflow:visible}
+.layout-lines{z-index:1!important}.layout-item{z-index:3!important}.floor-label{z-index:5!important}
+.floor.annotating{cursor:crosshair;touch-action:none}
+.floor.annotating .layout-item{pointer-events:none}
+.floor.annotating .annotation-layer{pointer-events:none}
+@media(max-width:760px){.drawing-toolbar{align-items:flex-start}.drawing-tools,.drawing-options{width:100%}.draw-tool span{display:none}.draw-tool{min-width:38px}.drawing-options{overflow-x:auto;flex-wrap:nowrap}}
+</style>
 </head>
 <body>
 <div class="app" id="app">
@@ -358,8 +378,37 @@ body{background:var(--page)!important;color:var(--ink)}
           <div class="field"><label>เผื่อแนวสาย</label><select id="routeAllowance"><option value="1">0%</option><option value="1.1" selected>10%</option><option value="1.2">20%</option></select></div>
           <div class="hint" style="padding-bottom:10px">เส้นจาก DB → เครื่องเป็นแนวประมาณ ไม่ใช่แบบ Shop Drawing</div>
         </div>
+        <div class="drawing-toolbar no-print" id="drawingToolbar">
+          <div class="drawing-tools">
+            <button class="draw-tool active" type="button" data-draw-tool="select" title="เลือก/ย้ายเครื่อง">↖ <span>เลือก</span></button>
+            <button class="draw-tool" type="button" data-draw-tool="text" title="เพิ่มข้อความ">T <span>Text</span></button>
+            <button class="draw-tool" type="button" data-draw-tool="pencil" title="วาดอิสระ">✎ <span>ดินสอ</span></button>
+            <button class="draw-tool" type="button" data-draw-tool="line" title="เส้นตรง">╱ <span>เส้น</span></button>
+            <button class="draw-tool" type="button" data-draw-tool="arrow" title="ลูกศร">➜ <span>ลูกศร</span></button>
+            <button class="draw-tool" type="button" data-draw-tool="rect" title="กรอบสี่เหลี่ยม">□ <span>สี่เหลี่ยม</span></button>
+            <button class="draw-tool" type="button" data-draw-tool="circle" title="วงกลม/วงรี">○ <span>วงกลม</span></button>
+          </div>
+          <div class="drawing-options">
+            <label class="draw-color" title="สี"><input id="annotationColor" type="color" value="#e53935"></label>
+            <select id="annotationWidth" title="ความหนาเส้น">
+              <option value="1.5">เส้นบาง</option>
+              <option value="2.5" selected>เส้นปกติ</option>
+              <option value="4">เส้นหนา</option>
+            </select>
+            <select id="annotationTextSize" title="ขนาดตัวอักษร">
+              <option value="14">Text S</option>
+              <option value="18" selected>Text M</option>
+              <option value="24">Text L</option>
+              <option value="32">Text XL</option>
+            </select>
+            <button class="draw-action" id="undoDrawingBtn" type="button" title="ย้อนกลับงานวาดล่าสุด">↶ ย้อนกลับ</button>
+            <button class="draw-action danger" id="clearDrawingBtn" type="button" title="ล้างงานวาดทั้งหมด">ล้างงานวาด</button>
+          </div>
+          <div class="drawing-hint">เลือกเครื่องมือแล้ววาดบนพื้นที่ผัง • กลับโหมด “เลือก” เพื่อเลื่อนเครื่อง/MAIN DB</div>
+        </div>
         <div class="floor" id="floor">
           <svg class="layout-lines" id="layoutLines"></svg>
+          <svg class="annotation-layer" id="annotationLayer" aria-label="ชั้นงานวาด"></svg>
           <div class="floor-label" id="floorLabel">12 × 8 m</div>
           <div class="layout-item db" id="dbItem" data-kind="db"><span>MAIN DB</span><small>ลากย้ายได้</small></div>
         </div>
@@ -438,7 +487,7 @@ const STANDARD_BREAKERS=REV_CALC.breakers;
 const state={
   step:'project',mode:'sales',
   project:{customerId:null,customer:'',customerContact:'',customerPhone:'',projectName:'',site:'',system:'3P4W',vLl:400,vLn:230,existingMainA:null,mainBreakerImage:null,mainCableLengthM:10,ambient:30,grouping:1,vdLimit:3,futureMargin:25,checks:{}},
-  machines:[],floor:{w:12,h:8,allowance:1.1,db:{x:.7,y:.7}},selectedLayoutId:null
+  machines:[],floor:{w:12,h:8,allowance:1.1,db:{x:.7,y:.7},annotations:[],annotationTool:'select',annotationColor:'#e53935',annotationWidth:2.5,annotationTextSize:18},selectedLayoutId:null
 };
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
@@ -546,15 +595,71 @@ function renderMachines(){
 function renderKpis(){const p=projectResult();const unresolved=p.branches.filter(x=>!Number.isFinite(x.r.ib)).length;$('#machineKpis').innerHTML=`<div class="kpi"><div class="label">จำนวนเครื่อง</div><div class="value">${state.machines.reduce((s,m)=>s+m.qty,0)}</div></div><div class="kpi"><div class="label">Main Design Current</div><div class="value">${fmt(p.mainDesign)} A</div></div><div class="kpi"><div class="label">Main Breaker</div><div class="value">${p.mainBreaker?p.mainBreaker+' A':'—'}</div></div><div class="kpi"><div class="label">ข้อมูลยังไม่ครบ</div><div class="value">${unresolved}</div></div>`;$('#phaseR').textContent=`L1 — ${fmt(p.R)} A`;$('#phaseS').textContent=`L2 — ${fmt(p.S)} A`;$('#phaseT').textContent=`L3 — ${fmt(p.T)} A`;}
 function autoPlaceMachines(){const W=state.floor.w,H=state.floor.h;let i=0;for(const m of state.machines){if(Number.isFinite(m.x)&&Number.isFinite(m.y))continue;const cols=Math.max(2,Math.floor(W/2.5));const col=i%cols,row=Math.floor(i/cols);m.x=clamp(2+col*2.1,.2,Math.max(.2,W-m.widthM-.2));m.y=clamp(1+row*1.8,.2,Math.max(.2,H-m.depthM-.2));i++}}
 function layoutPx(){const f=$('#floor'),r=f.getBoundingClientRect();return {w:r.width,h:r.height,sx:r.width/state.floor.w,sy:r.height/state.floor.h}}
+
+let annotationDraft=null,annotationBound=false;
+function ensureAnnotationState(){
+  if(!state.floor)state.floor={w:12,h:8,allowance:1.1,db:{x:.7,y:.7}};
+  if(!Array.isArray(state.floor.annotations))state.floor.annotations=[];
+  if(!state.floor.annotationTool)state.floor.annotationTool='select';
+  if(!state.floor.annotationColor)state.floor.annotationColor='#e53935';
+  if(!Number.isFinite(Number(state.floor.annotationWidth)))state.floor.annotationWidth=2.5;
+  if(!Number.isFinite(Number(state.floor.annotationTextSize)))state.floor.annotationTextSize=18;
+}
+function annotationPoint(e){const f=$('#floor'),r=f.getBoundingClientRect();return{x:clamp((e.clientX-r.left)/r.width*state.floor.w,0,state.floor.w),y:clamp((e.clientY-r.top)/r.height*state.floor.h,0,state.floor.h)}}
+function annotationScreenPoint(p,px){return{x:p.x*px.sx,y:p.y*px.sy}}
+function annotationMarkup(a,px,arrowId='annotationArrowHead'){
+  const color=escapeHtml(a.color||'#e53935'),sw=Number(a.width)||2.5;
+  const p1=annotationScreenPoint({x:a.x1??a.x??0,y:a.y1??a.y??0},px),p2=annotationScreenPoint({x:a.x2??a.x??0,y:a.y2??a.y??0},px);
+  const common=`fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"`;
+  if(a.type==='text')return `<text x="${p1.x}" y="${p1.y}" fill="${color}" font-size="${Number(a.fontSize)||18}" font-weight="700" font-family="Segoe UI,Tahoma,Arial,sans-serif" paint-order="stroke" stroke="#fff" stroke-width="3" stroke-linejoin="round">${escapeHtml(a.text||'')}</text>`;
+  if(a.type==='line')return `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" ${common}/>`;
+  if(a.type==='arrow')return `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" ${common} marker-end="url(#${arrowId})"/>`;
+  if(a.type==='rect'){const x=Math.min(p1.x,p2.x),y=Math.min(p1.y,p2.y),w=Math.abs(p2.x-p1.x),h=Math.abs(p2.y-p1.y);return `<rect x="${x}" y="${y}" width="${w}" height="${h}" ${common}/>`}
+  if(a.type==='circle'){const cx=(p1.x+p2.x)/2,cy=(p1.y+p2.y)/2,rx=Math.abs(p2.x-p1.x)/2,ry=Math.abs(p2.y-p1.y)/2;return `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" ${common}/>`}
+  if(a.type==='pencil'&&Array.isArray(a.points)){const pts=a.points.map(p=>{const q=annotationScreenPoint(p,px);return `${q.x},${q.y}`}).join(' ');return `<polyline points="${pts}" ${common}/>`}
+  return '';
+}
+function renderAnnotations(){
+  ensureAnnotationState();const svg=$('#annotationLayer');if(!svg)return;const px=layoutPx();svg.setAttribute('viewBox',`0 0 ${px.w} ${px.h}`);
+  const color=state.floor.annotationColor||'#e53935';
+  svg.innerHTML=`<defs><marker id="annotationArrowHead" markerWidth="10" markerHeight="10" refX="8" refY="3.5" orient="auto"><path d="M0,0 L9,3.5 L0,7 Z" fill="${escapeHtml(color)}"/></marker></defs>`+
+    state.floor.annotations.map(a=>annotationMarkup(a,px)).join('')+(annotationDraft?annotationMarkup(annotationDraft,px):'');
+  const floor=$('#floor');floor.classList.toggle('annotating',state.floor.annotationTool!=='select');
+  $$('.draw-tool').forEach(b=>b.classList.toggle('active',b.dataset.drawTool===state.floor.annotationTool));
+}
+function setAnnotationTool(tool){ensureAnnotationState();state.floor.annotationTool=tool;annotationDraft=null;renderAnnotations()}
+function bindAnnotationEvents(){
+  if(annotationBound)return;annotationBound=true;const floor=$('#floor');
+  floor.addEventListener('pointerdown',e=>{
+    ensureAnnotationState();const tool=state.floor.annotationTool;if(tool==='select')return;
+    if(e.button!=null&&e.button!==0)return;e.preventDefault();const p=annotationPoint(e);
+    if(tool==='text'){const txt=prompt('พิมพ์ข้อความที่ต้องการใส่บนผัง');if(txt&&txt.trim()){state.floor.annotations.push({id:uid(),type:'text',x:p.x,y:p.y,text:txt.trim(),color:state.floor.annotationColor,fontSize:Number(state.floor.annotationTextSize)||18,width:Number(state.floor.annotationWidth)||2.5});renderAnnotations()}return}
+    annotationDraft={id:uid(),type:tool,x1:p.x,y1:p.y,x2:p.x,y2:p.y,color:state.floor.annotationColor,width:Number(state.floor.annotationWidth)||2.5,points:tool==='pencil'?[p]:undefined};
+    try{floor.setPointerCapture(e.pointerId)}catch(_){}
+    renderAnnotations();
+  });
+  floor.addEventListener('pointermove',e=>{
+    if(!annotationDraft)return;const p=annotationPoint(e);
+    if(annotationDraft.type==='pencil')annotationDraft.points.push(p);else{annotationDraft.x2=p.x;annotationDraft.y2=p.y}
+    renderAnnotations();
+  });
+  const finish=e=>{
+    if(!annotationDraft)return;const d=annotationDraft;annotationDraft=null;
+    let keep=true;if(d.type!=='pencil'){const dx=(d.x2-d.x1),dy=(d.y2-d.y1);keep=Math.hypot(dx,dy)>.03}else keep=(d.points||[]).length>1;
+    if(keep)state.floor.annotations.push(d);renderAnnotations();
+  };
+  floor.addEventListener('pointerup',finish);floor.addEventListener('pointercancel',()=>{annotationDraft=null;renderAnnotations()});
+}
+function annotationsSummaryMarkup(sx,sy){ensureAnnotationState();const px={sx,sy};return `<defs><marker id="summaryArrowHead" markerWidth="10" markerHeight="10" refX="8" refY="3.5" orient="auto"><path d="M0,0 L9,3.5 L0,7 Z" fill="#e53935"/></marker></defs>`+state.floor.annotations.map(a=>annotationMarkup(a,px,'summaryArrowHead')).join('')}
 function renderLayout(){
-  $('#floorW').value=state.floor.w;$('#floorH').value=state.floor.h;$('#routeAllowance').value=state.floor.allowance;$('#floorLabel').textContent=`${state.floor.w} × ${state.floor.h} m`;
+  $('#floorW').value=state.floor.w;$('#floorH').value=state.floor.h;$('#routeAllowance').value=state.floor.allowance;$('#annotationColor').value=state.floor.annotationColor||'#e53935';$('#annotationWidth').value=String(state.floor.annotationWidth||2.5);$('#annotationTextSize').value=String(state.floor.annotationTextSize||18);$('#floorLabel').textContent=`${state.floor.w} × ${state.floor.h} m`;
   autoPlaceMachines();const f=$('#floor');f.querySelectorAll('.layout-item.machine').forEach(x=>x.remove());const px=layoutPx();
   const db=$('#dbItem');db.style.left=(state.floor.db.x*px.sx-35)+'px';db.style.top=(state.floor.db.y*px.sy-22)+'px';db.style.width='70px';db.style.height='44px';
   for(const m of state.machines){const el=document.createElement('div');el.className='layout-item machine'+(state.selectedLayoutId===m.id?' selected':'');el.dataset.id=m.id;el.style.left=(m.x*px.sx)+'px';el.style.top=(m.y*px.sy)+'px';el.style.width=Math.max(52,m.widthM*px.sx)+'px';el.style.height=Math.max(40,m.depthM*px.sy)+'px';el.innerHTML=`<div class="layout-machine-shell">${m.imageData?`<img src="${m.imageData}" alt="${escapeHtml(m.model||m.name)}">`:'<div class="machine-placeholder"></div>'}<div class="layout-caption">${escapeHtml(m.model||m.name)}${m.qty>1?' ×'+m.qty:''}<br><small>${m.phase||'?'} / ${m.voltage||'?'}V</small></div></div>`;f.appendChild(el);makeDraggable(el,m)}
-  makeDbDraggable();drawLayoutLines();renderLayoutSide();renderSelectedEditor();
+  makeDbDraggable();drawLayoutLines();bindAnnotationEvents();renderAnnotations();renderLayoutSide();renderSelectedEditor();
 }
-function makeDraggable(el,m){let start=null;el.onpointerdown=e=>{e.preventDefault();state.selectedLayoutId=m.id;renderSelectedEditor();$$('.layout-item.machine').forEach(x=>x.classList.toggle('selected',x.dataset.id===m.id));const px=layoutPx();start={x:e.clientX,y:e.clientY,mx:m.x,my:m.y,px};el.setPointerCapture(e.pointerId)};el.onpointermove=e=>{if(!start)return;const nx=start.mx+(e.clientX-start.x)/start.px.sx,ny=start.my+(e.clientY-start.y)/start.px.sy;m.x=clamp(nx,0,state.floor.w-m.widthM);m.y=clamp(ny,0,state.floor.h-m.depthM);el.style.left=m.x*start.px.sx+'px';el.style.top=m.y*start.px.sy+'px';drawLayoutLines();renderLayoutSide(false)};el.onpointerup=()=>{start=null;renderAll()}}
-let dbBound=false;function makeDbDraggable(){if(dbBound)return;dbBound=true;const el=$('#dbItem');let start=null;el.addEventListener('pointerdown',e=>{e.preventDefault();const px=layoutPx();start={x:e.clientX,y:e.clientY,dx:state.floor.db.x,dy:state.floor.db.y,px};el.setPointerCapture(e.pointerId)});el.addEventListener('pointermove',e=>{if(!start)return;state.floor.db.x=clamp(start.dx+(e.clientX-start.x)/start.px.sx,0,state.floor.w);state.floor.db.y=clamp(start.dy+(e.clientY-start.y)/start.px.sy,0,state.floor.h);el.style.left=(state.floor.db.x*start.px.sx-35)+'px';el.style.top=(state.floor.db.y*start.px.sy-22)+'px';drawLayoutLines();renderLayoutSide(false)});el.addEventListener('pointerup',()=>{start=null;renderAll()})}
+function makeDraggable(el,m){let start=null;el.onpointerdown=e=>{ensureAnnotationState();if(state.floor.annotationTool!=='select')return;e.preventDefault();state.selectedLayoutId=m.id;renderSelectedEditor();$$('.layout-item.machine').forEach(x=>x.classList.toggle('selected',x.dataset.id===m.id));const px=layoutPx();start={x:e.clientX,y:e.clientY,mx:m.x,my:m.y,px};el.setPointerCapture(e.pointerId)};el.onpointermove=e=>{if(!start)return;const nx=start.mx+(e.clientX-start.x)/start.px.sx,ny=start.my+(e.clientY-start.y)/start.px.sy;m.x=clamp(nx,0,state.floor.w-m.widthM);m.y=clamp(ny,0,state.floor.h-m.depthM);el.style.left=m.x*start.px.sx+'px';el.style.top=m.y*start.px.sy+'px';drawLayoutLines();renderLayoutSide(false)};el.onpointerup=()=>{start=null;renderAll()}}
+let dbBound=false;function makeDbDraggable(){if(dbBound)return;dbBound=true;const el=$('#dbItem');let start=null;el.addEventListener('pointerdown',e=>{ensureAnnotationState();if(state.floor.annotationTool!=='select')return;e.preventDefault();const px=layoutPx();start={x:e.clientX,y:e.clientY,dx:state.floor.db.x,dy:state.floor.db.y,px};el.setPointerCapture(e.pointerId)});el.addEventListener('pointermove',e=>{if(!start)return;state.floor.db.x=clamp(start.dx+(e.clientX-start.x)/start.px.sx,0,state.floor.w);state.floor.db.y=clamp(start.dy+(e.clientY-start.y)/start.px.sy,0,state.floor.h);el.style.left=(state.floor.db.x*start.px.sx-35)+'px';el.style.top=(state.floor.db.y*start.px.sy-22)+'px';drawLayoutLines();renderLayoutSide(false)});el.addEventListener('pointerup',()=>{start=null;renderAll()})}
 function drawLayoutLines(){const svg=$('#layoutLines'),px=layoutPx();svg.setAttribute('viewBox',`0 0 ${px.w} ${px.h}`);svg.innerHTML=state.machines.map(m=>{const x1=state.floor.db.x*px.sx,y1=state.floor.db.y*px.sy,x2=(m.x+m.widthM/2)*px.sx,y2=(m.y+m.depthM/2)*px.sy;return `<polyline points="${x1},${y1} ${x2},${y1} ${x2},${y2}" fill="none" stroke="#5f7895" stroke-width="1.5" stroke-dasharray="5 4"/>`;}).join('')}
 function renderLayoutSide(full=true){const el=$('#layoutSideList');el.innerHTML=state.machines.length?state.machines.map(m=>{const r=branchResult(m);return `<button type="button" class="side-row" data-id="${m.id}" style="text-align:left;cursor:pointer"><strong>${escapeHtml(m.model||m.name)}${m.qty>1?' ×'+m.qty:''}</strong><small>${fmt(r.length)} m • ${r.cable&&r.cable.size?r.cable.size+' mm²':'สาย —'} • ${r.breaker?r.breaker+'A':'Breaker —'}</small></button>`}).join(''):'<div class="empty">เพิ่มเครื่องก่อนวางผัง</div>';el.querySelectorAll('.side-row').forEach(b=>b.addEventListener('click',()=>{state.selectedLayoutId=b.dataset.id;renderLayout();}))}
 function renderSelectedEditor(){const box=$('#selectedEditor'),m=state.machines.find(x=>x.id===state.selectedLayoutId);if(!m){box.className='notice';box.innerHTML='เลือกเครื่องจากผังเพื่อแก้รายละเอียด';return}normalizeMachine(m);const r=branchResult(m);box.className='';box.innerHTML=`<div class="card" style="box-shadow:none;padding:12px"><div class="selected-preview">${m.imageData?`<img src="${m.imageData}" alt="${escapeHtml(m.model||m.name)}">`:'<div class="machine-placeholder" style="transform:scale(1.8)"></div>'}</div><h3 style="font-size:15px">${escapeHtml(m.model||m.name)}</h3><div class="form-grid" style="grid-template-columns:1fr 1fr"><div class="field"><label>กว้าง (cm)</label><input id="editW" type="number" min="1" step="1" value="${Math.round(m.widthM*100)}"></div><div class="field"><label>ลึก (cm)</label><input id="editD" type="number" min="1" step="1" value="${Math.round(m.depthM*100)}"></div><div class="field full"><label>สูง (cm)</label><input id="editH" type="number" min="1" step="1" value="${Math.round(m.heightM*100)}"></div><div class="field full"><label>ระยะสาย</label><select id="editDistMode"><option value="layout" ${m.distanceMode==='layout'?'selected':''}>ใช้ระยะจากผัง (${fmt(branchCableLength({...m,distanceMode:'layout'}))} m)</option><option value="manual" ${m.distanceMode==='manual'?'selected':''}>กรอกระยะจริง</option></select></div><div class="field full ${m.distanceMode==='manual'?'':'hidden'}" id="manualLenWrap"><label>ระยะจริง (m)</label><input id="editManualLen" type="number" min="0" step="0.5" value="${m.manualLengthM}"></div><div class="field full"><label>เฟส 1Φ</label><select id="editAssign"><option value="AUTO" ${m.assign==='AUTO'?'selected':''}>Auto Balance</option><option value="L1" ${m.assign==='L1'?'selected':''}>L1</option><option value="L2" ${m.assign==='L2'?'selected':''}>L2</option><option value="L3" ${m.assign==='L3'?'selected':''}>L3</option></select></div></div><div class="notice good" style="margin-top:9px">ระยะใช้คำนวณ: <b>${fmt(r.length)} m</b> • Cable: <b>${r.cable&&r.cable.size?r.cable.size+' mm²':'—'}</b> • Breaker: <b>${r.breaker?r.breaker+' A':'—'}</b></div></div>`;
@@ -590,7 +695,7 @@ function renderSummary(){
   const cableItems=[];if(p.mainCable&&p.mainCable.size)cableItems.push(`<div class="equipment-tag"><span><b>Main Cable Cu/PVC ${p.mainCable.size} mm²</b><br><span class="hint">Iz ${Number.isFinite(p.mainCable.iz)?fmt(p.mainCable.iz)+' A':'—'}</span></span><span class="qty">${fmt(state.project.mainCableLengthM)} m</span></div>`);for(const [size,len] of [...cableMap])cableItems.push(`<div class="equipment-tag"><span><b>${escapeHtml(size)}</b><br><span class="hint">รวมระยะวงจรย่อย</span></span><span class="qty">${fmt(len)} m</span></div>`);$('#cableTakeoff').innerHTML=cableItems.length?cableItems.join(''):'<div class="empty">ยังไม่มีข้อมูลสายไฟ</div>';
   $('#sldMain').innerHTML=`MAIN DB<br><span class="hint">${p.mainBreaker?p.mainBreaker+'A':'Breaker —'}<br>${p.mainCable&&p.mainCable.size?p.mainCable.size+' mm²':'Cable —'}</span>`;$('#sldBranches').innerHTML=p.branches.map(({m,r})=>`<div class="sld-branch"><b>${escapeHtml(m.model||m.name)}</b><br><span class="hint">${m.phase||'?'} ${m.voltage||'?'}V<br>Ib ${fmt(r.ib)}A<br>${r.breaker?r.breaker+'A':'Breaker —'} / ${r.cable&&r.cable.size?r.cable.size+'mm²':'Cable —'}</span></div>`).join('');renderSummaryLayout();
 }
-function renderSummaryLayout(){const host=$('#summaryLayout');if(!state.machines.length){host.innerHTML='<div class="empty">ยังไม่มีผัง</div>';return}const W=900,H=560,sx=W/state.floor.w,sy=H/state.floor.h;const lines=state.machines.map(m=>{const x1=state.floor.db.x*sx,y1=state.floor.db.y*sy,x2=(m.x+m.widthM/2)*sx,y2=(m.y+m.depthM/2)*sy;return `<polyline points="${x1},${y1} ${x2},${y1} ${x2},${y2}" fill="none" stroke="#718096" stroke-width="1.5" stroke-dasharray="6 4"/>`}).join('');const boxes=state.machines.map(m=>{const x=m.x*sx,y=m.y*sy,w=Math.max(45,m.widthM*sx),h=Math.max(32,m.depthM*sy);return m.imageData?`<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="7" fill="#fff" stroke="#0b5ea8" stroke-width="2"/><image href="${m.imageData}" x="${x+3}" y="${y+3}" width="${Math.max(10,w-6)}" height="${Math.max(10,h-6)}" preserveAspectRatio="xMidYMid meet"/></g>`:`<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="7" fill="#edf6ff" stroke="#0b5ea8" stroke-width="2"/><text x="${(m.x+m.widthM/2)*sx}" y="${(m.y+m.depthM/2)*sy}" text-anchor="middle" dominant-baseline="middle" font-size="11" font-weight="700" fill="#123a73">${escapeHtml(m.model||m.name).slice(0,22)}</text></g>`}).join('');host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-height:560px;border:1px solid #9aa9b8;background:#fbfdff;border-radius:10px"><g>${lines}<rect x="${state.floor.db.x*sx-35}" y="${state.floor.db.y*sy-20}" width="70" height="40" rx="6" fill="#fff1e3" stroke="#f27a22" stroke-width="2"/><text x="${state.floor.db.x*sx}" y="${state.floor.db.y*sy}" text-anchor="middle" dominant-baseline="middle" font-size="12" font-weight="800" fill="#8b460f">MAIN DB</text>${boxes}</g></svg>`}
+function renderSummaryLayout(){const host=$('#summaryLayout');ensureAnnotationState();if(!state.machines.length&&!state.floor.annotations.length){host.innerHTML='<div class="empty">ยังไม่มีผัง</div>';return}const W=900,H=560,sx=W/state.floor.w,sy=H/state.floor.h;const lines=state.machines.map(m=>{const x1=state.floor.db.x*sx,y1=state.floor.db.y*sy,x2=(m.x+m.widthM/2)*sx,y2=(m.y+m.depthM/2)*sy;return `<polyline points="${x1},${y1} ${x2},${y1} ${x2},${y2}" fill="none" stroke="#718096" stroke-width="1.5" stroke-dasharray="6 4"/>`}).join('');const boxes=state.machines.map(m=>{const x=m.x*sx,y=m.y*sy,w=Math.max(45,m.widthM*sx),h=Math.max(32,m.depthM*sy);return m.imageData?`<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="7" fill="#fff" stroke="#0b5ea8" stroke-width="2"/><image href="${m.imageData}" x="${x+3}" y="${y+3}" width="${Math.max(10,w-6)}" height="${Math.max(10,h-6)}" preserveAspectRatio="xMidYMid meet"/></g>`:`<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="7" fill="#edf6ff" stroke="#0b5ea8" stroke-width="2"/><text x="${(m.x+m.widthM/2)*sx}" y="${(m.y+m.depthM/2)*sy}" text-anchor="middle" dominant-baseline="middle" font-size="11" font-weight="700" fill="#123a73">${escapeHtml(m.model||m.name).slice(0,22)}</text></g>`}).join('');host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-height:560px;border:1px solid #9aa9b8;background:#fbfdff;border-radius:10px"><g>${lines}<rect x="${state.floor.db.x*sx-35}" y="${state.floor.db.y*sy-20}" width="70" height="40" rx="6" fill="#fff1e3" stroke="#f27a22" stroke-width="2"/><text x="${state.floor.db.x*sx}" y="${state.floor.db.y*sy}" text-anchor="middle" dominant-baseline="middle" font-size="12" font-weight="800" fill="#8b460f">MAIN DB</text>${boxes}${annotationsSummaryMarkup(sx,sy)}</g></svg>`}
 function normalizeMachine(m){if(!Number.isFinite(m.widthM))m.widthM=1;if(!Number.isFinite(m.depthM))m.depthM=1;if(!Number.isFinite(m.heightM))m.heightM=1;if(!('imageData' in m))m.imageData=null;if(!Number.isFinite(m.eff)||m.eff<=0)m.eff=1;if(!m.loadCategory)m.loadCategory=catalogLoadCategory(m.category||'');if(!Number.isFinite(m.demandFactor))m.demandFactor=REV_CALC.demandFactors[m.loadCategory]??1;if(m.assign==='R')m.assign='L1';if(m.assign==='S')m.assign='L2';if(m.assign==='T')m.assign='L3';return m}
 function renderAll(){state.machines.forEach(normalizeMachine);document.body.classList.toggle('tech-mode',state.mode==='tech');$('#modeSales').classList.toggle('active',state.mode==='sales');$('#modeTech').classList.toggle('active',state.mode==='tech');renderMachines();renderKpis();if(state.step==='layout')renderLayout();renderSummary();updateSiteCheck();}
 function syncProject(){state.project.customer=$('#customer').value;state.project.customerContact=$('#customerContact').value;state.project.customerPhone=$('#customerPhone').value;state.project.projectName=$('#projectName').value;state.project.site=$('#site').value;const selected=allCustomers().find(c=>c.id===state.project.customerId);if(selected&&state.project.customer!==selected.name)state.project.customerId=null;renderCustomerMeta();state.project.system=$('#system').value;const p=$('#voltagePreset').value;if(p==='380/220'){state.project.vLl=380;state.project.vLn=220}else if(p==='400/230'){state.project.vLl=400;state.project.vLn=230}else {state.project.vLl=Number(p);state.project.vLn=Number(p)}state.project.existingMainA=num($('#existingMainA').value);state.project.mainCableLengthM=Number($('#mainCableLengthM').value)||0;state.project.ambient=Number($('#ambient').value);state.project.grouping=Number($('#grouping').value);state.project.vdLimit=Number($('#vdLimit').value);state.project.futureMargin=Number($('#futureMargin').value);renderAll()}
@@ -601,13 +706,13 @@ function createCustomer(){const name=$('#newCustomerName').value.trim();if(!name
 function updateSiteCheck(){const n=Object.values(state.project.checks).filter(Boolean).length;$('#siteProgress').textContent=`Site Check: ${n}/5${n===5?' ✓ ครบสำหรับสำรวจเบื้องต้น':''}`}
 function exportProject(){const blob=new Blob([JSON.stringify({app:'IMODE_MACHINE_INSTALLATION_PLANNER_V1',version:1,savedAt:new Date().toISOString(),state},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`IMODE_${(state.project.customer||'Project').replace(/[^a-zA-Z0-9ก-๙_-]+/g,'_')}.json`;a.click();URL.revokeObjectURL(a.href);toast('บันทึกไฟล์โครงการแล้ว')}
 function importProject(file){const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);if(!d.state||!Array.isArray(d.state.machines))throw new Error();Object.assign(state,d.state);hydrateInputs();setStep(state.step||'project');renderAll();toast('เปิดโครงการแล้ว')}catch(e){alert('ไฟล์โครงการไม่ถูกต้อง')}};rd.readAsText(file)}
-function hydrateInputs(){$('#customer').value=state.project.customer||'';$('#customerContact').value=state.project.customerContact||'';$('#customerPhone').value=state.project.customerPhone||'';$('#customerSearch').value=state.project.customer||'';$('#projectName').value=state.project.projectName||'';$('#site').value=state.project.site||'';renderCustomerMeta();$('#system').value=state.project.system||'3P4W';$('#voltagePreset').value=state.project.vLl===400?'400/230':state.project.system==='1P2W'?String(state.project.vLn||220):'380/220';$('#existingMainA').value=state.project.existingMainA??'';renderBreakerPhoto();$('#mainCableLengthM').value=state.project.mainCableLengthM??10;$('#ambient').value=state.project.ambient??30;$('#grouping').value=state.project.grouping??1;$('#vdLimit').value=state.project.vdLimit??3;$('#futureMargin').value=state.project.futureMargin??25;$('#floorW').value=state.floor.w;$('#floorH').value=state.floor.h;$('#routeAllowance').value=state.floor.allowance;$$('#siteChecks input').forEach(c=>c.checked=!!state.project.checks[c.dataset.check])}
+function hydrateInputs(){ensureAnnotationState();$('#customer').value=state.project.customer||'';$('#customerContact').value=state.project.customerContact||'';$('#customerPhone').value=state.project.customerPhone||'';$('#customerSearch').value=state.project.customer||'';$('#projectName').value=state.project.projectName||'';$('#site').value=state.project.site||'';renderCustomerMeta();$('#system').value=state.project.system||'3P4W';$('#voltagePreset').value=state.project.vLl===400?'400/230':state.project.system==='1P2W'?String(state.project.vLn||220):'380/220';$('#existingMainA').value=state.project.existingMainA??'';renderBreakerPhoto();$('#mainCableLengthM').value=state.project.mainCableLengthM??10;$('#ambient').value=state.project.ambient??30;$('#grouping').value=state.project.grouping??1;$('#vdLimit').value=state.project.vdLimit??3;$('#futureMargin').value=state.project.futureMargin??25;$('#floorW').value=state.floor.w;$('#floorH').value=state.floor.h;$('#routeAllowance').value=state.floor.allowance;$$('#siteChecks input').forEach(c=>c.checked=!!state.project.checks[c.dataset.check])}
 function init(){const cats=[...new Set(CATALOG.filter(isCatalogReady).map(r=>r.category))].sort((a,b)=>a.localeCompare(b));$('#categoryFilter').innerHTML='<option value="">ทุกประเภท</option>'+cats.map(c=>`<option>${escapeHtml(c)}</option>`).join('');renderCatalog();hydrateInputs();renderAll();setStep('project');
   $$('.step').forEach(b=>b.addEventListener('click',()=>setStep(b.dataset.step)));$('#prevBtn').onclick=()=>setStep(STEPS[Math.max(0,STEPS.indexOf(state.step)-1)]);$('#nextBtn').onclick=()=>{if(state.step===STEPS.at(-1))setStep('machines');else setStep(STEPS[Math.min(STEPS.length-1,STEPS.indexOf(state.step)+1)])};
   $('#modeSales').onclick=()=>{state.mode='sales';renderAll()};$('#modeTech').onclick=()=>{state.mode='tech';renderAll()};$('#saveBtn').onclick=exportProject;$('#loadInput').onchange=e=>{if(e.target.files[0])importProject(e.target.files[0]);e.target.value=''};$('#resetBtn').onclick=()=>{if(confirm('เริ่มโครงการใหม่และล้างข้อมูลทั้งหมด?'))location.reload()};$('#printBtn').onclick=()=>window.print();$('#mainBreakerImageInput').onchange=e=>{const f=e.target.files&&e.target.files[0];if(!f)return;if(f.size>5*1024*1024){alert('รูปใหญ่เกิน 5 MB');e.target.value='';return}const rd=new FileReader();rd.onload=()=>{state.project.mainBreakerImage=rd.result;renderBreakerPhoto();toast('เพิ่มรูป Main Breaker แล้ว')};rd.readAsDataURL(f)};$('#removeBreakerImageBtn').onclick=()=>{state.project.mainBreakerImage=null;renderBreakerPhoto()};$('#manualMachineBtn').onclick=addManualMachine;['catalogSearch','categoryFilter'].forEach(id=>$('#'+id).addEventListener(id==='catalogSearch'?'input':'change',renderCatalog));
   $('#customerSearch').addEventListener('input',renderCustomerResults);$('#customerSearch').addEventListener('focus',renderCustomerResults);$('#addCustomerBtn').onclick=openCustomerModal;$('#saveNewCustomerBtn').onclick=createCustomer;$$('[data-close-customer-modal]').forEach(x=>x.onclick=closeCustomerModal);document.addEventListener('click',e=>{if(!e.target.closest('.customer-picker'))$('#customerResults').innerHTML=''});
   ['customer','customerContact','customerPhone','projectName','site','system','voltagePreset','existingMainA','mainCableLengthM','ambient','grouping','vdLimit','futureMargin'].forEach(id=>$('#'+id).addEventListener('change',syncProject));$('#ambient').addEventListener('input',syncProject);$$('#siteChecks input').forEach(c=>c.addEventListener('change',()=>{state.project.checks[c.dataset.check]=c.checked;updateSiteCheck()}));
-  $('#floorW').onchange=e=>{state.floor.w=Math.max(2,Number(e.target.value)||12);state.machines.forEach(m=>m.x=clamp(m.x||0,0,state.floor.w-m.widthM));renderAll()};$('#floorH').onchange=e=>{state.floor.h=Math.max(2,Number(e.target.value)||8);state.machines.forEach(m=>m.y=clamp(m.y||0,0,state.floor.h-m.depthM));renderAll()};$('#routeAllowance').onchange=e=>{state.floor.allowance=Number(e.target.value)||1;renderAll()};$('#autoPlaceBtn').onclick=()=>{state.machines.forEach(m=>{m.x=null;m.y=null});autoPlaceMachines();renderAll()};window.addEventListener('resize',()=>{if(state.step==='layout')renderLayout()});
+  $('#floorW').onchange=e=>{state.floor.w=Math.max(2,Number(e.target.value)||12);state.machines.forEach(m=>m.x=clamp(m.x||0,0,state.floor.w-m.widthM));renderAll()};$('#floorH').onchange=e=>{state.floor.h=Math.max(2,Number(e.target.value)||8);state.machines.forEach(m=>m.y=clamp(m.y||0,0,state.floor.h-m.depthM));renderAll()};$('#routeAllowance').onchange=e=>{state.floor.allowance=Number(e.target.value)||1;renderAll()};$('#autoPlaceBtn').onclick=()=>{state.machines.forEach(m=>{m.x=null;m.y=null});autoPlaceMachines();renderAll()};$$('.draw-tool').forEach(b=>b.onclick=()=>setAnnotationTool(b.dataset.drawTool));$('#annotationColor').oninput=e=>{ensureAnnotationState();state.floor.annotationColor=e.target.value;renderAnnotations()};$('#annotationWidth').onchange=e=>{ensureAnnotationState();state.floor.annotationWidth=Number(e.target.value)||2.5};$('#annotationTextSize').onchange=e=>{ensureAnnotationState();state.floor.annotationTextSize=Number(e.target.value)||18};$('#undoDrawingBtn').onclick=()=>{ensureAnnotationState();state.floor.annotations.pop();renderAnnotations();renderSummaryLayout()};$('#clearDrawingBtn').onclick=()=>{ensureAnnotationState();if(!state.floor.annotations.length)return;if(confirm('ล้างงานวาดทั้งหมดบนผัง?')){state.floor.annotations=[];renderAnnotations();renderSummaryLayout()}};window.addEventListener('resize',()=>{if(state.step==='layout')renderLayout()});
 }
 init();
 </script>

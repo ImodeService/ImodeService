@@ -291,6 +291,12 @@ body{background:var(--page)!important;color:var(--ink)}
 .floor.annotating .annotation-layer{pointer-events:none}
 @media(max-width:760px){.drawing-toolbar{align-items:flex-start}.drawing-tools,.drawing-options{width:100%}.draw-tool span{display:none}.draw-tool{min-width:38px}.drawing-options{overflow-x:auto;flex-wrap:nowrap}}
 </style>
+<style id="imode-drawing-tools-v17">
+.draw-tool.danger{color:#a63333;border-color:#e5c8c8}
+.draw-tool.danger.active{background:#a63333!important;color:#fff!important;border-color:#a63333!important}
+.drawing-toolbar{position:relative}
+.drawing-toolbar:before{content:"เครื่องมือวาดผัง";font-size:11px;font-weight:800;color:#243244;flex-basis:100%;margin-bottom:1px}
+</style>
 </head>
 <body>
 <div class="app" id="app">
@@ -387,6 +393,8 @@ body{background:var(--page)!important;color:var(--ink)}
             <button class="draw-tool" type="button" data-draw-tool="arrow" title="ลูกศร">➜ <span>ลูกศร</span></button>
             <button class="draw-tool" type="button" data-draw-tool="rect" title="กรอบสี่เหลี่ยม">□ <span>สี่เหลี่ยม</span></button>
             <button class="draw-tool" type="button" data-draw-tool="circle" title="วงกลม/วงรี">○ <span>วงกลม</span></button>
+            <button class="draw-tool" type="button" data-draw-tool="dimension" title="เส้นบอกขนาด/ระยะ">↔ <span>บอกขนาด</span></button>
+            <button class="draw-tool danger" type="button" data-draw-tool="eraser" title="ลบวัตถุงานวาด">⌫ <span>ยางลบ</span></button>
           </div>
           <div class="drawing-options">
             <label class="draw-color" title="สี"><input id="annotationColor" type="color" value="#e53935"></label>
@@ -404,7 +412,7 @@ body{background:var(--page)!important;color:var(--ink)}
             <button class="draw-action" id="undoDrawingBtn" type="button" title="ย้อนกลับงานวาดล่าสุด">↶ ย้อนกลับ</button>
             <button class="draw-action danger" id="clearDrawingBtn" type="button" title="ล้างงานวาดทั้งหมด">ล้างงานวาด</button>
           </div>
-          <div class="drawing-hint">เลือกเครื่องมือแล้ววาดบนพื้นที่ผัง • กลับโหมด “เลือก” เพื่อเลื่อนเครื่อง/MAIN DB</div>
+          <div class="drawing-hint">Text / ดินสอ / เส้น / ลูกศร / สี่เหลี่ยม / วงกลม / บอกขนาด / ยางลบ • กลับโหมด “เลือก” เพื่อเลื่อนเครื่องและ MAIN DB</div>
         </div>
         <div class="floor" id="floor">
           <svg class="layout-lines" id="layoutLines"></svg>
@@ -616,6 +624,7 @@ function annotationMarkup(a,px,arrowId='annotationArrowHead'){
   if(a.type==='arrow')return `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" ${common} marker-end="url(#${arrowId})"/>`;
   if(a.type==='rect'){const x=Math.min(p1.x,p2.x),y=Math.min(p1.y,p2.y),w=Math.abs(p2.x-p1.x),h=Math.abs(p2.y-p1.y);return `<rect x="${x}" y="${y}" width="${w}" height="${h}" ${common}/>`}
   if(a.type==='circle'){const cx=(p1.x+p2.x)/2,cy=(p1.y+p2.y)/2,rx=Math.abs(p2.x-p1.x)/2,ry=Math.abs(p2.y-p1.y)/2;return `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" ${common}/>`}
+  if(a.type==='dimension'){const dx=p2.x-p1.x,dy=p2.y-p1.y,lenPx=Math.hypot(dx,dy)||1,nx=-dy/lenPx,ny=dx/lenPx,tick=6,mx=(p1.x+p2.x)/2,my=(p1.y+p2.y)/2,dist=Math.hypot((a.x2-a.x1),(a.y2-a.y1));return `<g><line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" ${common}/><line x1="${p1.x-nx*tick}" y1="${p1.y-ny*tick}" x2="${p1.x+nx*tick}" y2="${p1.y+ny*tick}" ${common}/><line x1="${p2.x-nx*tick}" y1="${p2.y-ny*tick}" x2="${p2.x+nx*tick}" y2="${p2.y+ny*tick}" ${common}/><text x="${mx+nx*12}" y="${my+ny*12}" text-anchor="middle" dominant-baseline="middle" fill="${color}" font-size="13" font-weight="800" font-family="Segoe UI,Tahoma,Arial,sans-serif" paint-order="stroke" stroke="#fff" stroke-width="4">${dist.toFixed(2)} m</text></g>`}
   if(a.type==='pencil'&&Array.isArray(a.points)){const pts=a.points.map(p=>{const q=annotationScreenPoint(p,px);return `${q.x},${q.y}`}).join(' ');return `<polyline points="${pts}" ${common}/>`}
   return '';
 }
@@ -628,12 +637,30 @@ function renderAnnotations(){
   $$('.draw-tool').forEach(b=>b.classList.toggle('active',b.dataset.drawTool===state.floor.annotationTool));
 }
 function setAnnotationTool(tool){ensureAnnotationState();state.floor.annotationTool=tool;annotationDraft=null;renderAnnotations()}
+function annotationDistanceToPoint(a,p){
+  if(a.type==='text')return Math.hypot((a.x??0)-p.x,(a.y??0)-p.y);
+  if(a.type==='pencil'&&Array.isArray(a.points)&&a.points.length)return Math.min(...a.points.map(q=>Math.hypot(q.x-p.x,q.y-p.y)));
+  const x1=a.x1??a.x??0,y1=a.y1??a.y??0,x2=a.x2??x1,y2=a.y2??y1;
+  if(a.type==='rect'||a.type==='circle'||a.type==='dimension'||a.type==='line'||a.type==='arrow'){
+    const vx=x2-x1,vy=y2-y1,wx=p.x-x1,wy=p.y-y1,l2=vx*vx+vy*vy;
+    const t=l2?clamp((wx*vx+wy*vy)/l2,0,1):0;
+    return Math.hypot(p.x-(x1+t*vx),p.y-(y1+t*vy));
+  }
+  return Math.hypot(x1-p.x,y1-p.y);
+}
+function eraseAnnotationAt(p){
+  ensureAnnotationState();if(!state.floor.annotations.length)return;
+  let best=-1,bestD=Infinity;state.floor.annotations.forEach((a,i)=>{const d=annotationDistanceToPoint(a,p);if(d<bestD){bestD=d;best=i}});
+  const threshold=Math.max(state.floor.w,state.floor.h)*0.035;
+  if(best>=0&&bestD<=threshold){state.floor.annotations.splice(best,1);renderAnnotations();renderSummaryLayout();toast('ลบงานวาดแล้ว')}
+}
 function bindAnnotationEvents(){
   if(annotationBound)return;annotationBound=true;const floor=$('#floor');
   floor.addEventListener('pointerdown',e=>{
     ensureAnnotationState();const tool=state.floor.annotationTool;if(tool==='select')return;
     if(e.button!=null&&e.button!==0)return;e.preventDefault();const p=annotationPoint(e);
-    if(tool==='text'){const txt=prompt('พิมพ์ข้อความที่ต้องการใส่บนผัง');if(txt&&txt.trim()){state.floor.annotations.push({id:uid(),type:'text',x:p.x,y:p.y,text:txt.trim(),color:state.floor.annotationColor,fontSize:Number(state.floor.annotationTextSize)||18,width:Number(state.floor.annotationWidth)||2.5});renderAnnotations()}return}
+    if(tool==='eraser'){eraseAnnotationAt(p);return}
+    if(tool==='text'){const txt=prompt('พิมพ์ข้อความที่ต้องการใส่บนผัง');if(txt&&txt.trim()){state.floor.annotations.push({id:uid(),type:'text',x:p.x,y:p.y,text:txt.trim(),color:state.floor.annotationColor,fontSize:Number(state.floor.annotationTextSize)||18,width:Number(state.floor.annotationWidth)||2.5});renderAnnotations();renderSummaryLayout()}return}
     annotationDraft={id:uid(),type:tool,x1:p.x,y1:p.y,x2:p.x,y2:p.y,color:state.floor.annotationColor,width:Number(state.floor.annotationWidth)||2.5,points:tool==='pencil'?[p]:undefined};
     try{floor.setPointerCapture(e.pointerId)}catch(_){}
     renderAnnotations();
@@ -646,7 +673,7 @@ function bindAnnotationEvents(){
   const finish=e=>{
     if(!annotationDraft)return;const d=annotationDraft;annotationDraft=null;
     let keep=true;if(d.type!=='pencil'){const dx=(d.x2-d.x1),dy=(d.y2-d.y1);keep=Math.hypot(dx,dy)>.03}else keep=(d.points||[]).length>1;
-    if(keep)state.floor.annotations.push(d);renderAnnotations();
+    if(keep)state.floor.annotations.push(d);renderAnnotations();renderSummaryLayout();
   };
   floor.addEventListener('pointerup',finish);floor.addEventListener('pointercancel',()=>{annotationDraft=null;renderAnnotations()});
 }

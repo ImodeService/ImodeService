@@ -297,6 +297,41 @@ body{background:var(--page)!important;color:var(--ink)}
 .drawing-toolbar{position:relative}
 .drawing-toolbar:before{content:"เครื่องมือวาดผัง";font-size:11px;font-weight:800;color:#243244;flex-basis:100%;margin-bottom:1px}
 </style>
+<style id="imode-paint-ribbon-v18">
+.paint-ribbon{
+  display:flex;align-items:stretch;gap:0;flex-wrap:wrap;
+  margin:10px 0 12px;padding:0;background:#f7f8fa;
+  border:1px solid #d9dee5;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.05);
+  min-height:104px;overflow:visible
+}
+.paint-group{display:flex;flex-direction:column;justify-content:space-between;padding:8px 10px 5px;border-right:1px solid #dfe3e8;min-width:84px}
+.paint-group-body{display:flex;align-items:center;justify-content:center;gap:6px;min-height:62px}
+.paint-group-label{text-align:center;font-size:10px;color:#737d88;margin-top:5px;white-space:nowrap}
+.paint-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:54px;min-height:58px;border:1px solid transparent;background:transparent;border-radius:3px;color:#26313f;font-size:10px;font-weight:700;cursor:pointer}
+.paint-btn:hover,.paint-square:hover,.paint-mini:hover{background:#eef2f6;border-color:#cbd4de}
+.paint-btn.active,.paint-square.active{background:#e7f0fa;border-color:#6f9fcd;color:#103f70}
+.paint-icon{font-size:24px;line-height:1}
+.paint-tools-grid{display:grid;grid-template-columns:repeat(2,34px);gap:4px}
+.paint-shape-grid{display:grid;grid-template-columns:repeat(3,34px);gap:4px}
+.paint-square{width:34px;height:30px;display:flex;align-items:center;justify-content:center;border:1px solid transparent;background:transparent;border-radius:3px;font-size:18px;cursor:pointer;color:#253445}
+.paint-square.danger{color:#ae3535}
+.paint-select{height:30px;border:1px solid #cdd5df;border-radius:3px;background:#fff;padding:0 5px;font-size:10px;max-width:84px}
+.paint-stack{flex-direction:column;gap:4px}
+.paint-mini{height:28px;border:1px solid #ccd4dd;background:#fff;border-radius:3px;padding:0 8px;font-size:10px;font-weight:700;cursor:pointer}
+.paint-mini.danger{color:#a53131}
+.paint-colors{min-width:230px}
+.paint-current-color{width:42px;height:42px;border:2px solid #173f73;border-radius:50%;padding:3px;background:#fff;overflow:hidden;flex:0 0 auto}
+.paint-current-color input{width:100%;height:100%;padding:0;border:0;border-radius:50%;background:transparent;cursor:pointer}
+.paint-palette{display:grid;grid-template-columns:repeat(5,24px);gap:5px}
+.color-swatch{width:24px;height:24px;border:1px solid #aeb7c1;border-radius:50%;cursor:pointer;padding:0}
+.color-swatch:hover{outline:2px solid #6f9fcd;outline-offset:1px}
+.paint-ribbon-note{flex-basis:100%;padding:5px 10px;border-top:1px solid #e3e6ea;background:#fff;font-size:10px;color:#6f7884}
+.floor.has-floor-bg{background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important}
+@media(max-width:1100px){
+  .paint-ribbon{overflow-x:auto;flex-wrap:nowrap;padding-bottom:0}
+  .paint-group{flex:0 0 auto}.paint-ribbon-note{display:none}
+}
+</style>
 </head>
 <body>
 <div class="app" id="app">
@@ -384,36 +419,99 @@ body{background:var(--page)!important;color:var(--ink)}
           <div class="field"><label>เผื่อแนวสาย</label><select id="routeAllowance"><option value="1">0%</option><option value="1.1" selected>10%</option><option value="1.2">20%</option></select></div>
           <div class="hint" style="padding-bottom:10px">เส้นจาก DB → เครื่องเป็นแนวประมาณ ไม่ใช่แบบ Shop Drawing</div>
         </div>
-        <div class="drawing-toolbar no-print" id="drawingToolbar">
-          <div class="drawing-tools">
-            <button class="draw-tool active" type="button" data-draw-tool="select" title="เลือก/ย้ายเครื่อง">↖ <span>เลือก</span></button>
-            <button class="draw-tool" type="button" data-draw-tool="text" title="เพิ่มข้อความ">T <span>Text</span></button>
-            <button class="draw-tool" type="button" data-draw-tool="pencil" title="วาดอิสระ">✎ <span>ดินสอ</span></button>
-            <button class="draw-tool" type="button" data-draw-tool="line" title="เส้นตรง">╱ <span>เส้น</span></button>
-            <button class="draw-tool" type="button" data-draw-tool="arrow" title="ลูกศร">➜ <span>ลูกศร</span></button>
-            <button class="draw-tool" type="button" data-draw-tool="rect" title="กรอบสี่เหลี่ยม">□ <span>สี่เหลี่ยม</span></button>
-            <button class="draw-tool" type="button" data-draw-tool="circle" title="วงกลม/วงรี">○ <span>วงกลม</span></button>
-            <button class="draw-tool" type="button" data-draw-tool="dimension" title="เส้นบอกขนาด/ระยะ">↔ <span>บอกขนาด</span></button>
-            <button class="draw-tool danger" type="button" data-draw-tool="eraser" title="ลบวัตถุงานวาด">⌫ <span>ยางลบ</span></button>
-          </div>
-          <div class="drawing-options">
-            <label class="draw-color" title="สี"><input id="annotationColor" type="color" value="#e53935"></label>
-            <select id="annotationWidth" title="ความหนาเส้น">
-              <option value="1.5">เส้นบาง</option>
-              <option value="2.5" selected>เส้นปกติ</option>
-              <option value="4">เส้นหนา</option>
-            </select>
-            <select id="annotationTextSize" title="ขนาดตัวอักษร">
-              <option value="14">Text S</option>
-              <option value="18" selected>Text M</option>
-              <option value="24">Text L</option>
-              <option value="32">Text XL</option>
-            </select>
-            <button class="draw-action" id="undoDrawingBtn" type="button" title="ย้อนกลับงานวาดล่าสุด">↶ ย้อนกลับ</button>
-            <button class="draw-action danger" id="clearDrawingBtn" type="button" title="ล้างงานวาดทั้งหมด">ล้างงานวาด</button>
-          </div>
-          <div class="drawing-hint">Text / ดินสอ / เส้น / ลูกศร / สี่เหลี่ยม / วงกลม / บอกขนาด / ยางลบ • กลับโหมด “เลือก” เพื่อเลื่อนเครื่องและ MAIN DB</div>
-        </div>
+        <div class="paint-ribbon no-print" id="drawingToolbar">
+  <div class="paint-group">
+    <div class="paint-group-body">
+      <button class="paint-btn draw-tool active" type="button" data-draw-tool="select" title="เลือก/ย้ายเครื่องและวัตถุ">
+        <span class="paint-icon">⬚</span><span>เลือก</span>
+      </button>
+    </div>
+    <div class="paint-group-label">Selection</div>
+  </div>
+
+  <div class="paint-group">
+    <div class="paint-group-body">
+      <label class="paint-btn" title="นำเข้ารูปแปลนเป็นพื้นหลัง">
+        <span class="paint-icon">🖼</span><span>รูปแปลน</span>
+        <input id="floorBackgroundInput" type="file" accept="image/*" hidden>
+      </label>
+      <button class="paint-mini danger" id="removeFloorBackgroundBtn" type="button" title="ลบรูปแปลน">ลบรูป</button>
+    </div>
+    <div class="paint-group-label">Image</div>
+  </div>
+
+  <div class="paint-group">
+    <div class="paint-group-body paint-tools-grid">
+      <button class="paint-square draw-tool" type="button" data-draw-tool="pencil" title="ดินสอ">✎</button>
+      <button class="paint-square draw-tool" type="button" data-draw-tool="eraser" title="ยางลบ">⌫</button>
+      <button class="paint-square draw-tool" type="button" data-draw-tool="text" title="ข้อความ">A</button>
+      <button class="paint-square draw-tool" type="button" data-draw-tool="dimension" title="บอกขนาด">↔</button>
+    </div>
+    <div class="paint-group-label">Tools</div>
+  </div>
+
+  <div class="paint-group">
+    <div class="paint-group-body">
+      <button class="paint-btn draw-tool" type="button" data-draw-tool="pencil" title="Brush">
+        <span class="paint-icon">🖌</span><span>Brushes</span>
+      </button>
+      <select id="annotationWidth" class="paint-select" title="ความหนาเส้น">
+        <option value="1.5">1.5 px</option>
+        <option value="2.5" selected>2.5 px</option>
+        <option value="4">4 px</option>
+        <option value="6">6 px</option>
+      </select>
+    </div>
+    <div class="paint-group-label">Brushes</div>
+  </div>
+
+  <div class="paint-group paint-shapes">
+    <div class="paint-group-body paint-shape-grid">
+      <button class="paint-square draw-tool" type="button" data-draw-tool="line" title="เส้นตรง">╱</button>
+      <button class="paint-square draw-tool" type="button" data-draw-tool="arrow" title="ลูกศร">➜</button>
+      <button class="paint-square draw-tool" type="button" data-draw-tool="rect" title="สี่เหลี่ยม">□</button>
+      <button class="paint-square draw-tool" type="button" data-draw-tool="circle" title="วงกลม/วงรี">○</button>
+      <button class="paint-square draw-tool" type="button" data-draw-tool="triangle" title="สามเหลี่ยม">△</button>
+      <button class="paint-square draw-tool" type="button" data-draw-tool="dimension" title="เส้นบอกขนาด">↔</button>
+    </div>
+    <div class="paint-group-label">Shapes</div>
+  </div>
+
+  <div class="paint-group paint-colors">
+    <div class="paint-group-body">
+      <label class="paint-current-color" title="เลือกสีเอง"><input id="annotationColor" type="color" value="#e53935"></label>
+      <div class="paint-palette" id="paintPalette">
+        <button type="button" class="color-swatch" data-color="#000000" style="background:#000000" title="ดำ"></button>
+        <button type="button" class="color-swatch" data-color="#ffffff" style="background:#ffffff" title="ขาว"></button>
+        <button type="button" class="color-swatch" data-color="#7f8c8d" style="background:#7f8c8d" title="เทา"></button>
+        <button type="button" class="color-swatch" data-color="#e53935" style="background:#e53935" title="แดง"></button>
+        <button type="button" class="color-swatch" data-color="#ff8a00" style="background:#ff8a00" title="ส้ม"></button>
+        <button type="button" class="color-swatch" data-color="#ffd600" style="background:#ffd600" title="เหลือง"></button>
+        <button type="button" class="color-swatch" data-color="#43a047" style="background:#43a047" title="เขียว"></button>
+        <button type="button" class="color-swatch" data-color="#00acc1" style="background:#00acc1" title="ฟ้า"></button>
+        <button type="button" class="color-swatch" data-color="#1e88e5" style="background:#1e88e5" title="น้ำเงิน"></button>
+        <button type="button" class="color-swatch" data-color="#5e35b1" style="background:#5e35b1" title="ม่วง"></button>
+      </div>
+    </div>
+    <div class="paint-group-label">Colors</div>
+  </div>
+
+  <div class="paint-group">
+    <div class="paint-group-body paint-stack">
+      <select id="annotationTextSize" class="paint-select" title="ขนาดตัวอักษร">
+        <option value="14">Text S</option>
+        <option value="18" selected>Text M</option>
+        <option value="24">Text L</option>
+        <option value="32">Text XL</option>
+      </select>
+      <button class="paint-mini" id="undoDrawingBtn" type="button">↶ Undo</button>
+      <button class="paint-mini danger" id="clearDrawingBtn" type="button">Clear</button>
+    </div>
+    <div class="paint-group-label">Edit</div>
+  </div>
+
+  <div class="paint-ribbon-note">เลือกเครื่องมือแล้ววาดบนผัง • ใช้ “เลือก” เพื่อกลับไปย้ายเครื่อง/MAIN DB</div>
+</div>
         <div class="floor" id="floor">
           <svg class="layout-lines" id="layoutLines"></svg>
           <svg class="annotation-layer" id="annotationLayer" aria-label="ชั้นงานวาด"></svg>
@@ -495,7 +593,7 @@ const STANDARD_BREAKERS=REV_CALC.breakers;
 const state={
   step:'project',mode:'sales',
   project:{customerId:null,customer:'',customerContact:'',customerPhone:'',projectName:'',site:'',system:'3P4W',vLl:400,vLn:230,existingMainA:null,mainBreakerImage:null,mainCableLengthM:10,ambient:30,grouping:1,vdLimit:3,futureMargin:25,checks:{}},
-  machines:[],floor:{w:12,h:8,allowance:1.1,db:{x:.7,y:.7},annotations:[],annotationTool:'select',annotationColor:'#e53935',annotationWidth:2.5,annotationTextSize:18},selectedLayoutId:null
+  machines:[],floor:{w:12,h:8,allowance:1.1,db:{x:.7,y:.7},annotations:[],annotationTool:'select',annotationColor:'#e53935',annotationWidth:2.5,annotationTextSize:18,backgroundImage:null},selectedLayoutId:null
 };
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
@@ -611,7 +709,7 @@ function ensureAnnotationState(){
   if(!state.floor.annotationTool)state.floor.annotationTool='select';
   if(!state.floor.annotationColor)state.floor.annotationColor='#e53935';
   if(!Number.isFinite(Number(state.floor.annotationWidth)))state.floor.annotationWidth=2.5;
-  if(!Number.isFinite(Number(state.floor.annotationTextSize)))state.floor.annotationTextSize=18;
+  if(!Number.isFinite(Number(state.floor.annotationTextSize)))state.floor.annotationTextSize=18;if(!('backgroundImage' in state.floor))state.floor.backgroundImage=null;
 }
 function annotationPoint(e){const f=$('#floor'),r=f.getBoundingClientRect();return{x:clamp((e.clientX-r.left)/r.width*state.floor.w,0,state.floor.w),y:clamp((e.clientY-r.top)/r.height*state.floor.h,0,state.floor.h)}}
 function annotationScreenPoint(p,px){return{x:p.x*px.sx,y:p.y*px.sy}}
@@ -624,6 +722,7 @@ function annotationMarkup(a,px,arrowId='annotationArrowHead'){
   if(a.type==='arrow')return `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" ${common} marker-end="url(#${arrowId})"/>`;
   if(a.type==='rect'){const x=Math.min(p1.x,p2.x),y=Math.min(p1.y,p2.y),w=Math.abs(p2.x-p1.x),h=Math.abs(p2.y-p1.y);return `<rect x="${x}" y="${y}" width="${w}" height="${h}" ${common}/>`}
   if(a.type==='circle'){const cx=(p1.x+p2.x)/2,cy=(p1.y+p2.y)/2,rx=Math.abs(p2.x-p1.x)/2,ry=Math.abs(p2.y-p1.y)/2;return `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" ${common}/>`}
+  if(a.type==='triangle'){const topX=(p1.x+p2.x)/2,topY=Math.min(p1.y,p2.y),bottomY=Math.max(p1.y,p2.y),leftX=Math.min(p1.x,p2.x),rightX=Math.max(p1.x,p2.x);return `<polygon points="${topX},${topY} ${rightX},${bottomY} ${leftX},${bottomY}" ${common}/>`}
   if(a.type==='dimension'){const dx=p2.x-p1.x,dy=p2.y-p1.y,lenPx=Math.hypot(dx,dy)||1,nx=-dy/lenPx,ny=dx/lenPx,tick=6,mx=(p1.x+p2.x)/2,my=(p1.y+p2.y)/2,dist=Math.hypot((a.x2-a.x1),(a.y2-a.y1));return `<g><line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" ${common}/><line x1="${p1.x-nx*tick}" y1="${p1.y-ny*tick}" x2="${p1.x+nx*tick}" y2="${p1.y+ny*tick}" ${common}/><line x1="${p2.x-nx*tick}" y1="${p2.y-ny*tick}" x2="${p2.x+nx*tick}" y2="${p2.y+ny*tick}" ${common}/><text x="${mx+nx*12}" y="${my+ny*12}" text-anchor="middle" dominant-baseline="middle" fill="${color}" font-size="13" font-weight="800" font-family="Segoe UI,Tahoma,Arial,sans-serif" paint-order="stroke" stroke="#fff" stroke-width="4">${dist.toFixed(2)} m</text></g>`}
   if(a.type==='pencil'&&Array.isArray(a.points)){const pts=a.points.map(p=>{const q=annotationScreenPoint(p,px);return `${q.x},${q.y}`}).join(' ');return `<polyline points="${pts}" ${common}/>`}
   return '';
@@ -680,7 +779,7 @@ function bindAnnotationEvents(){
 function annotationsSummaryMarkup(sx,sy){ensureAnnotationState();const px={sx,sy};return `<defs><marker id="summaryArrowHead" markerWidth="10" markerHeight="10" refX="8" refY="3.5" orient="auto"><path d="M0,0 L9,3.5 L0,7 Z" fill="#e53935"/></marker></defs>`+state.floor.annotations.map(a=>annotationMarkup(a,px,'summaryArrowHead')).join('')}
 function renderLayout(){
   $('#floorW').value=state.floor.w;$('#floorH').value=state.floor.h;$('#routeAllowance').value=state.floor.allowance;$('#annotationColor').value=state.floor.annotationColor||'#e53935';$('#annotationWidth').value=String(state.floor.annotationWidth||2.5);$('#annotationTextSize').value=String(state.floor.annotationTextSize||18);$('#floorLabel').textContent=`${state.floor.w} × ${state.floor.h} m`;
-  autoPlaceMachines();const f=$('#floor');f.querySelectorAll('.layout-item.machine').forEach(x=>x.remove());const px=layoutPx();
+  autoPlaceMachines();const f=$('#floor');f.style.backgroundImage=state.floor.backgroundImage?`linear-gradient(rgba(255,255,255,.38),rgba(255,255,255,.38)),url(${state.floor.backgroundImage})`:'';f.classList.toggle('has-floor-bg',!!state.floor.backgroundImage);f.querySelectorAll('.layout-item.machine').forEach(x=>x.remove());const px=layoutPx();
   const db=$('#dbItem');db.style.left=(state.floor.db.x*px.sx-35)+'px';db.style.top=(state.floor.db.y*px.sy-22)+'px';db.style.width='70px';db.style.height='44px';
   for(const m of state.machines){const el=document.createElement('div');el.className='layout-item machine'+(state.selectedLayoutId===m.id?' selected':'');el.dataset.id=m.id;el.style.left=(m.x*px.sx)+'px';el.style.top=(m.y*px.sy)+'px';el.style.width=Math.max(52,m.widthM*px.sx)+'px';el.style.height=Math.max(40,m.depthM*px.sy)+'px';el.innerHTML=`<div class="layout-machine-shell">${m.imageData?`<img src="${m.imageData}" alt="${escapeHtml(m.model||m.name)}">`:'<div class="machine-placeholder"></div>'}<div class="layout-caption">${escapeHtml(m.model||m.name)}${m.qty>1?' ×'+m.qty:''}<br><small>${m.phase||'?'} / ${m.voltage||'?'}V</small></div></div>`;f.appendChild(el);makeDraggable(el,m)}
   makeDbDraggable();drawLayoutLines();bindAnnotationEvents();renderAnnotations();renderLayoutSide();renderSelectedEditor();
@@ -722,7 +821,7 @@ function renderSummary(){
   const cableItems=[];if(p.mainCable&&p.mainCable.size)cableItems.push(`<div class="equipment-tag"><span><b>Main Cable Cu/PVC ${p.mainCable.size} mm²</b><br><span class="hint">Iz ${Number.isFinite(p.mainCable.iz)?fmt(p.mainCable.iz)+' A':'—'}</span></span><span class="qty">${fmt(state.project.mainCableLengthM)} m</span></div>`);for(const [size,len] of [...cableMap])cableItems.push(`<div class="equipment-tag"><span><b>${escapeHtml(size)}</b><br><span class="hint">รวมระยะวงจรย่อย</span></span><span class="qty">${fmt(len)} m</span></div>`);$('#cableTakeoff').innerHTML=cableItems.length?cableItems.join(''):'<div class="empty">ยังไม่มีข้อมูลสายไฟ</div>';
   $('#sldMain').innerHTML=`MAIN DB<br><span class="hint">${p.mainBreaker?p.mainBreaker+'A':'Breaker —'}<br>${p.mainCable&&p.mainCable.size?p.mainCable.size+' mm²':'Cable —'}</span>`;$('#sldBranches').innerHTML=p.branches.map(({m,r})=>`<div class="sld-branch"><b>${escapeHtml(m.model||m.name)}</b><br><span class="hint">${m.phase||'?'} ${m.voltage||'?'}V<br>Ib ${fmt(r.ib)}A<br>${r.breaker?r.breaker+'A':'Breaker —'} / ${r.cable&&r.cable.size?r.cable.size+'mm²':'Cable —'}</span></div>`).join('');renderSummaryLayout();
 }
-function renderSummaryLayout(){const host=$('#summaryLayout');ensureAnnotationState();if(!state.machines.length&&!state.floor.annotations.length){host.innerHTML='<div class="empty">ยังไม่มีผัง</div>';return}const W=900,H=560,sx=W/state.floor.w,sy=H/state.floor.h;const lines=state.machines.map(m=>{const x1=state.floor.db.x*sx,y1=state.floor.db.y*sy,x2=(m.x+m.widthM/2)*sx,y2=(m.y+m.depthM/2)*sy;return `<polyline points="${x1},${y1} ${x2},${y1} ${x2},${y2}" fill="none" stroke="#718096" stroke-width="1.5" stroke-dasharray="6 4"/>`}).join('');const boxes=state.machines.map(m=>{const x=m.x*sx,y=m.y*sy,w=Math.max(45,m.widthM*sx),h=Math.max(32,m.depthM*sy);return m.imageData?`<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="7" fill="#fff" stroke="#0b5ea8" stroke-width="2"/><image href="${m.imageData}" x="${x+3}" y="${y+3}" width="${Math.max(10,w-6)}" height="${Math.max(10,h-6)}" preserveAspectRatio="xMidYMid meet"/></g>`:`<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="7" fill="#edf6ff" stroke="#0b5ea8" stroke-width="2"/><text x="${(m.x+m.widthM/2)*sx}" y="${(m.y+m.depthM/2)*sy}" text-anchor="middle" dominant-baseline="middle" font-size="11" font-weight="700" fill="#123a73">${escapeHtml(m.model||m.name).slice(0,22)}</text></g>`}).join('');host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-height:560px;border:1px solid #9aa9b8;background:#fbfdff;border-radius:10px"><g>${lines}<rect x="${state.floor.db.x*sx-35}" y="${state.floor.db.y*sy-20}" width="70" height="40" rx="6" fill="#fff1e3" stroke="#f27a22" stroke-width="2"/><text x="${state.floor.db.x*sx}" y="${state.floor.db.y*sy}" text-anchor="middle" dominant-baseline="middle" font-size="12" font-weight="800" fill="#8b460f">MAIN DB</text>${boxes}${annotationsSummaryMarkup(sx,sy)}</g></svg>`}
+function renderSummaryLayout(){const host=$('#summaryLayout');ensureAnnotationState();if(!state.machines.length&&!state.floor.annotations.length){host.innerHTML='<div class="empty">ยังไม่มีผัง</div>';return}const W=900,H=560,sx=W/state.floor.w,sy=H/state.floor.h;const lines=state.machines.map(m=>{const x1=state.floor.db.x*sx,y1=state.floor.db.y*sy,x2=(m.x+m.widthM/2)*sx,y2=(m.y+m.depthM/2)*sy;return `<polyline points="${x1},${y1} ${x2},${y1} ${x2},${y2}" fill="none" stroke="#718096" stroke-width="1.5" stroke-dasharray="6 4"/>`}).join('');const boxes=state.machines.map(m=>{const x=m.x*sx,y=m.y*sy,w=Math.max(45,m.widthM*sx),h=Math.max(32,m.depthM*sy);return m.imageData?`<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="7" fill="#fff" stroke="#0b5ea8" stroke-width="2"/><image href="${m.imageData}" x="${x+3}" y="${y+3}" width="${Math.max(10,w-6)}" height="${Math.max(10,h-6)}" preserveAspectRatio="xMidYMid meet"/></g>`:`<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="7" fill="#edf6ff" stroke="#0b5ea8" stroke-width="2"/><text x="${(m.x+m.widthM/2)*sx}" y="${(m.y+m.depthM/2)*sy}" text-anchor="middle" dominant-baseline="middle" font-size="11" font-weight="700" fill="#123a73">${escapeHtml(m.model||m.name).slice(0,22)}</text></g>`}).join('');const bg=state.floor.backgroundImage?`<image href="${state.floor.backgroundImage}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice" opacity=".55"/>`:'';host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-height:560px;border:1px solid #9aa9b8;background:#fbfdff;border-radius:10px"><g>${bg}${lines}<rect x="${state.floor.db.x*sx-35}" y="${state.floor.db.y*sy-20}" width="70" height="40" rx="6" fill="#fff1e3" stroke="#f27a22" stroke-width="2"/><text x="${state.floor.db.x*sx}" y="${state.floor.db.y*sy}" text-anchor="middle" dominant-baseline="middle" font-size="12" font-weight="800" fill="#8b460f">MAIN DB</text>${boxes}${annotationsSummaryMarkup(sx,sy)}</g></svg>`}
 function normalizeMachine(m){if(!Number.isFinite(m.widthM))m.widthM=1;if(!Number.isFinite(m.depthM))m.depthM=1;if(!Number.isFinite(m.heightM))m.heightM=1;if(!('imageData' in m))m.imageData=null;if(!Number.isFinite(m.eff)||m.eff<=0)m.eff=1;if(!m.loadCategory)m.loadCategory=catalogLoadCategory(m.category||'');if(!Number.isFinite(m.demandFactor))m.demandFactor=REV_CALC.demandFactors[m.loadCategory]??1;if(m.assign==='R')m.assign='L1';if(m.assign==='S')m.assign='L2';if(m.assign==='T')m.assign='L3';return m}
 function renderAll(){state.machines.forEach(normalizeMachine);document.body.classList.toggle('tech-mode',state.mode==='tech');$('#modeSales').classList.toggle('active',state.mode==='sales');$('#modeTech').classList.toggle('active',state.mode==='tech');renderMachines();renderKpis();if(state.step==='layout')renderLayout();renderSummary();updateSiteCheck();}
 function syncProject(){state.project.customer=$('#customer').value;state.project.customerContact=$('#customerContact').value;state.project.customerPhone=$('#customerPhone').value;state.project.projectName=$('#projectName').value;state.project.site=$('#site').value;const selected=allCustomers().find(c=>c.id===state.project.customerId);if(selected&&state.project.customer!==selected.name)state.project.customerId=null;renderCustomerMeta();state.project.system=$('#system').value;const p=$('#voltagePreset').value;if(p==='380/220'){state.project.vLl=380;state.project.vLn=220}else if(p==='400/230'){state.project.vLl=400;state.project.vLn=230}else {state.project.vLl=Number(p);state.project.vLn=Number(p)}state.project.existingMainA=num($('#existingMainA').value);state.project.mainCableLengthM=Number($('#mainCableLengthM').value)||0;state.project.ambient=Number($('#ambient').value);state.project.grouping=Number($('#grouping').value);state.project.vdLimit=Number($('#vdLimit').value);state.project.futureMargin=Number($('#futureMargin').value);renderAll()}
@@ -739,7 +838,9 @@ function init(){const cats=[...new Set(CATALOG.filter(isCatalogReady).map(r=>r.c
   $('#modeSales').onclick=()=>{state.mode='sales';renderAll()};$('#modeTech').onclick=()=>{state.mode='tech';renderAll()};$('#saveBtn').onclick=exportProject;$('#loadInput').onchange=e=>{if(e.target.files[0])importProject(e.target.files[0]);e.target.value=''};$('#resetBtn').onclick=()=>{if(confirm('เริ่มโครงการใหม่และล้างข้อมูลทั้งหมด?'))location.reload()};$('#printBtn').onclick=()=>window.print();$('#mainBreakerImageInput').onchange=e=>{const f=e.target.files&&e.target.files[0];if(!f)return;if(f.size>5*1024*1024){alert('รูปใหญ่เกิน 5 MB');e.target.value='';return}const rd=new FileReader();rd.onload=()=>{state.project.mainBreakerImage=rd.result;renderBreakerPhoto();toast('เพิ่มรูป Main Breaker แล้ว')};rd.readAsDataURL(f)};$('#removeBreakerImageBtn').onclick=()=>{state.project.mainBreakerImage=null;renderBreakerPhoto()};$('#manualMachineBtn').onclick=addManualMachine;['catalogSearch','categoryFilter'].forEach(id=>$('#'+id).addEventListener(id==='catalogSearch'?'input':'change',renderCatalog));
   $('#customerSearch').addEventListener('input',renderCustomerResults);$('#customerSearch').addEventListener('focus',renderCustomerResults);$('#addCustomerBtn').onclick=openCustomerModal;$('#saveNewCustomerBtn').onclick=createCustomer;$$('[data-close-customer-modal]').forEach(x=>x.onclick=closeCustomerModal);document.addEventListener('click',e=>{if(!e.target.closest('.customer-picker'))$('#customerResults').innerHTML=''});
   ['customer','customerContact','customerPhone','projectName','site','system','voltagePreset','existingMainA','mainCableLengthM','ambient','grouping','vdLimit','futureMargin'].forEach(id=>$('#'+id).addEventListener('change',syncProject));$('#ambient').addEventListener('input',syncProject);$$('#siteChecks input').forEach(c=>c.addEventListener('change',()=>{state.project.checks[c.dataset.check]=c.checked;updateSiteCheck()}));
-  $('#floorW').onchange=e=>{state.floor.w=Math.max(2,Number(e.target.value)||12);state.machines.forEach(m=>m.x=clamp(m.x||0,0,state.floor.w-m.widthM));renderAll()};$('#floorH').onchange=e=>{state.floor.h=Math.max(2,Number(e.target.value)||8);state.machines.forEach(m=>m.y=clamp(m.y||0,0,state.floor.h-m.depthM));renderAll()};$('#routeAllowance').onchange=e=>{state.floor.allowance=Number(e.target.value)||1;renderAll()};$('#autoPlaceBtn').onclick=()=>{state.machines.forEach(m=>{m.x=null;m.y=null});autoPlaceMachines();renderAll()};$$('.draw-tool').forEach(b=>b.onclick=()=>setAnnotationTool(b.dataset.drawTool));$('#annotationColor').oninput=e=>{ensureAnnotationState();state.floor.annotationColor=e.target.value;renderAnnotations()};$('#annotationWidth').onchange=e=>{ensureAnnotationState();state.floor.annotationWidth=Number(e.target.value)||2.5};$('#annotationTextSize').onchange=e=>{ensureAnnotationState();state.floor.annotationTextSize=Number(e.target.value)||18};$('#undoDrawingBtn').onclick=()=>{ensureAnnotationState();state.floor.annotations.pop();renderAnnotations();renderSummaryLayout()};$('#clearDrawingBtn').onclick=()=>{ensureAnnotationState();if(!state.floor.annotations.length)return;if(confirm('ล้างงานวาดทั้งหมดบนผัง?')){state.floor.annotations=[];renderAnnotations();renderSummaryLayout()}};window.addEventListener('resize',()=>{if(state.step==='layout')renderLayout()});
+  $('#floorW').onchange=e=>{state.floor.w=Math.max(2,Number(e.target.value)||12);state.machines.forEach(m=>m.x=clamp(m.x||0,0,state.floor.w-m.widthM));renderAll()};$('#floorH').onchange=e=>{state.floor.h=Math.max(2,Number(e.target.value)||8);state.machines.forEach(m=>m.y=clamp(m.y||0,0,state.floor.h-m.depthM));renderAll()};$('#routeAllowance').onchange=e=>{state.floor.allowance=Number(e.target.value)||1;renderAll()};$('#autoPlaceBtn').onclick=()=>{state.machines.forEach(m=>{m.x=null;m.y=null});autoPlaceMachines();renderAll()};$$('.draw-tool').forEach(b=>b.onclick=()=>setAnnotationTool(b.dataset.drawTool));$('#annotationColor').oninput=e=>{ensureAnnotationState();state.floor.annotationColor=e.target.value;renderAnnotations()};$('#annotationWidth').onchange=e=>{ensureAnnotationState();state.floor.annotationWidth=Number(e.target.value)||2.5};$('#annotationTextSize').onchange=e=>{ensureAnnotationState();state.floor.annotationTextSize=Number(e.target.value)||18};$('#undoDrawingBtn').onclick=()=>{ensureAnnotationState();state.floor.annotations.pop();renderAnnotations();renderSummaryLayout()};$('#clearDrawingBtn').onclick=()=>{ensureAnnotationState();if(!state.floor.annotations.length)return;if(confirm('ล้างงานวาดทั้งหมดบนผัง?')){state.floor.annotations=[];renderAnnotations();renderSummaryLayout()}};$('.color-swatch').forEach(b=>b.onclick=()=>{ensureAnnotationState();state.floor.annotationColor=b.dataset.color;$('#annotationColor').value=b.dataset.color;renderAnnotations()});
+$('#floorBackgroundInput').onchange=e=>{const file=e.target.files&&e.target.files[0];if(!file)return;if(file.size>8*1024*1024){alert('รูปแปลนใหญ่เกิน 8 MB');e.target.value='';return}const rd=new FileReader();rd.onload=()=>{ensureAnnotationState();state.floor.backgroundImage=rd.result;renderLayout();renderSummaryLayout();toast('เพิ่มรูปแปลนแล้ว')};rd.readAsDataURL(file)};
+$('#removeFloorBackgroundBtn').onclick=()=>{ensureAnnotationState();state.floor.backgroundImage=null;renderLayout();renderSummaryLayout();toast('ลบรูปแปลนแล้ว')};window.addEventListener('resize',()=>{if(state.step==='layout')renderLayout()});
 }
 init();
 </script>
